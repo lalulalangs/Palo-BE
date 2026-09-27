@@ -8,6 +8,7 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
@@ -18,6 +19,11 @@ class ProductsTable
     {
         return $table
             ->columns([
+                ImageColumn::make('thumbnail.url')
+                    ->label('Foto')
+                    ->disk('public')
+                    ->square()
+                    ->placeholder('-'),
                 TextColumn::make('category.name')
                     ->searchable(),
                 TextColumn::make('name')
