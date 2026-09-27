@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
@@ -44,7 +45,12 @@ class Product extends Model
 
     public function media(): HasMany
     {
-        return $this->hasMany(ProductMedia::class);
+        return $this->hasMany(ProductMedia::class)->orderBy('sort_order', 'asc');
+    }
+
+    public function thumbnail(): HasOne
+    {
+        return $this->hasOne(ProductMedia::class)->ofMany(['sort_order' => 'min', 'id' => 'min']);
     }
 
     public function skus(): HasManyThrough
