@@ -22,7 +22,9 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        DB::statement('ALTER TABLE skus ADD CONSTRAINT chk_skus_stock_positive CHECK (stock >= 0);');
+        if (DB::getDriverName() === 'pgsql') {
+            DB::statement('ALTER TABLE skus ADD CONSTRAINT chk_skus_stock_positive CHECK (stock >= 0);');
+        }
     }
 
     /**

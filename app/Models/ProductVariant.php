@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ProductVariant extends Model
 {
@@ -32,5 +33,10 @@ class ProductVariant extends Model
     public function skus(): HasMany
     {
         return $this->hasMany(Sku::class, 'variant_id');
+    }
+
+    public function sku(): HasOne
+    {
+        return $this->hasOne(Sku::class, 'variant_id');
     }
 }
