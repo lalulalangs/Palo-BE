@@ -25,7 +25,7 @@ class ProductsTable
                 TextColumn::make('slug')
                     ->searchable(),
                 TextColumn::make('base_price')
-                    ->money()
+                    ->money('IDR', locale: 'id')
                     ->sortable(),
                 IconColumn::make('is_featured')
                     ->boolean(),
