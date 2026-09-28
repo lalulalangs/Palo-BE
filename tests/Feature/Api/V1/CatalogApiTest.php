@@ -332,4 +332,127 @@ class CatalogApiTest extends TestCase
                 'message' => 'Produk tidak ditemukan atau tidak aktif',
             ]);
     }
+
+    public function test_soft_deleted_product_is_excluded_from_catalog_and_detail(): void
+    {
+        $product = Product::create([
+            'category_id' => $this->childCategory->id,
+            'name' => 'Produk Terhapus',
+            'slug' => 'produk-terhapus',
+            'base_price' => 150000.00,
+            'is_active' => true,
+        ]);
+        $product->delete(); // Soft delete
+
+        // Should not appear in product list
+        $listResponse = $this->getJson('/api/v1/products');
+        $listResponse->assertStatus(200)
+            ->assertJsonMissing(['slug' => 'produk-terhapus']);
+
+        // Should return 404 on show
+        $detailResponse = $this->getJson('/api/v1/products/produk-terhapus');
+        $detailResponse->assertStatus(404);
+    }
+
+    public function test_banners_respect_date_schedules(): void
+    {
+        // Future banner
+        Banner::create([
+            'title' => 'Future Banner',
+            'image_url' => 'banners/future.jpg',
+            'is_active' => true,
+            'start_date' => now()->addDays(5)->toDateString(),
+            'end_date' => now()->addDays(10)->toDateString(),
+        ]);
+
+        // Expired banner
+        Banner::create([
+            'title' => 'Expired Banner',
+            'image_url' => 'banners/expired.jpg',
+            'is_active' => true,
+            'start_date' => now()->subDays(10)->toDateString(),
+            'end_date' => now()->subDays(2)->toDateString(),
+        ]);
+
+        // Currently active banner
+        Banner::create([
+            'title' => 'Current Banner',
+            'image_url' => 'banners/current.jpg',
+            'is_active' => true,
+            'start_date' => now()->subDay()->toDateString(),
+            'end_date' => now()->addDays(2)->toDateString(),
+        ]);
+
+        $response = $this->getJson('/api/v1/banners');
+        $response->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', 'Current Banner');
+    }
+
+    public function test_pagination_capping_and_price_desc_sorting(): void
+    {
+        for ($i = 1; $i <= 5; $i++) {
+            Product::create([
+                'category_id' => $this->childCategory->id,
+                'name' => "Item {$i}",
+                'slug' => "item-{$i}",
+                'base_price' => $i * 50000.00,
+                'is_active' => true,
+            ]);
+        }
+
+        // Test sort=price_desc
+        $sortDescResponse = $this->getJson('/api/v1/products?sort=price_desc');
+        $sortDescResponse->assertStatus(200)
+            ->assertJsonPath('data.0.base_price', 250000)
+            ->assertJsonPath('data.4.base_price', 50000);
+
+        // Test per_page capping (requesting 150 should be capped at 100)
+        $perPageResponse = $this->getJson('/api/v1/products?per_page=150');
+        $perPageResponse->assertStatus(200)
+            ->assertJsonPath('pagination.per_page', 100);
+    }
+
+    public function test_filter_by_non_existent_category_returns_empty_collection(): void
+    {
+        $response = $this->getJson('/api/v1/products?category=kategori-fiktif');
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message' => 'Daftar produk berhasil diambil',
+            ])
+            ->assertJsonCount(0, 'data')
+            ->assertJsonPath('pagination.total', 0);
+    }
+
+    public function test_product_detail_marks_out_of_stock_when_skus_have_zero_stock(): void
+    {
+        $product = Product::create([
+            'category_id' => $this->childCategory->id,
+            'name' => 'Tenda Habis Total',
+            'slug' => 'tenda-habis-total',
+            'base_price' => 500000.00,
+            'is_active' => true,
+        ]);
+
+        $variant = ProductVariant::create([
+            'product_id' => $product->id,
+            'name' => 'Standard',
+        ]);
+
+        Sku::create([
+            'variant_id' => $variant->id,
+            'sku_code' => 'TND-HBS-01',
+            'stock' => 0,
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson('/api/v1/products/tenda-habis-total');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.total_stock', 0)
+            ->assertJsonPath('data.is_out_of_stock', true)
+            ->assertJsonPath('data.variants.0.skus.0.is_available', false);
+    }
 }
