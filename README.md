@@ -5,7 +5,7 @@
 [![PHP](https://img.shields.io/badge/PHP-8.3%2B-777BB4?style=flat-square&logo=php)](https://php.net)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?style=flat-square&logo=postgresql)](https://www.postgresql.org)
 [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-v4-06B6D4?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
-[![Tests](https://img.shields.io/badge/Tests-30%20Passed-22C55E?style=flat-square)](https://phpunit.de)
+[![Tests](https://img.shields.io/badge/Tests-37%20Passed-22C55E?style=flat-square)](https://phpunit.de)
 
 Backend dan panel administrasi untuk platform D2C (Direct-to-Consumer) e-commerce **Palo Mountain Goods**, brand perlengkapan luar ruang (*outdoor gear*), pakaian gunung, dan komoditas kopi khas lereng Gunung Rinjani.
 
@@ -61,6 +61,15 @@ PaloRinjani mengadopsi prinsip **Modular Monolith** (SAM §1):
 * **Tema Warna Brand Terintegrasi:** Mengadopsi token warna resmi *Palo Mountain Goods* (Primary *Palo Pine Green* `#1E5E3E`, Accent *Campfire Ochre* `#D96B27`, dan Neutral *Stone*).
 * **Format Mata Uang Standar:** Tampilan tabel harga menggunakan format Rupiah resmi (`Rp xxx.xxx,xx`).
 * **Indikator Stok Cerdas:** Badge status stok dengan warna dinamis (Merah: Habis, Kuning: Menipis $\le 5$, Hijau: Aman).
+
+### 5. Caching Layer & Auto-Invalidation Real-Time (PRD §3.2 & SAM §1)
+* **Penyimpanan Cache Pintar (`CatalogCacheService`):** Seluruh read API di-cache dengan dukungan tag cache (`catalog`, `banners`, `categories`, `products`) pada driver Redis/Array, serta *key versioning* otomatis untuk driver database/file.
+* **Auto-Invalidation via Eloquent Observers:**
+  * Perubahan Banner $\rightarrow$ `BannerObserver` membatalkan cache banner.
+  * Perubahan Kategori $\rightarrow$ `CategoryObserver` membatalkan cache tree kategori dan counter produk.
+  * Perubahan Produk $\rightarrow$ `ProductObserver` membatalkan cache detail produk dan query listing.
+  * Perubahan Harga/Varian $\rightarrow$ `ProductVariantObserver` dan `SkuObserver` membatalkan cache produk induk. Sesuai Acceptance Criteria PRD §3.2, saat admin mengubah harga varian di Filament, pembeli yang merefresh etalase langsung mendapatkan harga baru tanpa jeda cache.
+  * Perubahan Galeri Media $\rightarrow$ `ProductMediaObserver` membatalkan cache detail produk.
 
 ---
 
