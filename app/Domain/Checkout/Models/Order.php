@@ -133,7 +133,7 @@ class Order extends Model
      */
     public function isHoldingStock(): bool
     {
-        return ! in_array($this->status->value, OrderStatus::releasableValues(), true);
+        return $this->status === OrderStatus::MenungguPembayaran;
     }
 
     /**

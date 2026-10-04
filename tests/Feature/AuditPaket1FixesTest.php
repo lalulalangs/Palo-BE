@@ -241,11 +241,22 @@ class AuditPaket1FixesTest extends TestCase
      */
     public function test_b17_is_holding_stock_logic(): void
     {
+        // Hanya MenungguPembayaran yang sedang aktif mengikat stok
         $orderWaiting = new Order(['status' => OrderStatus::MenungguPembayaran]);
         $this->assertTrue($orderWaiting->isHoldingStock(), 'MenungguPembayaran must return true for isHoldingStock');
 
+        // Status lain tidak sedang mengikat reservasi
         $orderPaid = new Order(['status' => OrderStatus::Dibayar]);
         $this->assertFalse($orderPaid->isHoldingStock(), 'Dibayar must return false for isHoldingStock');
+
+        $orderProcessing = new Order(['status' => OrderStatus::Diproses]);
+        $this->assertFalse($orderProcessing->isHoldingStock(), 'Diproses must return false for isHoldingStock');
+
+        $orderShipped = new Order(['status' => OrderStatus::Dikirim]);
+        $this->assertFalse($orderShipped->isHoldingStock(), 'Dikirim must return false for isHoldingStock');
+
+        $orderCompleted = new Order(['status' => OrderStatus::Selesai]);
+        $this->assertFalse($orderCompleted->isHoldingStock(), 'Selesai must return false for isHoldingStock');
 
         $orderExpired = new Order(['status' => OrderStatus::Expired]);
         $this->assertFalse($orderExpired->isHoldingStock(), 'Expired must return false for isHoldingStock');
