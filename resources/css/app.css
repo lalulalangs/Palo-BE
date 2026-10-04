@@ -3,7 +3,25 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
+/*
+ * Font: BlinkMacSystemFont, sama seperti frontend.
+ *
+ * Sebelumnya `--font-sans` di sini menunjuk 'Instrument Sans' yang
+ * diunduh dari Bunny Fonts. Dua hal salah dengan itu:
+ *
+ *  1. Bentrok dengan frontend. Permintaan pemilik: seluruh UI pakai
+ *     BlinkMacSystemFont. Admin memakai satu font, storefront memakai
+ *     font lain, keduanya milik produk yang sama.
+ *  2. 6 berkas font (woff + woff2, 400/500/600) diunduh untuk
+ *    -application yangyarinya hanya form dan tabel.
+ *
+ * Nilai font yang sekarang didefinisikan di
+ * `resources/css/filament/admin/theme.css` supaya ada satu sumber
+ * untuk panel admin, dan di sini hanya untuk halaman non-Filament
+ * (paginasi Laravel, halaman error).
+ */
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans:
+        BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+        sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
 }

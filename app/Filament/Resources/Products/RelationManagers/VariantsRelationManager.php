@@ -2,14 +2,10 @@
 
 namespace App\Filament\Resources\Products\RelationManagers;
 
-use App\Models\Sku;
-use Filament\Actions\BulkActionGroup;
+use App\Domain\Catalog\Models\ProductVariant;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\KeyValue;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -17,60 +13,40 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Support\Number;
 
+/**
+ * RelationManager varian produk.
+ *
+ * PRD §3.2: "Produk tanpa pilihan tetap memiliki satu SKU default."
+ *
+ * Konsekuensinya: produk TANPA varian tidak punya baris di tabel ini. Ia
+ * langsung punya satu `Sku` dengan `product_variant_id = null`. Karena itu
+ * menambahkan varian di sini berarti mengubah karakter produk dari
+ * single-SKU menjadi multi-varian.
+ */
 class VariantsRelationManager extends RelationManager
 {
     protected static string $relationship = 'variants';
 
+    protected static ?string $title = 'Varian';
+
+    protected static ?string $modelLabel = 'Varian';
+
+    protected static ?string $pluralModelLabel = 'Varian';
+
     public function form(Schema $schema): Schema
     {
-        return $schema
-            ->components([
-                TextInput::make('name')
-                    ->label('Nama Varian')
-                    ->placeholder('Contoh: Black / Size M')
-                    ->required()
-                    ->maxLength(255),
-                KeyValue::make('attributes')
-                    ->label('Atribut Varian')
-                    ->keyLabel('Atribut (misal: color, size)')
-                    ->valueLabel('Nilai (misal: Black, M)')
-                    ->reorderable(),
-                Repeater::make('skus')
-                    ->relationship('skus')
-                    ->label('Informasi SKU & Stok')
-                    ->schema([
-                        TextInput::make('sku_code')
-                            ->label('Kode SKU')
-                            ->placeholder('Contoh: PR-HD-BLK-M')
-                            ->required()
-                            ->unique(Sku::class, 'sku_code', ignoreRecord: true),
-                        TextInput::make('stock')
-                            ->label('Jumlah Stok')
-                            ->numeric()
-                            ->integer()
-                            ->minValue(0)
-                            ->default(0)
-                            ->required(),
-                        TextInput::make('price_override')
-                            ->label('Harga Khusus Varian (Override)')
-                            ->numeric()
-                            ->prefix('Rp')
-                            ->minValue(0)
-                            ->helperText('Kosongkan jika ingin menggunakan harga dasar produk'),
-                        Toggle::make('is_active')
-                            ->label('Status Aktif SKU')
-                            ->default(true),
-                    ])
-                    ->columns(2)
-                    ->defaultItems(1)
-                    ->minItems(1)
-                    ->maxItems(1)
-                    ->deletable(false)
-                    ->reorderable(false)
-                    ->columnSpanFull(),
-            ]);
+        return $schema->components([
+            TextInput::make('name')
+                ->label('Nama Varian')
+                ->required()
+                ->maxLength(255)
+                ->helperText('Kombinasi atribut yang memang dimiliki produk, misalnya "M / Hitam".'),
+
+            Toggle::make('is_default')
+                ->label('Jadikan Varian Default')
+                ->helperText('Dipakai sebagai pilihan awal di halaman produk.'),
+        ]);
     }
 
     public function table(Table $table): Table
@@ -81,45 +57,37 @@ class VariantsRelationManager extends RelationManager
                 TextColumn::make('name')
                     ->label('Nama Varian')
                     ->searchable()
-                    ->sortable()
-                    ->weight('medium'),
-                TextColumn::make('sku.sku_code')
-                    ->label('Kode SKU')
-                    ->searchable()
-                    ->badge()
-                    ->copyable()
-                    ->copyMessage('Kode SKU disalin'),
-                TextColumn::make('sku.stock')
-                    ->label('Stok')
-                    ->sortable()
-                    ->badge()
-                    ->color(fn (int|string|null $state): string => match (true) {
-                        (int) $state <= 0 => 'danger',
-                        (int) $state <= 5 => 'warning',
-                        default => 'success',
-                    }),
-                TextColumn::make('sku.price_override')
-                    ->label('Harga Varian')
-                    ->money('IDR', locale: 'id')
-                    ->placeholder(fn ($record) => $record->product ? Number::currency($record->product->base_price, 'IDR', 'id') : '-'),
-                IconColumn::make('sku.is_active')
-                    ->label('Aktif')
+                    ->sortable(),
+
+                IconColumn::make('is_default')
+                    ->label('Default')
                     ->boolean(),
+
+                TextColumn::make('skus_count')
+                    ->label('Jumlah SKU')
+                    // Dihitung, bukan kolom di database, jadi tidak sortable.
+                    ->state(fn (ProductVariant $record): int => $record->skus()->count())
+                    ->alignCenter(),
+
+                TextColumn::make('created_at')
+                    ->label('Dibuat')
+                    ->dateTime('d M Y H:i')
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([
-                //
-            ])
+            ->defaultSort('name')
             ->headerActions([
-                CreateAction::make(),
+                // Otorisasi `CreateAction`/`EditAction`/`DeleteAction` di
+                // RelationManager diambil dari policy model yang terkait
+                // (`ProductVariantPolicy` bila ada, jika tidak maka
+                // `ProductPolicy` lewat model induk). Jangan menambahkan
+                // `->visible()` manual di sini: itu hanya menyembunyikan tombol,
+                // bukan menolak endpoint-nya.
+                CreateAction::make()
+                    ->label('Tambah Varian'),
             ])
             ->recordActions([
                 EditAction::make(),
                 DeleteAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
             ]);
     }
 }

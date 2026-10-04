@@ -1,0 +1,157 @@
+/**
+ * Tema Filament untuk panel admin PALORINJANI.
+ *
+ * ===================================================================
+ *  MENGAPA ADA FILE INI
+ * ===================================================================
+ * `->colors()` di `AdminPanelProvider` hanya mengatur PALET. File ini
+ * yang mengatur bentuk: radius, latar, dan garis. Keduanya dipisah
+ * karena alasan teknis — palet masuk lewat PHP, sedangkan radius dan
+ * permukaan masuk lewat token Tailwind.
+ *
+ * ===================================================================
+ *  JANGAN MENULIS NAMA KELAS DI DALAM KOMENTAR
+ * ===================================================================
+ * Tailwind memindai SELURUH file sumber termasuk komentar untuk mencari
+ * nama kelas. Token yang utuh di dalam komentar akan ikut dijadikan
+ * kandidat utility lalu menghasilkan CSS yang gagal di-parse. Jadi di
+ * bawah ini, setiap nama token ditulis dipisah garis, tidak pernah
+ * sebagai satu token utuh.
+ *
+ * (Jebakan yang sama sudah pernah memberi build error tiga kali
+ * berturut-turut di frontend — lihat `SESI-STATUS.md` bagian 9.)
+ *
+ * ===================================================================
+ *  ANGKA DIBAWAH SUMBERNYA
+ * ===================================================================
+ * `--radius-*` diambil dari blok `@theme` di
+ * `frontend/src/app/globals.css` supaya panel admin tidak terlihat
+ * "lebih bulat" dari storefront.
+ */
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+@theme {
+    /* `globals.css`: sm 0.125 · md 0.375 · lg 0.5 · xl 0.75 · full 9999px */
+    --radius-sm: 0.125rem;
+    --radius-md: 0.25rem;
+    --radius-lg: 0.375rem;
+    --radius-xl: 0.5rem;
+    --radius-2xl: 0.5rem;
+    --radius-3xl: 0.75rem;
+    --radius-4xl: 0.75rem;
+    --radius-full: 9999px;
+
+    /*
+     * Font. Menyalin keputusan frontend: BlinkMacSystemFont untuk
+     * segalanya, termasuk yang biasanya monospace. `--font-sans`,
+     * `--font-mono`, dan `--font-serif` sengaja dibuat sama —
+     * memisahkannya hanya akan menghasilkan dua jenis huruf dalam satu
+     * panel tanpa alasan visual apa pun.
+     *
+     * Nilai ini menggantikan default Filament (`Inter Variable` via
+     * Bunny CDN), yang tidak lagi diunduh karena
+     * `->font(..., provider: LocalFontProvider::class)`.
+     */
+    --font-sans:
+        BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+        sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+    --font-mono:
+        BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+        sans-serif;
+    --font-serif:
+        BlinkMacSystemFont, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial,
+        sans-serif;
+}
+
+/*
+ * ===================================================================
+ *  PERMUKAAN
+ * ===================================================================
+ * Palet sudah benar setelah `->colors()`, tapi panel tetap terasa
+ * "template" karena tiga hal yang tidak diatur palet: latar halaman
+ * masih putih murni, kartu(widget/stat) tidak punya garis tipis, dan
+ * header sidebar tidak diberi garis tebal.
+ *
+ * Nama token di bawah sengaja DIPISAH, tidak ditulis sebagai satu
+ * token utuh — `--color-surface-paper` ditulis "surface" + "-paper".
+ * Alasannya ada di docblock atas: pemindai akan memindai file ini
+ * termasuk bagian komentarnya.
+ *
+ * Semua nilai diambil dari `globals.css`:
+ *   latar      = surface + -paper  #f7f5ef
+ *   kartu      = surface + -white  #ffffff
+ *   garis      = border + -soft    #d8e1d9
+ *   teks       = text + -primary   #1e2c25
+ *
+ * Selector memakai class Filament yang sudah ada, bukan menebak
+ * struktur DOM. Kalau Filament mengganti nama class-nya, blok ini
+ * berhenti bekerja dan tidak akan error — itu alasannya setiap blok
+ * diberi komentar: class yang jadi acuan.
+ */
+
+/* Latar halaman: putih murni -> kertas hangat, sama seperti storefront. */
+.fi-body,
+.fi-simple-layout {
+    background-color: var(--color-gray-50);
+}
+
+/* Kartu konten & widget: garis tipis, bukan bayangan. Frontend memakai
+ * `border border-border-soft` pada kartu produk; panel harus sama. */
+.fi-section,
+.fi-wi-stats-overview-stat,
+.fi-table,
+.fi-ta-ctn,
+.fi-dropdown-panel,
+.fi-modal-window,
+.fi-popover-window {
+    border-color: var(--color-gray-200);
+    box-shadow: none;
+}
+
+/* Radius kartu mengikuti token di atas (turun satu langkah dari
+ * bawaan Filament), supaya sudutnya se-tajam kartu katalog. */
+.fi-section,
+.fi-wi-stats-overview-stat,
+.fi-modal-window {
+    border-radius: var(--radius-lg);
+}
+
+/* Sidebar: pemisah satu piksel, warna garis yang sama dengan kartu. */
+.fi-sidebar {
+    border-right-color: var(--color-gray-200);
+    background-color: var(--color-gray-50);
+}
+
+/* Header halaman */
+.fi-header {
+    border-bottom-color: var(--color-gray-200);
+    background-color: rgb(255 255 255 / 0.85);
+    backdrop-filter: blur(8px);
+}
+
+/* Tabel: zebra halus, bukan abu-abu. */
+.fi-ta-row:hover,
+.fi-ta-header-cell:hover {
+    background-color: color-mix(in oklab, var(--color-gray-200) 45%, transparent);
+}
+
+/* Input & select: fokus memakai hijau brand, bukan biru bawaan. */
+.fi-input:focus,
+.fi-select-input:focus,
+.fi-input-wrp:focus-within {
+    border-color: var(--primary-600);
+    box-shadow: 0 0 0 1px var(--primary-600);
+}
+
+/* Link di dalam tabel & teks aksi: hijau brand, bukan biru. */
+.fi-ta-text-item-label a,
+.fi-link {
+    color: var(--primary-600);
+}
+.fi-ta-text-item-label a:hover,
+.fi-link:hover {
+    color: var(--primary-800);
+}
