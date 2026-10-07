@@ -99,6 +99,17 @@ class ProductDetailResource extends JsonResource
                     ];
                 });
             }),
+            'collections' => $this->whenLoaded('collections', function () {
+                return $this->collections->map(function ($collection) {
+                    return [
+                        'id' => $collection->id,
+                        'name' => $collection->name,
+                        'slug' => $collection->slug,
+                        'tagline' => $collection->tagline,
+                        'badge_label' => $collection->badge_label,
+                    ];
+                });
+            }),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

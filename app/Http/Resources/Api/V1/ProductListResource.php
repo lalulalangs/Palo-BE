@@ -54,6 +54,14 @@ class ProductListResource extends JsonResource
             }),
             'is_featured' => (bool) $this->is_featured,
             'is_out_of_stock' => $this->relationLoaded('variants') || $this->relationLoaded('skus') ? $totalStock <= 0 : false,
+            'collections' => $this->whenLoaded('collections', function () {
+                return $this->collections->map(fn ($collection) => [
+                    'id' => $collection->id,
+                    'name' => $collection->name,
+                    'slug' => $collection->slug,
+                    'badge_label' => $collection->badge_label,
+                ]);
+            }),
             'created_at' => $this->created_at?->toISOString(),
         ];
     }
