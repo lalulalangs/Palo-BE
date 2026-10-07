@@ -20,12 +20,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Admin User
+        // 1. Admin User — kredensial diambil dari .env agar login /admin
+        // selalu konsisten setiap fresh migrate/seed.
         $admin = User::firstOrCreate(
-            ['email' => 'admin@palorinjani.com'],
+            ['email' => env('ADMIN_EMAIL', 'admin@palorinjani.com')],
             [
-                'name' => 'Admin PaloRinjani',
-                'password' => Hash::make('password'),
+                'name' => env('ADMIN_NAME', 'Admin PaloRinjani'),
+                'password_hash' => Hash::make(env('ADMIN_PASSWORD', 'password')),
                 'email_verified_at' => now(),
             ]
         );
