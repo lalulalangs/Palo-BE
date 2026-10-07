@@ -2,16 +2,20 @@
 
 namespace App\Filament\Resources\Products\RelationManagers;
 
+use App\Filament\Actions\CreateVariantMatrix;
 use App\Models\Sku;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
@@ -110,7 +114,61 @@ class VariantsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                CreateAction::make(),
+                Action::make('createMatrix')
+                    ->label('Matriks Warna × Ukuran')
+                    ->icon('heroicon-o-squares-plus')
+                    ->modalHeading('Tambah Varian per Warna')
+                    ->modalDescription('Satu warna menghasilkan satu varian untuk setiap ukuran yang dipilih.')
+                    ->schema([
+                        Repeater::make('colors')
+                            ->label('Warna')
+                            ->schema([
+                                TextInput::make('color')
+                                    ->label('Warna')
+                                    ->placeholder('Contoh: Hitam')
+                                    ->required()
+                                    ->maxLength(50),
+                                CheckboxList::make('sizes')
+                                    ->label('Ukuran yang ready')
+                                    ->options(array_combine(CreateVariantMatrix::SIZES, CreateVariantMatrix::SIZES))
+                                    ->columns(3)
+                                    ->required()
+                                    ->minItems(1),
+                                TextInput::make('stock')
+                                    ->label('Stok (berlaku semua ukuran)')
+                                    ->numeric()
+                                    ->integer()
+                                    ->minValue(0)
+                                    ->default(0)
+                                    ->required(),
+                                TextInput::make('price_override')
+                                    ->label('Harga Override (Rp)')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->minValue(0)
+                                    ->helperText('Kosongkan untuk memakai harga dasar produk'),
+                                Toggle::make('is_active')
+                                    ->label('SKU aktif')
+                                    ->default(true),
+                            ])
+                            ->columns(2)
+                            ->defaultItems(1)
+                            ->minItems(1)
+                            ->addActionLabel('Tambah warna lain')
+                            ->reorderable(false)
+                            ->columnSpanFull(),
+                    ])
+                    ->action(function (array $data, RelationManager $livewire): void {
+                        $product = $livewire->getOwnerRecord();
+                        $created = app(CreateVariantMatrix::class)->execute($product, $data['colors'] ?? []);
+
+                        Notification::make()
+                            ->success()
+                            ->title(count($created).' varian berhasil dibuat')
+                            ->send();
+                    }),
+                CreateAction::make()
+                    ->label('Tambah Varian Satuan'),
             ])
             ->recordActions([
                 EditAction::make(),
