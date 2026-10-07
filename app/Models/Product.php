@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
@@ -23,6 +24,24 @@ class Product extends Model
         'is_featured',
         'is_active',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $model): void {
+            if (empty($model->slug) && ! empty($model->name)) {
+                $baseSlug = Str::slug($model->name);
+                $slug = $baseSlug;
+                $counter = 1;
+
+                while (static::withTrashed()->where('slug', $slug)->exists()) {
+                    $slug = "{$baseSlug}-{$counter}";
+                    $counter++;
+                }
+
+                $model->slug = $slug;
+            }
+        });
+    }
 
     protected function casts(): array
     {
