@@ -99,12 +99,11 @@ class ProductMediaManagementTest extends TestCase
         $this->assertEquals($mediaPrimary->id, $product->fresh()->media->first()->id);
     }
 
-    public function test_can_upload_and_save_product_with_media(): void
+    public function test_can_upload_and_save_product_with_single_media(): void
     {
         Storage::fake('public');
 
         $file1 = UploadedFile::fake()->image('photo1.jpg');
-        $file2 = UploadedFile::fake()->image('photo2.png');
 
         Livewire::actingAs($this->admin)
             ->test(CreateProduct::class)
@@ -120,10 +119,6 @@ class ProductMediaManagementTest extends TestCase
                         'url' => [$file1],
                         'type' => 'image',
                     ],
-                    [
-                        'url' => [$file2],
-                        'type' => 'image',
-                    ],
                 ],
             ])
             ->call('create')
@@ -137,8 +132,37 @@ class ProductMediaManagementTest extends TestCase
             'name' => 'Matras Angin Ultralight',
         ]);
 
-        $this->assertCount(2, $product->media);
+        $this->assertCount(1, $product->media);
         $this->assertNotNull($product->thumbnail);
+    }
+
+    public function test_cannot_upload_more_than_one_media_item(): void
+    {
+        Storage::fake('public');
+
+        $file1 = UploadedFile::fake()->image('photo1.jpg');
+        $file2 = UploadedFile::fake()->image('photo2.png');
+
+        Livewire::actingAs($this->admin)
+            ->test(CreateProduct::class)
+            ->fillForm([
+                'category_id' => $this->category->id,
+                'name' => 'Tenda Dome 2P',
+                'slug' => 'tenda-dome-2p',
+                'base_price' => 500000.00,
+                'media' => [
+                    [
+                        'url' => [$file1],
+                        'type' => 'image',
+                    ],
+                    [
+                        'url' => [$file2],
+                        'type' => 'image',
+                    ],
+                ],
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['media']);
     }
 
     public function test_deleting_product_cascades_to_media(): void

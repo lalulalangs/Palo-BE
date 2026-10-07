@@ -61,31 +61,31 @@ class ProductForm
                             )
                             ->helperText('Otomatis dibuat saat produk baru ditambahkan. Klik ikon refresh jika ingin sinkronkan dengan nama saat ini.'),
                         TextInput::make('base_price')
+                            ->label('Harga Dasar')
                             ->required()
                             ->numeric()
                             ->prefix('Rp')
                             ->minValue(0),
                         Textarea::make('description')
+                            ->label('Deskripsi Produk')
+                            ->placeholder('Tuliskan detail spesifikasi, bahan, atau informasi penting produk...')
                             ->rows(4)
                             ->columnSpanFull(),
-                        Toggle::make('is_featured')
-                            ->default(false),
-                        Toggle::make('is_active')
-                            ->default(true),
                     ])
                     ->columns(2),
 
-                Section::make('Galeri Media Produk')
-                    ->description('Unggah gambar produk (maksimal 2MB, format JPG/PNG/WEBP). Gambar pertama otomatis menjadi foto utama/thumbnail. Tarik untuk mengubah urutan.')
+                Section::make('Foto Utama Produk')
+                    ->description('Unggah 1 foto produk utama (maksimal 2MB, format JPG/PNG/WEBP). Foto ini akan menjadi gambar utama di katalog dan etalase toko.')
                     ->schema([
                         Repeater::make('media')
                             ->relationship('media')
                             ->orderColumn('sort_order')
-                            ->reorderable()
-                            ->addActionLabel('Tambah Gambar Produk')
+                            ->maxItems(1)
+                            ->reorderable(false)
+                            ->addActionLabel('Unggah Foto Produk')
                             ->schema([
                                 FileUpload::make('url')
-                                    ->label('Foto Produk')
+                                    ->label('File Foto')
                                     ->image()
                                     ->disk('public')
                                     ->directory('products')
@@ -95,13 +95,30 @@ class ProductForm
                                 Hidden::make('type')
                                     ->default('image'),
                             ])
-                            ->grid([
-                                'default' => 1,
-                                'sm' => 2,
-                                'md' => 3,
-                            ])
                             ->columnSpanFull(),
                     ]),
+
+                Section::make('Status & Visibilitas Produk')
+                    ->description('Atur ketersediaan produk di etalase toko dan penyorotan di halaman depan.')
+                    ->schema([
+                        Toggle::make('is_active')
+                            ->label('Status Produk (Tampilkan di Toko)')
+                            ->helperText('Jika diaktifkan, produk langsung dapat dilihat, dicari, dan dibeli oleh pelanggan di website. Jika nonaktif, produk disimpan sebagai draf/disembunyikan.')
+                            ->onColor('success')
+                            ->offColor('danger')
+                            ->onIcon('heroicon-m-eye')
+                            ->offIcon('heroicon-m-eye-slash')
+                            ->default(true),
+                        Toggle::make('is_featured')
+                            ->label('Jadikan Produk Unggulan (Rekomendasi Utama)')
+                            ->helperText('Jika diaktifkan, produk ini akan disorot di bagian "Produk Pilihan / Rekomendasi" pada halaman depan (homepage) website.')
+                            ->onColor('warning')
+                            ->offColor('gray')
+                            ->onIcon('heroicon-m-star')
+                            ->offIcon('heroicon-m-star')
+                            ->default(false),
+                    ])
+                    ->columns(2),
             ]);
     }
 }
