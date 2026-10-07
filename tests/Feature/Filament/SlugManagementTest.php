@@ -4,8 +4,10 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\Categories\Pages\CreateCategory;
 use App\Filament\Resources\Categories\Pages\EditCategory;
+use App\Filament\Resources\Categories\Pages\ListCategories;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
+use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
@@ -122,5 +124,47 @@ class SlugManagementTest extends TestCase
             'base_price' => 50000.00,
         ]);
         $this->assertEquals('matras-alumunium-foil-1', $prod2->slug);
+    }
+
+    public function test_can_bulk_delete_products(): void
+    {
+        $product = Product::create([
+            'category_id' => $this->category->id,
+            'name' => 'Produk Akan Dihapus',
+            'slug' => 'produk-akan-dihapus',
+            'base_price' => 100000.00,
+        ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(ListProducts::class)
+            ->callTableBulkAction('delete', [$product]);
+
+        $this->assertSoftDeleted('products', [
+            'id' => $product->id,
+        ]);
+    }
+
+    public function test_can_bulk_delete_categories(): void
+    {
+        $category = Category::create([
+            'name' => 'Kategori Dihapus',
+            'slug' => 'kategori-dihapus',
+        ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(ListCategories::class)
+            ->callTableBulkAction('delete', [$category]);
+
+        $this->assertDatabaseMissing('categories', [
+            'id' => $category->id,
+        ]);
+    }
+
+    public function test_can_select_category_in_product_form(): void
+    {
+        Livewire::actingAs($this->admin)
+            ->test(CreateProduct::class)
+            ->set('data.category_id', $this->category->id)
+            ->assertSet('data.category_id', $this->category->id);
     }
 }
