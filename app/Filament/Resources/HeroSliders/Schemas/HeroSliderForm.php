@@ -2,14 +2,12 @@
 
 namespace App\Filament\Resources\HeroSliders\Schemas;
 
-use App\Services\ImageOptimizer;
-use Filament\Forms\Components\FileUpload;
+use App\Filament\Components\ImageFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class HeroSliderForm
 {
@@ -46,23 +44,15 @@ class HeroSliderForm
                 Section::make('Gambar')
                     ->description('Gambar desktop wajib, mobile opsional (maksimal 5MB, format JPG/PNG/WEBP). Gambar otomatis dikompres dan dikonversi ke WebP di disk public/heroes.')
                     ->schema([
-                        FileUpload::make('image_desktop')
+                        ImageFileUpload::make('image_desktop')
                             ->label('Gambar Desktop')
-                            ->image()
                             ->disk('public')
                             ->directory('heroes')
-                            ->maxSize(config('image.max_upload_kb'))
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => app(ImageOptimizer::class)->optimize($file, 'heroes', 'public'))
                             ->required(),
-                        FileUpload::make('image_mobile')
+                        ImageFileUpload::make('image_mobile')
                             ->label('Gambar Mobile')
-                            ->image()
                             ->disk('public')
-                            ->directory('heroes')
-                            ->maxSize(config('image.max_upload_kb'))
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => app(ImageOptimizer::class)->optimize($file, 'heroes', 'public')),
+                            ->directory('heroes'),
                     ])
                     ->columns(2),
 

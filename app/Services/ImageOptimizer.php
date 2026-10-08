@@ -20,10 +20,12 @@ class ImageOptimizer
         }
 
         try {
+            $name = Str::ulid().'.webp';
+
             return Storage::disk($disk)->putFileAs(
                 $directory,
-                new UploadedFile($processed, Str::ulid().'.webp', 'image/webp', null, true),
-                Str::ulid().'.webp',
+                new UploadedFile($processed, $name, 'image/webp', null, true),
+                $name,
                 'public',
             );
         } finally {
@@ -36,6 +38,10 @@ class ImageOptimizer
         $source = $file->getRealPath();
 
         if ($source === false) {
+            return null;
+        }
+
+        if (! $this->isWithinPixelBudget($source)) {
             return null;
         }
 
@@ -55,5 +61,16 @@ class ImageOptimizer
         }
 
         return $target;
+    }
+
+    private function isWithinPixelBudget(string $source): bool
+    {
+        $size = @getimagesize($source);
+
+        if ($size === false) {
+            return false;
+        }
+
+        return ($size[0] * $size[1]) <= (int) config('image.max_pixels');
     }
 }

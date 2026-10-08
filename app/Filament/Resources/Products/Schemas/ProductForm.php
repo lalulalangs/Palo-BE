@@ -2,10 +2,9 @@
 
 namespace App\Filament\Resources\Products\Schemas;
 
+use App\Filament\Components\ImageFileUpload;
 use App\Models\Product;
-use App\Services\ImageOptimizer;
 use Filament\Actions\Action;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -17,7 +16,6 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class ProductForm
 {
@@ -93,14 +91,10 @@ class ProductForm
                             ->reorderable(false)
                             ->addActionLabel('Unggah Foto Produk')
                             ->schema([
-                                FileUpload::make('url')
+                                ImageFileUpload::make('url')
                                     ->label('File Foto')
-                                    ->image()
                                     ->disk('public')
                                     ->directory('products')
-                                    ->maxSize(config('image.max_upload_kb'))
-                                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                                    ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => app(ImageOptimizer::class)->optimize($file, 'products', 'public'))
                                     ->required(),
                                 Hidden::make('type')
                                     ->default('image'),

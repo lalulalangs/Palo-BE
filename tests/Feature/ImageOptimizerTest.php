@@ -49,6 +49,39 @@ class ImageOptimizerTest extends TestCase
         $this->assertSame(IMAGETYPE_WEBP, getimagesizefromstring(Storage::disk('public')->get($path))[2]);
     }
 
+    public function test_exif_orientation_is_applied(): void
+    {
+        Storage::fake('public');
+
+        $source = $this->withExifOrientation($this->jpeg(200, 100), 6);
+
+        $path = app(ImageOptimizer::class)->optimize(
+            new UploadedFile($source, 'rotated.jpg', 'image/jpeg', null, true),
+            'products',
+        );
+
+        [$width, $height] = getimagesizefromstring(Storage::disk('public')->get($path));
+
+        $this->assertSame(100, $width);
+        $this->assertSame(200, $height);
+    }
+
+    public function test_image_exceeding_pixel_budget_falls_back_to_original(): void
+    {
+        Storage::fake('public');
+        config()->set('image.max_pixels', 100);
+
+        $source = $this->noisyPng(300, 200);
+
+        $path = app(ImageOptimizer::class)->optimize(
+            new UploadedFile($source, 'huge.png', 'image/png', null, true),
+            'products',
+        );
+
+        $this->assertStringEndsWith('.png', $path);
+        $this->assertSame(file_get_contents($source), Storage::disk('public')->get($path));
+    }
+
     public function test_small_image_is_not_upscaled_and_keeps_aspect_ratio(): void
     {
         Storage::fake('public');
@@ -116,6 +149,21 @@ class ImageOptimizerTest extends TestCase
         $path = sys_get_temp_dir().'/gradient_'.uniqid().'.jpg';
         imagejpeg($image, $path, 95);
         imagedestroy($image);
+
+        return $path;
+    }
+
+    private function withExifOrientation(string $jpegPath, int $orientation): string
+    {
+        $tiff = "II\x2A\x00".pack('V', 8);
+        $tiff .= pack('v', 1);
+        $tiff .= pack('v', 0x0112).pack('v', 3).pack('V', 1).pack('v', $orientation)."\x00\x00";
+        $tiff .= pack('V', 0);
+        $app1 = "\xFF\xE1".pack('n', strlen($tiff) + 2 + 6)."Exif\x00\x00".$tiff;
+
+        $jpeg = file_get_contents($jpegPath);
+        $path = sys_get_temp_dir().'/exif_'.uniqid().'.jpg';
+        file_put_contents($path, substr($jpeg, 0, 2).$app1.substr($jpeg, 2));
 
         return $path;
     }
