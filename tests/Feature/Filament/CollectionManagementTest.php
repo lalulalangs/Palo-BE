@@ -130,4 +130,33 @@ class CollectionManagementTest extends TestCase
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$product]);
     }
+
+    public function test_can_upload_and_optimize_collection_banners_to_webp(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('public');
+
+        $desktop = \Illuminate\Http\UploadedFile::fake()->image('banner-desktop.jpg', 2400, 1200);
+        $mobile = \Illuminate\Http\UploadedFile::fake()->image('banner-mobile.png', 1080, 1920);
+
+        Livewire::actingAs($this->admin)
+            ->test(CreateCollection::class)
+            ->fillForm([
+                'name' => 'Series Rinjani Peak',
+                'slug' => 'series-rinjani-peak',
+                'is_active' => true,
+                'banner_desktop' => $desktop,
+                'banner_mobile' => $mobile,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $collection = Collection::where('slug', 'series-rinjani-peak')->first();
+        $this->assertNotNull($collection);
+        $this->assertNotNull($collection->banner_desktop);
+        $this->assertNotNull($collection->banner_mobile);
+        $this->assertStringEndsWith('.webp', $collection->banner_desktop);
+        $this->assertStringEndsWith('.webp', $collection->banner_mobile);
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($collection->banner_desktop));
+        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($collection->banner_mobile));
+    }
 }

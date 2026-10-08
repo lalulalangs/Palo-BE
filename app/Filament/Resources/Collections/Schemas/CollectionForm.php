@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Collections\Schemas;
 
 use App\Models\Collection;
+use App\Services\ImageOptimizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
@@ -14,6 +15,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class CollectionForm
 {
@@ -81,17 +83,19 @@ class CollectionForm
                             ->image()
                             ->disk('public')
                             ->directory('collections')
-                            ->maxSize(4096)
+                            ->maxSize(config('image.max_upload_kb', 5120))
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->helperText('Disarankan rasio lebar (16:9 / 21:9) resolusi tinggi.'),
+                            ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => app(ImageOptimizer::class)->optimize($file, 'collections', 'public'))
+                            ->helperText('Disarankan rasio lebar (16:9 / 21:9) resolusi tinggi, maksimal 5MB. Gambar otomatis dikompres dan dikonversi ke WebP.'),
                         FileUpload::make('banner_mobile')
                             ->label('Banner Mobile (Opsional)')
                             ->image()
                             ->disk('public')
                             ->directory('collections')
-                            ->maxSize(3072)
+                            ->maxSize(config('image.max_upload_kb', 5120))
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->helperText('Banner vertikal optimal untuk tampilan layar handphone.'),
+                            ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => app(ImageOptimizer::class)->optimize($file, 'collections', 'public'))
+                            ->helperText('Banner vertikal optimal untuk tampilan layar handphone, maksimal 5MB. Gambar otomatis dikompres dan dikonversi ke WebP.'),
                     ])
                     ->columns(2),
 
