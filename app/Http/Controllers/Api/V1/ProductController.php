@@ -23,6 +23,7 @@ class ProductController extends Controller
                 'category',
                 'thumbnail',
                 'variants.skus',
+                'collections' => fn ($q) => $q->active(),
             ]);
 
         // Filter by Category slug (including sub-categories)
@@ -35,6 +36,13 @@ class ProductController extends Controller
             } else {
                 $query->whereRaw('1 = 0');
             }
+        }
+
+        // Filter by Collection slug
+        if ($collectionSlug = $request->input('collection')) {
+            $query->whereHas('collections', function (Builder $q) use ($collectionSlug): void {
+                $q->active()->where('slug', $collectionSlug);
+            });
         }
 
         // Search in Name or Description
@@ -102,6 +110,7 @@ class ProductController extends Controller
                 'category.parent',
                 'media',
                 'variants.skus',
+                'collections' => fn ($q) => $q->active(),
             ])
             ->first();
 

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -75,5 +76,13 @@ class Product extends Model
     public function skus(): HasManyThrough
     {
         return $this->hasManyThrough(Sku::class, ProductVariant::class, 'product_id', 'variant_id');
+    }
+
+    public function collections(): BelongsToMany
+    {
+        return $this->belongsToMany(Collection::class, 'collection_product')
+            ->withPivot('sort_order')
+            ->withTimestamps()
+            ->orderByPivot('sort_order', 'asc');
     }
 }

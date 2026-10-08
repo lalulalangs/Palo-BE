@@ -29,6 +29,13 @@ class ProductForm
                             ->relationship('category', 'name')
                             ->searchable()
                             ->preload(),
+                        Select::make('collections')
+                            ->label('Koleksi / Series (Opsional)')
+                            ->relationship('collections', 'name')
+                            ->multiple()
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Pilih satu atau lebih koleksi yang menaungi produk ini.'),
                         TextInput::make('name')
                             ->label('Nama Produk')
                             ->required()

@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\AdminHeroSliderController;
 use App\Http\Controllers\Api\V1\BannerController;
 use App\Http\Controllers\Api\V1\CategoryController;
+use App\Http\Controllers\Api\V1\CollectionController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\PublicHeroSliderController;
 use Illuminate\Support\Facades\Route;
@@ -11,6 +12,8 @@ Route::prefix('v1')->group(function (): void {
     // Public Catalog
     Route::get('banners', [BannerController::class, 'index']);
     Route::get('categories', [CategoryController::class, 'index']);
+    Route::get('collections', [CollectionController::class, 'index']);
+    Route::get('collections/{slug}', [CollectionController::class, 'show']);
     Route::get('products', [ProductController::class, 'index']);
     Route::get('products/{slug}', [ProductController::class, 'show']);
 
