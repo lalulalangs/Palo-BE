@@ -11,6 +11,8 @@ use App\Models\Collection;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -214,10 +216,10 @@ class CollectionManagementTest extends TestCase
 
     public function test_can_upload_and_optimize_collection_banners_to_webp(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('public');
+        Storage::fake('public');
 
-        $desktop = \Illuminate\Http\UploadedFile::fake()->image('banner-desktop.jpg', 2400, 1200);
-        $mobile = \Illuminate\Http\UploadedFile::fake()->image('banner-mobile.png', 1080, 1920);
+        $desktop = UploadedFile::fake()->image('banner-desktop.jpg', 2400, 1200);
+        $mobile = UploadedFile::fake()->image('banner-mobile.png', 1080, 1920);
 
         Livewire::actingAs($this->admin)
             ->test(CreateCollection::class)
@@ -237,8 +239,8 @@ class CollectionManagementTest extends TestCase
         $this->assertNotNull($collection->banner_mobile);
         $this->assertStringEndsWith('.webp', $collection->banner_desktop);
         $this->assertStringEndsWith('.webp', $collection->banner_mobile);
-        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($collection->banner_desktop));
-        $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($collection->banner_mobile));
+        $this->assertTrue(Storage::disk('public')->exists($collection->banner_desktop));
+        $this->assertTrue(Storage::disk('public')->exists($collection->banner_mobile));
     }
 
     public function test_ended_at_cannot_be_before_published_at_in_collection_form(): void
