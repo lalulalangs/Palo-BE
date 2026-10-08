@@ -7,10 +7,8 @@ use App\Services\Inventory\StockMovementService;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
-use Filament\Support\Enums\FontFamily;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class StockOpnamesTable
@@ -20,42 +18,26 @@ class StockOpnamesTable
         return $table
             ->columns([
                 TextColumn::make('opname_number')
-                    ->label('No. Dokumen')
+                    ->label('No. Opname')
                     ->searchable()
                     ->sortable()
-                    ->fontFamily(FontFamily::Mono)
-                    ->weight('bold')
-                    ->icon(Heroicon::OutlinedDocumentText)
-                    ->copyable()
-                    ->copyMessage('Nomor dokumen opname disalin ke clipboard'),
-
+                    ->weight('bold'),
                 TextColumn::make('created_at')
-                    ->label('Waktu Pembuatan')
-                    ->dateTime('d M Y, H:i')
-                    ->description(fn (StockOpname $record): ?string => $record->created_at?->diffForHumans())
+                    ->label('Tanggal Dibuat')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable(),
-
                 TextColumn::make('auditor.name')
-                    ->label('Auditor')
-                    ->icon(Heroicon::OutlinedUser)
-                    ->placeholder('—')
+                    ->label('Petugas Pemeriksa')
+                    ->placeholder('-')
                     ->searchable(),
-
                 TextColumn::make('items_count')
                     ->counts('items')
-                    ->label('Item SKU')
-                    ->badge()
-                    ->color('gray')
+                    ->label('Total SKU')
+                    ->numeric()
                     ->alignCenter(),
-
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->icon(fn (string $state): Heroicon => match ($state) {
-                        StockOpname::STATUS_COMPLETED => Heroicon::OutlinedCheckCircle,
-                        StockOpname::STATUS_CANCELLED => Heroicon::OutlinedXCircle,
-                        default => Heroicon::OutlinedClock,
-                    })
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         StockOpname::STATUS_COMPLETED => 'Selesai',
                         StockOpname::STATUS_CANCELLED => 'Dibatalkan',
@@ -66,29 +48,13 @@ class StockOpnamesTable
                         StockOpname::STATUS_CANCELLED => 'danger',
                         default => 'warning',
                     }),
-
                 TextColumn::make('completed_at')
                     ->label('Waktu Selesai')
-                    ->dateTime('d M Y, H:i')
-                    ->placeholder('Belum Diterapkan')
-                    ->sortable()
-                    ->toggleable(),
+                    ->dateTime('d/m/Y H:i')
+                    ->placeholder('-')
+                    ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
-            ->filters([
-                SelectFilter::make('status')
-                    ->label('Status Audit')
-                    ->options([
-                        StockOpname::STATUS_DRAFT => 'Draft (Pengecekan)',
-                        StockOpname::STATUS_COMPLETED => 'Selesai Diterapkan',
-                        StockOpname::STATUS_CANCELLED => 'Dibatalkan',
-                    ]),
-                SelectFilter::make('user_id')
-                    ->label('Auditor')
-                    ->relationship('auditor', 'name')
-                    ->searchable()
-                    ->preload(),
-            ])
             ->recordActions([
                 EditAction::make(),
                 Action::make('apply_opname')
@@ -96,10 +62,9 @@ class StockOpnamesTable
                     ->icon(Heroicon::OutlinedCheckCircle)
                     ->color('success')
                     ->requiresConfirmation()
-                    ->modalIcon(Heroicon::OutlinedScale)
                     ->modalHeading('Terapkan Penyesuaian Stok Opname')
-                    ->modalDescription('Apakah Anda yakin ingin menerapkan hasil opname fisik ini? Saldo stok SKU akan langsung disesuaikan dan log jurnal mutasi penyesuaian akan dibukukan ke sistem.')
-                    ->modalSubmitActionLabel('Ya, Terapkan Sekarang')
+                    ->modalDescription('Apakah Anda yakin ingin menerapkan hasil opname fisik ini? Saldo stok SKU akan disesuaikan dan log mutasi stok akan dicatat secara otomatis ke sistem.')
+                    ->modalSubmitActionLabel('Ya, Terapkan Penyesuaian')
                     ->visible(fn (StockOpname $record): bool => ! $record->isCompleted())
                     ->action(function (StockOpname $record, StockMovementService $service): void {
                         try {
