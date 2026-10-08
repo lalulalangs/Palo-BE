@@ -131,6 +131,87 @@ class CollectionManagementTest extends TestCase
             ->assertCanSeeTableRecords([$product]);
     }
 
+    public function test_can_attach_product_to_collection_via_relation_manager_attach_action(): void
+    {
+        $collection = Collection::create([
+            'name' => 'Summit Series',
+            'slug' => 'summit-series',
+            'is_active' => true,
+        ]);
+
+        $product = Product::create([
+            'category_id' => $this->category->id,
+            'name' => 'Jaket Summit Gore-Tex',
+            'slug' => 'jaket-summit-gore-tex',
+            'base_price' => 1250000,
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($this->admin)
+            ->test(ProductsRelationManager::class, [
+                'ownerRecord' => $collection,
+                'pageClass' => EditCollection::class,
+            ])
+            ->mountTableAction('attach')
+            ->set('mountedActions.0.data.recordId', $product->id)
+            ->set('mountedActions.0.data.sort_order', 3)
+            ->callMountedTableAction()
+            ->assertHasNoTableActionErrors();
+
+        $attached = $collection->fresh()->products()->where('product_id', $product->id)->first();
+        $this->assertNotNull($attached);
+        $this->assertEquals(3, $attached->pivot->sort_order);
+    }
+
+    public function test_can_detach_product_from_collection_via_detach_action(): void
+    {
+        $collection = Collection::create([
+            'name' => 'Trail Series',
+            'slug' => 'trail-series',
+            'is_active' => true,
+        ]);
+
+        $product = Product::create([
+            'category_id' => $this->category->id,
+            'name' => 'Sepatu Trail 01',
+            'slug' => 'sepatu-trail-01',
+            'base_price' => 750000,
+            'is_active' => true,
+        ]);
+
+        $collection->products()->attach($product->id, ['sort_order' => 1]);
+
+        Livewire::actingAs($this->admin)
+            ->test(ProductsRelationManager::class, [
+                'ownerRecord' => $collection,
+                'pageClass' => EditCollection::class,
+            ])
+            ->callTableAction('detach', $product)
+            ->assertHasNoTableActionErrors();
+
+        $this->assertDatabaseMissing('collection_product', [
+            'collection_id' => $collection->id,
+            'product_id' => $product->id,
+        ]);
+    }
+
+    public function test_creating_collection_redirects_to_edit_page(): void
+    {
+        Livewire::actingAs($this->admin)
+            ->test(CreateCollection::class)
+            ->fillForm([
+                'name' => 'Ekspedisi Segara Anak',
+                'slug' => 'ekspedisi-segara-anak',
+                'is_active' => true,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+
+        $created = Collection::where('slug', 'ekspedisi-segara-anak')->first();
+        $this->assertNotNull($created);
+    }
+
     public function test_can_upload_and_optimize_collection_banners_to_webp(): void
     {
         \Illuminate\Support\Facades\Storage::fake('public');

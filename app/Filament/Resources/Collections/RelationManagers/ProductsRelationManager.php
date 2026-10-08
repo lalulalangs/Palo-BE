@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Collections\RelationManagers;
 
+use App\Models\Product;
 use Filament\Actions\AttachAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DetachAction;
@@ -11,6 +12,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Number;
@@ -39,6 +41,11 @@ class ProductsRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('name')
             ->columns([
+                ImageColumn::make('thumbnail.url')
+                    ->label('Foto')
+                    ->disk('public')
+                    ->square()
+                    ->placeholder('-'),
                 TextColumn::make('name')
                     ->label('Nama Produk')
                     ->searchable()
@@ -61,12 +68,23 @@ class ProductsRelationManager extends RelationManager
             ->headerActions([
                 AttachAction::make()
                     ->label('Tambahkan Produk ke Koleksi')
+                    ->modalHeading('Pilih Produk untuk Koleksi')
+                    ->modalSubmitActionLabel('Tambahkan ke Koleksi')
                     ->preloadRecordSelect()
-                    ->schema([
+                    ->recordSelectSearchColumns(['name', 'slug'])
+                    ->recordTitle(fn (Product $record): string => "{$record->name} (" . Number::currency($record->base_price, 'IDR', 'id') . ")")
+                    ->schema(fn (AttachAction $action): array => [
+                        $action->getRecordSelect()
+                            ->label('Pilih Produk dari Katalog')
+                            ->helperText('Hanya menampilkan produk yang belum ada di koleksi ini.')
+                            ->searchable()
+                            ->required(),
                         TextInput::make('sort_order')
-                            ->label('Urutan Prioritas')
+                            ->label('Urutan Prioritas di Koleksi')
                             ->numeric()
-                            ->default(0),
+                            ->default(0)
+                            ->helperText('Angka lebih kecil tampil lebih awal di etalase toko (misal: 1, 2, 3).')
+                            ->required(),
                     ]),
             ])
             ->recordActions([
