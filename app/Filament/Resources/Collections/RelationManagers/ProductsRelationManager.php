@@ -72,7 +72,7 @@ class ProductsRelationManager extends RelationManager
                     ->modalSubmitActionLabel('Tambahkan ke Koleksi')
                     ->preloadRecordSelect()
                     ->recordSelectSearchColumns(['name', 'slug'])
-                    ->recordTitle(fn (Product $record): string => "{$record->name} (" . Number::currency($record->base_price, 'IDR', 'id') . ")")
+                    ->recordTitle(fn (Product $record): string => "{$record->name} (".Number::currency($record->base_price, 'IDR', 'id').')')
                     ->schema(fn (AttachAction $action): array => [
                         $action->getRecordSelect()
                             ->label('Pilih Produk dari Katalog')

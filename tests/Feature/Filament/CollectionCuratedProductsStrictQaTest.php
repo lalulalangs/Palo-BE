@@ -11,6 +11,8 @@ use App\Models\Product;
 use App\Models\ProductMedia;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -349,8 +351,8 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
      */
     public function test_qa_product_can_be_assigned_to_collections_from_product_form(): void
     {
-        \Illuminate\Support\Facades\Storage::fake('public');
-        $photo = \Illuminate\Http\UploadedFile::fake()->image('jacket.jpg', 600, 600);
+        Storage::fake('public');
+        $photo = UploadedFile::fake()->image('jacket.jpg', 600, 600);
 
         $c1 = Collection::create(['name' => 'Koleksi 1', 'slug' => 'koleksi-1', 'is_active' => true]);
         $c2 = Collection::create(['name' => 'Koleksi 2', 'slug' => 'koleksi-2', 'is_active' => true]);
