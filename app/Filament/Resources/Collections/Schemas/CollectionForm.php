@@ -116,11 +116,16 @@ class CollectionForm
                             ->default(false),
                         DateTimePicker::make('published_at')
                             ->label('Mulai Tayang (Opsional)')
-                            ->placeholder('Langsung Tayang')
+                            ->displayFormat('d/m/Y H:i')
+                            ->native(false)
+                            ->placeholder('DD/MM/YYYY HH:mm')
                             ->helperText('Biarkan kosong jika ingin langsung tayang.'),
                         DateTimePicker::make('ended_at')
                             ->label('Berakhir Tayang (Opsional)')
-                            ->placeholder('Selamanya')
+                            ->displayFormat('d/m/Y H:i')
+                            ->native(false)
+                            ->placeholder('DD/MM/YYYY HH:mm')
+                            ->afterOrEqual('published_at')
                             ->helperText('Isi tanggal jika koleksi ini edisi terbatas (time-limited drop).'),
                         TextInput::make('sort_order')
                             ->label('Prioritas Urutan')

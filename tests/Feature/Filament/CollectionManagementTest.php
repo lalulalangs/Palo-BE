@@ -159,4 +159,18 @@ class CollectionManagementTest extends TestCase
         $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($collection->banner_desktop));
         $this->assertTrue(\Illuminate\Support\Facades\Storage::disk('public')->exists($collection->banner_mobile));
     }
+
+    public function test_ended_at_cannot_be_before_published_at_in_collection_form(): void
+    {
+        Livewire::actingAs($this->admin)
+            ->test(CreateCollection::class)
+            ->fillForm([
+                'name' => 'Flash Event Series',
+                'slug' => 'flash-event-series',
+                'published_at' => '2026-10-10 10:00:00',
+                'ended_at' => '2026-10-09 10:00:00',
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['ended_at']);
+    }
 }

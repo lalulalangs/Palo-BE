@@ -45,9 +45,11 @@ class BannerForm
                     ->schema([
                         DatePicker::make('start_date')
                             ->label('Tanggal Mulai Tayang')
+                            ->displayFormat('d/m/Y')
                             ->native(false),
                         DatePicker::make('end_date')
                             ->label('Tanggal Berakhir Tayang')
+                            ->displayFormat('d/m/Y')
                             ->native(false)
                             ->afterOrEqual('start_date'),
                     ])
