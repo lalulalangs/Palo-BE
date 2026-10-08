@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 
 class Sku extends Model
@@ -43,5 +44,10 @@ class Sku extends Model
             'variant_id',  // Local key on Sku table...
             'product_id'   // Local key on ProductVariant table...
         );
+    }
+
+    public function movements(): HasMany
+    {
+        return $this->hasMany(StockMovement::class);
     }
 }
