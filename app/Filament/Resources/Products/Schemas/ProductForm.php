@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Models\Product;
+use App\Services\ImageOptimizer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -16,6 +17,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class ProductForm
 {
@@ -82,7 +84,7 @@ class ProductForm
                     ->columns(2),
 
                 Section::make('Foto Utama Produk')
-                    ->description('Unggah 1 foto produk utama (maksimal 2MB, format JPG/PNG/WEBP). Foto ini akan menjadi gambar utama di katalog dan etalase toko.')
+                    ->description('Unggah 1 foto produk utama (maksimal 5MB, format JPG/PNG/WEBP). Foto otomatis dikompres dan dikonversi ke WebP.')
                     ->schema([
                         Repeater::make('media')
                             ->relationship('media')
@@ -96,8 +98,9 @@ class ProductForm
                                     ->image()
                                     ->disk('public')
                                     ->directory('products')
-                                    ->maxSize(2048)
+                                    ->maxSize(config('image.max_upload_kb'))
                                     ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                                    ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => app(ImageOptimizer::class)->optimize($file, 'products', 'public'))
                                     ->required(),
                                 Hidden::make('type')
                                     ->default('image'),

@@ -120,4 +120,49 @@ class HeroSliderTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['title', 'image_desktop', 'primary_btn_url']);
     }
+
+    public function test_admin_store_accepts_image_over_2mb_and_converts_to_webp(): void
+    {
+        Storage::fake('public');
+
+        $source = $this->noisyPng(1200, 1200);
+        $this->assertGreaterThan(2 * 1024 * 1024, filesize($source));
+
+        $create = $this->postJson('/api/v1/admin/hero-sliders', [
+            'title' => 'Big upload',
+            'image_desktop' => new UploadedFile($source, 'big.png', 'image/png', null, true),
+            'primary_btn_url' => '/katalog',
+        ]);
+
+        $create->assertCreated();
+
+        $slider = HeroSlider::find($create->json('data.id'));
+        $this->assertStringEndsWith('.webp', $slider->image_desktop);
+        Storage::disk('public')->assertExists($slider->image_desktop);
+        $this->assertLessThan(2 * 1024 * 1024, Storage::disk('public')->size($slider->image_desktop));
+    }
+
+    private function noisyPng(int $width, int $height): string
+    {
+        $image = imagecreatetruecolor($width, $height);
+        mt_srand(42);
+
+        for ($y = 0; $y < $height; $y += 4) {
+            for ($x = 0; $x < $width; $x += 4) {
+                if (mt_rand(1, 100) <= 15) {
+                    $color = imagecolorallocate($image, mt_rand(0, 255), mt_rand(0, 255), mt_rand(0, 255));
+                } else {
+                    $color = imagecolorallocate($image, (int) ($x / $width * 255), (int) ($y / $height * 255), 128);
+                }
+
+                imagefilledrectangle($image, $x, $y, $x + 3, $y + 3, $color);
+            }
+        }
+
+        $path = sys_get_temp_dir().'/noisy_'.uniqid().'.png';
+        imagepng($image, $path, 0);
+        imagedestroy($image);
+
+        return $path;
+    }
 }
