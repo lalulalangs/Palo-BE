@@ -7,6 +7,7 @@ use App\Http\Requests\Api\V1\StoreHeroSliderRequest;
 use App\Http\Requests\Api\V1\UpdateHeroSliderRequest;
 use App\Http\Resources\Api\V1\HeroSliderResource;
 use App\Models\HeroSlider;
+use App\Services\ImageOptimizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 
@@ -27,10 +28,10 @@ class AdminHeroSliderController extends Controller
     {
         $data = $request->validated();
 
-        $data['image_desktop'] = $request->file('image_desktop')->store('heroes', 'public');
+        $data['image_desktop'] = app(ImageOptimizer::class)->optimize($request->file('image_desktop'), 'heroes', 'public');
 
         if ($request->hasFile('image_mobile')) {
-            $data['image_mobile'] = $request->file('image_mobile')->store('heroes', 'public');
+            $data['image_mobile'] = app(ImageOptimizer::class)->optimize($request->file('image_mobile'), 'heroes', 'public');
         }
 
         $slider = HeroSlider::create($data);
@@ -56,14 +57,14 @@ class AdminHeroSliderController extends Controller
 
         if ($request->hasFile('image_desktop')) {
             Storage::disk('public')->delete($heroSlider->image_desktop);
-            $data['image_desktop'] = $request->file('image_desktop')->store('heroes', 'public');
+            $data['image_desktop'] = app(ImageOptimizer::class)->optimize($request->file('image_desktop'), 'heroes', 'public');
         }
 
         if ($request->hasFile('image_mobile')) {
             if ($heroSlider->image_mobile) {
                 Storage::disk('public')->delete($heroSlider->image_mobile);
             }
-            $data['image_mobile'] = $request->file('image_mobile')->store('heroes', 'public');
+            $data['image_mobile'] = app(ImageOptimizer::class)->optimize($request->file('image_mobile'), 'heroes', 'public');
         }
 
         $heroSlider->update($data);

@@ -134,6 +134,7 @@ class ProductMediaManagementTest extends TestCase
 
         $this->assertCount(1, $product->media);
         $this->assertNotNull($product->thumbnail);
+        $this->assertStringEndsWith('.webp', $product->media->first()->url);
     }
 
     public function test_cannot_upload_more_than_one_media_item(): void

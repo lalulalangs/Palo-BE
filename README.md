@@ -97,12 +97,27 @@ REST API publik disediakan untuk dikonsumsi oleh etalase Storefront Next.js deng
 
 | Komponen | Versi Minimum / Spesifikasi |
 |---|---|
-| **PHP** | `^8.3` (diuji pada `PHP 8.5.10`, ekstensi: `pdo_pgsql`, `mbstring`, `openssl`, `fileinfo`, `gd`/`imagick`) |
+| **PHP** | `^8.3` (diuji pada `PHP 8.5.10`, ekstensi: `pdo_pgsql`, `mbstring`, `openssl`, `fileinfo`, `gd`/`imagick`, `exif`) |
 | **Composer** | `^2.2` |
 | **Database** | PostgreSQL `15+` (atau SQLite untuk in-memory testing) |
 | **Asset Bundler** | Node.js `20+` & NPM |
 | **Framework** | Laravel `^13.17` (terpasang `13.33.0`) |
 | **Admin Panel** | Filament `v5.8+` |
+| **Image Processing** | `intervention/image:^4.0` (driver GD) untuk kompresi & konversi WebP saat upload |
+
+### Batas Upload Gambar
+
+Upload gambar (produk, hero slider, banner) menerima file hingga **5MB**. Semua gambar otomatis dikompres dan dikonversi ke WebP oleh `App\Services\ImageOptimizer` (kualitas & lebar maksimum diatur di `config/image.php`). Agar file besar dapat diterima server, pastikan konfigurasi berikut pada runtime PHP (php.ini) dan web server (nginx):
+
+```ini
+upload_max_filesize = 5M
+post_max_size = 10M
+memory_limit = 512M
+```
+
+```nginx
+client_max_body_size 10m;
+```
 
 ---
 
