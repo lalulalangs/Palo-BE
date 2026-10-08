@@ -2,15 +2,13 @@
 
 namespace App\Filament\Resources\Banners\Schemas;
 
-use App\Services\ImageOptimizer;
+use App\Filament\Components\ImageFileUpload;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class BannerForm
 {
@@ -26,14 +24,10 @@ class BannerForm
                             ->required()
                             ->maxLength(255)
                             ->columnSpanFull(),
-                        FileUpload::make('image_url')
+                        ImageFileUpload::make('image_url')
                             ->label('Gambar Banner')
-                            ->image()
                             ->disk('public')
                             ->directory('banners')
-                            ->maxSize(config('image.max_upload_kb'))
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->saveUploadedFileUsing(fn (TemporaryUploadedFile $file): string => app(ImageOptimizer::class)->optimize($file, 'banners', 'public'))
                             ->required(fn (string $operation): bool => $operation === 'create')
                             ->dehydrated(fn ($state) => filled($state))
                             ->helperText('Rekomendasi rasio lanskap lebar (16:9 atau 21:9), maksimal 5MB (JPG/PNG/WEBP). Gambar otomatis dikompres dan dikonversi ke WebP.')
