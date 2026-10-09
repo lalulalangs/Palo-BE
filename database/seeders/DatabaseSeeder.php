@@ -101,5 +101,8 @@ class DatabaseSeeder extends Seeder
                 'is_active' => true,
             ]
         );
+
+        // 4. Seed manual verification orders for Filament Admin
+        $this->call(OrderManualVerificationSeeder::class);
     }
 }
