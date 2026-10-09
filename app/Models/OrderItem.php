@@ -39,4 +39,9 @@ class OrderItem extends Model
     {
         return $this->belongsTo(Sku::class);
     }
+
+    public function getThumbnailUrl(): ?string
+    {
+        return $this->sku?->product?->thumbnail?->url;
+    }
 }

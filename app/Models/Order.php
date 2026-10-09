@@ -12,6 +12,47 @@ class Order extends Model
 {
     use HasFactory;
 
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_PAID = 'paid';
+
+    public const STATUS_PROCESSING = 'processing';
+
+    public const STATUS_SHIPPED = 'shipped';
+
+    public const STATUS_COMPLETED = 'completed';
+
+    public const STATUS_CANCELLED = 'cancelled';
+
+    public const STATUS_EXPIRED = 'expired';
+
+    public static function getStatusLabels(): array
+    {
+        return [
+            self::STATUS_PENDING => 'Menunggu Pembayaran',
+            self::STATUS_PAID => 'Dibayar',
+            self::STATUS_PROCESSING => 'Diproses',
+            self::STATUS_SHIPPED => 'Dikirim',
+            self::STATUS_COMPLETED => 'Selesai',
+            self::STATUS_CANCELLED => 'Dibatalkan',
+            self::STATUS_EXPIRED => 'Kedaluwarsa',
+        ];
+    }
+
+    public static function getStatusColor(string $status): string
+    {
+        return match ($status) {
+            self::STATUS_PENDING => 'warning',
+            self::STATUS_PAID => 'info',
+            self::STATUS_PROCESSING => 'primary',
+            self::STATUS_SHIPPED => 'info',
+            self::STATUS_COMPLETED => 'success',
+            self::STATUS_CANCELLED => 'danger',
+            self::STATUS_EXPIRED => 'gray',
+            default => 'gray',
+        };
+    }
+
     protected $fillable = [
         'order_number',
         'user_id',
