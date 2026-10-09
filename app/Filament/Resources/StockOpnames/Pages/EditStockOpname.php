@@ -9,6 +9,7 @@ use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Auth;
 
 class EditStockOpname extends EditRecord
 {
@@ -31,7 +32,7 @@ class EditStockOpname extends EditRecord
                     $record = $this->getRecord();
 
                     try {
-                        $service->applyOpname($record, auth()->id());
+                        $service->applyOpname($record, Auth::id() ? (int) Auth::id() : null);
 
                         Notification::make()
                             ->title('Penyesuaian stok opname berhasil diterapkan')

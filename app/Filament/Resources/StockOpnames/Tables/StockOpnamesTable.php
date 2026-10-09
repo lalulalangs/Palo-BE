@@ -10,6 +10,7 @@ use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 
 class StockOpnamesTable
 {
@@ -68,7 +69,7 @@ class StockOpnamesTable
                     ->visible(fn (StockOpname $record): bool => ! $record->isCompleted())
                     ->action(function (StockOpname $record, StockMovementService $service): void {
                         try {
-                            $service->applyOpname($record, auth()->id());
+                            $service->applyOpname($record, Auth::id() ? (int) Auth::id() : null);
 
                             Notification::make()
                                 ->title('Penyesuaian stok opname berhasil diterapkan')

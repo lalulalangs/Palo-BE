@@ -12,6 +12,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Facades\Auth;
 
 class StockOpnameForm
 {
@@ -29,7 +30,7 @@ class StockOpnameForm
                         Select::make('user_id')
                             ->label('Petugas Pemeriksa')
                             ->relationship('auditor', 'name')
-                            ->default(auth()->id())
+                            ->default(fn () => Auth::id())
                             ->searchable()
                             ->preload()
                             ->required(),
