@@ -22,6 +22,33 @@ class OrderInfolist
     {
         return $schema
             ->components([
+                Section::make('Ringkasan Transaksi')
+                    ->columnSpanFull()
+                    ->schema([
+                        Grid::make(4)
+                            ->schema([
+                                TextEntry::make('order_number')
+                                    ->label('Nomor Pesanan')
+                                    ->fontFamily(FontFamily::Mono)
+                                    ->weight('bold')
+                                    ->copyable(),
+
+                                TextEntry::make('status')
+                                    ->label('Status Pesanan')
+                                    ->badge()
+                                    ->formatStateUsing(fn (string $state): string => Order::getStatusLabels()[$state] ?? $state)
+                                    ->color(fn (string $state): string => Order::getStatusColor($state)),
+
+                                TextEntry::make('created_at')
+                                    ->label('Waktu Checkout')
+                                    ->dateTime('d/m/Y H:i:s'),
+
+                                TextEntry::make('user.name')
+                                    ->label('Akun Pembeli')
+                                    ->placeholder('Guest / Pelanggan'),
+                            ]),
+                    ]),
+
                 Tabs::make('OrderTabs')
                     ->columnSpanFull()
                     ->tabs([

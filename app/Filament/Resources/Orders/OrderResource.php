@@ -29,6 +29,8 @@ class OrderResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Daftar Pesanan';
 
+    protected static ?string $recordTitleAttribute = 'order_number';
+
     protected static ?int $navigationSort = 1;
 
     public static function canCreate(): bool
