@@ -4,6 +4,7 @@ namespace App\Filament\Resources\StockOpnames\Schemas;
 
 use App\Models\Sku;
 use App\Models\StockOpname;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -12,6 +13,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
 
 class StockOpnameForm
@@ -36,10 +38,31 @@ class StockOpnameForm
                             ->searchable()
                             ->preload()
                             ->required(),
-                        TextInput::make('status')
+                        Placeholder::make('status')
                             ->label('Status Sesi')
-                            ->default(StockOpname::STATUS_DRAFT)
-                            ->readOnly(),
+                            ->badge()
+                            ->color(fn (?StockOpname $record, string $operation): string => match ($operation === 'create' || $record === null ? 'draft' : ($record->status ?? 'draft')) {
+                                StockOpname::STATUS_COMPLETED => 'success',
+                                StockOpname::STATUS_CANCELLED => 'danger',
+                                default => 'warning',
+                            })
+                            ->icon(fn (?StockOpname $record, string $operation): Heroicon => match ($operation === 'create' || $record === null ? 'draft' : ($record->status ?? 'draft')) {
+                                StockOpname::STATUS_COMPLETED => Heroicon::OutlinedCheckCircle,
+                                StockOpname::STATUS_CANCELLED => Heroicon::OutlinedXCircle,
+                                default => Heroicon::OutlinedClock,
+                            })
+                            ->content(fn (?StockOpname $record, string $operation): string => match ($operation === 'create' || $record === null ? 'draft' : ($record->status ?? 'draft')) {
+                                StockOpname::STATUS_COMPLETED => 'Selesai (Terkunci)',
+                                StockOpname::STATUS_CANCELLED => 'Dibatalkan',
+                                default => $operation === 'create' ? 'Draft (Baru)' : 'Draft Aktif',
+                            })
+                            ->helperText(fn (?StockOpname $record, string $operation): string => match ($operation === 'create' || $record === null ? 'draft' : ($record->status ?? 'draft')) {
+                                StockOpname::STATUS_COMPLETED => 'Penyesuaian stok telah dibukukan.',
+                                StockOpname::STATUS_CANCELLED => 'Sesi ditutup tanpa mutasi stok.',
+                                default => $operation === 'create'
+                                    ? 'Tahap input — Belum mempengaruhi saldo stok.'
+                                    : 'Editable — Belum dibukukan ke mutasi stok.',
+                            }),
                         Textarea::make('notes')
                             ->label('Catatan Audit')
                             ->placeholder('Contoh: Opname fisik rutin rak jaket & kaos gerai Senaru')

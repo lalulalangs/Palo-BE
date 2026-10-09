@@ -74,6 +74,8 @@ class StockOpnameResourceTest extends TestCase
     {
         Livewire::actingAs($this->admin)
             ->test(CreateStockOpname::class)
+            ->assertSee('Status Sesi')
+            ->assertSee('Draft (Baru)')
             ->fillForm([
                 'user_id' => $this->admin->id,
                 'notes' => 'Audit rak topi Senaru',
@@ -128,6 +130,8 @@ class StockOpnameResourceTest extends TestCase
 
         Livewire::actingAs($this->admin)
             ->test(EditStockOpname::class, ['record' => $opname->getKey()])
+            ->assertSee('Status Sesi')
+            ->assertSee('Draft Aktif')
             ->callAction('apply_opname')
             ->assertHasNoActionErrors()
             ->assertNotified('Penyesuaian stok opname berhasil diterapkan');
