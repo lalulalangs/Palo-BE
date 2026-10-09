@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\Orders\Tables;
 
+use App\Filament\Resources\Orders\Actions\OrderActions;
 use App\Models\Order;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -117,6 +119,16 @@ class OrdersTable
             ])
             ->recordActions([
                 ViewAction::make(),
+                OrderActions::makeProcessingAction(),
+                OrderActions::makeShipAction(),
+                OrderActions::makeCompleteAction(),
+                OrderActions::makeCancelAction(),
+            ])
+            ->bulkActions([
+                BulkActionGroup::make([
+                    OrderActions::makeBulkProcessingAction(),
+                    OrderActions::makeBulkExportAction(),
+                ]),
             ]);
     }
 }
