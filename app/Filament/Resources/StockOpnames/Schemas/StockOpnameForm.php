@@ -19,8 +19,10 @@ class StockOpnameForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
+            ->columns(1)
             ->components([
                 Section::make('Informasi Sesi Opname')
+                    ->columnSpanFull()
                     ->schema([
                         TextInput::make('opname_number')
                             ->label('Nomor Opname')
@@ -47,12 +49,14 @@ class StockOpnameForm
 
                 Section::make('Daftar Item Fisik')
                     ->description('Masukkan hasil penghitungan fisik di rak gudang. Selisih akan dihitung secara otomatis.')
+                    ->columnSpanFull()
                     ->schema([
                         Repeater::make('items')
                             ->relationship('items')
                             ->label('Item SKU')
                             ->addActionLabel('Tambah SKU untuk Diperiksa')
                             ->disabled(fn (?StockOpname $record): bool => $record?->isCompleted() ?? false)
+                            ->columnSpanFull()
                             ->schema([
                                 Select::make('sku_id')
                                     ->label('Pilih SKU')
