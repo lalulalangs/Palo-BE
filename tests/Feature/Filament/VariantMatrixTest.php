@@ -5,11 +5,11 @@ namespace Tests\Feature\Filament;
 use App\Filament\Actions\CreateVariantMatrix;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\RelationManagers\VariantsRelationManager;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sku;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
@@ -19,7 +19,7 @@ class VariantMatrixTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Product $product;
 
@@ -27,7 +27,7 @@ class VariantMatrixTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
 
@@ -118,7 +118,7 @@ class VariantMatrixTest extends TestCase
 
     public function test_aksi_matriks_dari_tabel_varian_berhasil_disimpan(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(VariantsRelationManager::class, [
                 'ownerRecord' => $this->product,
                 'pageClass' => EditProduct::class,

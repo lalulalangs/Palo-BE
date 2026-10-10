@@ -3,8 +3,8 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Pages\ManageSocialMediaSettings;
+use App\Models\AdminUser;
 use App\Models\AppSetting;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -13,27 +13,27 @@ class SocialMediaSettingsTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
     }
 
     public function test_authenticated_admin_can_render_social_media_settings_page(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->assertSuccessful();
     }
 
     public function test_form_contains_expected_fields(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->assertFormFieldExists('instagram_url')
             ->assertFormFieldExists('instagram_handle')
@@ -44,7 +44,7 @@ class SocialMediaSettingsTest extends TestCase
 
     public function test_can_save_valid_social_media_and_whatsapp_settings(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->fillForm([
                 'instagram_url' => 'https://instagram.com/palorinjani_official',
@@ -75,7 +75,7 @@ class SocialMediaSettingsTest extends TestCase
             'whatsapp_default_message' => 'Sapaan awal tes',
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->assertFormSet([
                 'instagram_url' => 'https://instagram.com/palorinjani',
@@ -88,7 +88,7 @@ class SocialMediaSettingsTest extends TestCase
 
     public function test_validation_rejects_invalid_url_for_instagram_and_facebook(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->fillForm([
                 'instagram_url' => 'javascript:alert(1)',
@@ -101,7 +101,7 @@ class SocialMediaSettingsTest extends TestCase
     public function test_validation_rejects_invalid_whatsapp_number_format(): void
     {
         // Must reject alphabetic or too short numbers
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->fillForm([
                 'whatsapp_number' => 'nomor_wa_palsu',
@@ -109,7 +109,7 @@ class SocialMediaSettingsTest extends TestCase
             ->call('save')
             ->assertHasFormErrors(['whatsapp_number']);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->fillForm([
                 'whatsapp_number' => '12345', // too short, does not match 08 or 62 prefix
@@ -122,7 +122,7 @@ class SocialMediaSettingsTest extends TestCase
     {
         AppSetting::setValue('instagram_url', 'https://instagram.com/old');
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->fillForm([
                 'instagram_url' => '',

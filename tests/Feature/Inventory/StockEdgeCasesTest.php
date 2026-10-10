@@ -4,6 +4,7 @@ namespace Tests\Feature\Inventory;
 
 use App\Filament\Resources\StockMovements\Pages\ListStockMovements;
 use App\Filament\Resources\StockOpnames\Pages\CreateStockOpname;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -11,7 +12,6 @@ use App\Models\Sku;
 use App\Models\StockMovement;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
-use App\Models\User;
 use App\Services\Inventory\StockMovementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
@@ -23,7 +23,7 @@ class StockEdgeCasesTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Sku $skuA;
 
@@ -37,7 +37,7 @@ class StockEdgeCasesTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin.edgecase@palorinjani.com',
             'name' => 'Admin QA',
         ]);
@@ -301,7 +301,7 @@ class StockEdgeCasesTest extends TestCase
 
     public function test_filament_opname_rejects_negative_physical_stock_in_form(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateStockOpname::class)
             ->fillForm([
                 'user_id' => $this->admin->id,
@@ -320,7 +320,7 @@ class StockEdgeCasesTest extends TestCase
 
     public function test_filament_quick_adjustment_rejects_zero_quantity_change(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListStockMovements::class)
             ->callAction('quick_adjustment', [
                 'sku_id' => $this->skuA->id,

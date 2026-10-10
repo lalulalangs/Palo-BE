@@ -166,11 +166,13 @@ Akses aplikasi melalui browser:
 
 ## Kredensial Default Admin
 
-Setelah menjalankan `php artisan db:seed`, akun administrator berikut siap digunakan:
+Setelah menjalankan `php artisan db:seed`, akun administrator superadmin dibuat otomatis dari variabel `.env` (`ADMIN_NAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD`) ke tabel `admin_users`:
 
 * **URL Login:** `http://127.0.0.1:8000/admin/login`
-* **Email:** `admin@palorinjani.com`
-* **Password:** `password`
+* **Email:** nilai `ADMIN_EMAIL` di `.env` (contoh: `admin@palorinjani.local`)
+* **Password:** nilai `ADMIN_PASSWORD` di `.env`
+
+Role & pengguna panel admin dikelola dari menu **Role & Pengguna** oleh superadmin.
 
 ---
 

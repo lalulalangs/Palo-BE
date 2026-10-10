@@ -19,6 +19,7 @@ class Role extends Model
     {
         return [
             'permissions' => 'array',
+            'is_super_admin' => 'boolean',
         ];
     }
 

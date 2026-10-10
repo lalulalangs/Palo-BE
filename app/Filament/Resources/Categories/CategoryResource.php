@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Categories;
 
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Filament\Resources\Categories\Pages\CreateCategory;
 use App\Filament\Resources\Categories\Pages\EditCategory;
 use App\Filament\Resources\Categories\Pages\ListCategories;
@@ -16,11 +18,18 @@ use Filament\Tables\Table;
 
 class CategoryResource extends Resource
 {
+    use HasAdminFeatureAccess;
+
     protected static ?string $model = Category::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::Categories;
+    }
 
     public static function form(Schema $schema): Schema
     {

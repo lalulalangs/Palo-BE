@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Address;
+use App\Models\AdminUser;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderStatusHistory;
@@ -19,24 +20,10 @@ class OrderManualVerificationSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Ensure Admin users exist for login
-        $envAdmin = User::firstOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@palorinjani.local')],
-            [
-                'name' => env('ADMIN_NAME', 'Admin Palo Senaru'),
-                'password_hash' => Hash::make(env('ADMIN_PASSWORD', 'Senaru#2026Aman')),
-                'email_verified_at' => now(),
-            ]
-        );
+        // 1. Pastikan role superadmin & akun admin panel sudah ada, lalu ambil aktornya.
+        $this->call(RoleAndAdminUserSeeder::class);
 
-        User::firstOrCreate(
-            ['email' => 'admin@palorinjani.com'],
-            [
-                'name' => 'Admin Palo Rinjani',
-                'password_hash' => Hash::make('password'),
-                'email_verified_at' => now(),
-            ]
-        );
+        $envAdmin = AdminUser::where('email', env('ADMIN_EMAIL', 'admin@palorinjani.local'))->firstOrFail();
 
         // 2. Ensure Customer user exists
         $customer = User::firstOrCreate(

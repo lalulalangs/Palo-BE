@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -24,7 +25,7 @@ class OrderActionsStrictQaTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected User $buyer;
 
@@ -36,7 +37,7 @@ class OrderActionsStrictQaTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin.sprint2qa@palorinjani.com',
             'name' => 'Lead Warehouse QA',
         ]);
@@ -107,19 +108,19 @@ class OrderActionsStrictQaTest extends TestCase
         $pendingOrder = $this->createOrder(Order::STATUS_PENDING);
 
         // A. mark_as_shipped mewajibkan tracking_number
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $processingOrder->getKey()])
             ->callAction('mark_as_shipped', ['tracking_number' => ''])
             ->assertHasActionErrors(['tracking_number' => ['required']]);
 
         // B. update_tracking mewajibkan tracking_number dan reason
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $shippedOrder->getKey()])
             ->callAction('update_tracking', ['tracking_number' => '', 'reason' => ''])
             ->assertHasActionErrors(['tracking_number' => ['required'], 'reason' => ['required']]);
 
         // C. cancel_order mewajibkan cancelled_reason
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $pendingOrder->getKey()])
             ->callAction('cancel_order', ['cancelled_reason' => ''])
             ->assertHasActionErrors(['cancelled_reason' => ['required']]);
@@ -142,7 +143,7 @@ class OrderActionsStrictQaTest extends TestCase
         };
         app()->instance(OrderTransitionService::class, $failingService);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->callAction('mark_as_processing')
             ->assertNotified(); // Memverifikasi notification danger terkirim, bukan 500 fatal crash
@@ -157,7 +158,7 @@ class OrderActionsStrictQaTest extends TestCase
         $orderShipped = $this->createOrder(Order::STATUS_SHIPPED, ['tracking_number' => 'RESI-SHIPPED']);
         $orderCompleted = $this->createOrder(Order::STATUS_COMPLETED);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->callTableBulkAction('bulk_processing', [$orderPending, $orderShipped, $orderCompleted])
             ->assertHasNoTableActionErrors()
@@ -183,7 +184,7 @@ class OrderActionsStrictQaTest extends TestCase
             'tracking_number' => null,
         ]);
 
-        $test = Livewire::actingAs($this->admin)
+        $test = Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->callTableBulkAction('bulk_export', [$orderComplex]);
 
@@ -224,7 +225,7 @@ class OrderActionsStrictQaTest extends TestCase
             'subtotal' => 7500000,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->callAction('cancel_order', [
                 'cancelled_reason' => 'Pembeli membatalkan kedua tenda sebelum kurir tiba',
@@ -266,7 +267,7 @@ class OrderActionsStrictQaTest extends TestCase
         $paidOrder = $this->createOrder(Order::STATUS_PAID);
 
         // A. Proses pesanan langsung dari tombol tabel
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->callTableAction('mark_as_processing', $paidOrder)
             ->assertHasNoTableActionErrors()
@@ -275,7 +276,7 @@ class OrderActionsStrictQaTest extends TestCase
         $this->assertEquals(Order::STATUS_PROCESSING, $paidOrder->fresh()->status);
 
         // B. Kirim pesanan langsung dari tombol tabel
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->callTableAction('mark_as_shipped', $paidOrder, [
                 'tracking_number' => 'JNT-ROW-TEST-123',
@@ -287,7 +288,7 @@ class OrderActionsStrictQaTest extends TestCase
         $this->assertEquals('JNT-ROW-TEST-123', $paidOrder->fresh()->tracking_number);
 
         // C. Selesaikan pesanan langsung dari tombol tabel
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->callTableAction('mark_as_completed', $paidOrder)
             ->assertHasNoTableActionErrors()
@@ -304,7 +305,7 @@ class OrderActionsStrictQaTest extends TestCase
         $order = $this->createOrder(Order::STATUS_SHIPPED, ['tracking_number' => 'RESI-VERSI-1']);
 
         // Update pertama: RESI-VERSI-1 -> RESI-VERSI-2
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->callAction('update_tracking', [
                 'tracking_number' => 'RESI-VERSI-2',
@@ -315,7 +316,7 @@ class OrderActionsStrictQaTest extends TestCase
         $this->assertEquals('RESI-VERSI-2', $order->fresh()->tracking_number);
 
         // Update kedua: RESI-VERSI-2 -> RESI-VERSI-3
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->callAction('update_tracking', [
                 'tracking_number' => 'RESI-VERSI-3',

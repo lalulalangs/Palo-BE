@@ -3,12 +3,12 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\StockMovements\Pages\ListStockMovements;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sku;
 use App\Models\StockMovement;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -17,7 +17,7 @@ class StockMovementResourceTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Sku $sku;
 
@@ -25,7 +25,7 @@ class StockMovementResourceTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
             'name' => 'Admin Gudang Senaru',
         ]);
@@ -63,7 +63,7 @@ class StockMovementResourceTest extends TestCase
             'notes' => 'Stok awal gudang',
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListStockMovements::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$movement]);
@@ -71,7 +71,7 @@ class StockMovementResourceTest extends TestCase
 
     public function test_quick_adjustment_action_creates_restock_and_updates_sku_stock(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListStockMovements::class)
             ->callAction('quick_adjustment', [
                 'sku_id' => $this->sku->id,
@@ -98,7 +98,7 @@ class StockMovementResourceTest extends TestCase
 
     public function test_quick_adjustment_prevents_excessive_decrement(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListStockMovements::class)
             ->callAction('quick_adjustment', [
                 'sku_id' => $this->sku->id,

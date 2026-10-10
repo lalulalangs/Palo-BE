@@ -4,6 +4,7 @@ namespace Tests\Feature\Orders;
 
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -24,7 +25,7 @@ class OrderStrictQaTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected User $buyer;
 
@@ -38,7 +39,7 @@ class OrderStrictQaTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'qa.admin@palorinjani.com',
             'name' => 'QA Lead Admin',
         ]);
@@ -360,7 +361,7 @@ class OrderStrictQaTest extends TestCase
             'created_at' => now(),
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $sparseOrder->getKey()])
             ->assertSuccessful()
             ->assertSee($sparseOrder->order_number)
@@ -387,28 +388,28 @@ class OrderStrictQaTest extends TestCase
         ]);
 
         // 1. Search by Order Number
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->searchTable('SEARCH-RESI-01')
             ->assertCanSeeTableRecords([$orderWithResi])
             ->assertCanNotSeeTableRecords([$orderNoResi]);
 
         // 2. Search by Recipient Name
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->searchTable('Sembalun')
             ->assertCanSeeTableRecords([$orderWithResi])
             ->assertCanNotSeeTableRecords([$orderNoResi]);
 
         // 3. Filter "has_resi = yes"
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->filterTable('tracking_status', ['has_resi' => 'yes'])
             ->assertCanSeeTableRecords([$orderWithResi])
             ->assertCanNotSeeTableRecords([$orderNoResi]);
 
         // 4. Filter "has_resi = no"
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->filterTable('tracking_status', ['has_resi' => 'no'])
             ->assertCanSeeTableRecords([$orderNoResi])

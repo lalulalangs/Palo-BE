@@ -3,8 +3,8 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\Banners\Pages\EditBanner;
+use App\Models\AdminUser;
 use App\Models\Banner;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -19,7 +19,7 @@ class ImageFileUploadTest extends TestCase
         Storage::fake('public', ['url' => 'http://localhost:8000/storage']);
         Storage::disk('public')->put('banners/example.webp', $this->webpBytes());
 
-        $admin = User::factory()->create([
+        $admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
 
@@ -30,7 +30,7 @@ class ImageFileUploadTest extends TestCase
             'sort_order' => 0,
         ]);
 
-        $livewire = Livewire::actingAs($admin)
+        $livewire = Livewire::actingAs($admin, 'admin')
             ->test(EditBanner::class, ['record' => $banner->getRouteKey()])
             ->assertSuccessful();
 
@@ -59,7 +59,7 @@ class ImageFileUploadTest extends TestCase
         Storage::fake('public', ['url' => 'https://cdn.example.com/media']);
         Storage::disk('public')->put('banners/example.webp', $this->webpBytes());
 
-        $admin = User::factory()->create([
+        $admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
 
@@ -70,7 +70,7 @@ class ImageFileUploadTest extends TestCase
             'sort_order' => 0,
         ]);
 
-        $livewire = Livewire::actingAs($admin)
+        $livewire = Livewire::actingAs($admin, 'admin')
             ->test(EditBanner::class, ['record' => $banner->getRouteKey()])
             ->assertSuccessful();
 

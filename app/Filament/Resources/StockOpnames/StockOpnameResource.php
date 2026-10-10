@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\StockOpnames;
 
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Filament\Resources\StockOpnames\Pages\CreateStockOpname;
 use App\Filament\Resources\StockOpnames\Pages\EditStockOpname;
 use App\Filament\Resources\StockOpnames\Pages\ListStockOpnames;
@@ -17,6 +19,8 @@ use UnitEnum;
 
 class StockOpnameResource extends Resource
 {
+    use HasAdminFeatureAccess;
+
     protected static ?string $model = StockOpname::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedScale;
@@ -26,6 +30,11 @@ class StockOpnameResource extends Resource
     protected static ?string $navigationLabel = 'Opname Stok';
 
     protected static ?int $navigationSort = 2;
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::StockOpnames;
+    }
 
     public static function form(Schema $schema): Schema
     {

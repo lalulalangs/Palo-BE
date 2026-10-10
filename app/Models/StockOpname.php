@@ -34,7 +34,7 @@ class StockOpname extends Model
 
     public function auditor(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(AdminUser::class, 'user_id');
     }
 
     public function items(): HasMany

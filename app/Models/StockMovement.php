@@ -49,7 +49,7 @@ class StockMovement extends Model
 
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(AdminUser::class);
     }
 
     public function reference(): MorphTo

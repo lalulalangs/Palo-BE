@@ -11,6 +11,20 @@ class Payment extends Model
 {
     use HasFactory;
 
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_SETTLEMENT = 'settlement';
+
+    public const STATUS_CAPTURE = 'capture';
+
+    public const STATUS_DENY = 'deny';
+
+    public const STATUS_CANCEL = 'cancel';
+
+    public const STATUS_EXPIRE = 'expire';
+
+    public const STATUS_REFUND = 'refund';
+
     protected $fillable = [
         'order_id',
         'gateway',

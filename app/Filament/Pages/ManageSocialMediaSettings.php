@@ -2,6 +2,8 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Models\AppSetting;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -21,6 +23,7 @@ use UnitEnum;
 
 class ManageSocialMediaSettings extends Page
 {
+    use HasAdminFeatureAccess;
     use InteractsWithFormActions;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedGlobeAlt;
@@ -39,6 +42,11 @@ class ManageSocialMediaSettings extends Page
      * @var array<string, mixed> | null
      */
     public ?array $data = [];
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::SocialMediaSettings;
+    }
 
     public function mount(): void
     {

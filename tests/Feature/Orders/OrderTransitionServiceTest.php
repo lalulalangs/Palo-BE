@@ -2,9 +2,11 @@
 
 namespace Tests\Feature\Orders;
 
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sku;
@@ -20,7 +22,7 @@ class OrderTransitionServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected User $buyer;
 
@@ -32,7 +34,7 @@ class OrderTransitionServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create(['email' => 'admin@palorinjani.com']);
+        $this->admin = AdminUser::factory()->create(['email' => 'admin@palorinjani.com']);
         $this->buyer = User::factory()->create(['email' => 'buyer@example.com']);
         $this->service = app(OrderTransitionService::class);
 
@@ -117,6 +119,31 @@ class OrderTransitionServiceTest extends TestCase
         ]);
     }
 
+    public function test_mark_as_paid_updates_payment_status_if_payment_exists(): void
+    {
+        $order = $this->createSampleOrder(Order::STATUS_PENDING, 1);
+
+        Payment::create([
+            'order_id' => $order->id,
+            'gateway' => 'midtrans',
+            'gateway_transaction_id' => 'MID-TEST-9988',
+            'payment_method' => 'bank_transfer_bca',
+            'amount' => 520000,
+            'status' => Payment::STATUS_PENDING,
+        ]);
+
+        $result = $this->service->markAsPaid($order, $this->admin->id);
+
+        $this->assertEquals(Order::STATUS_PAID, $result->status);
+        $this->assertNotNull($result->payment);
+        $this->assertEquals(Payment::STATUS_SETTLEMENT, $result->payment->status);
+        $this->assertNotNull($result->payment->paid_at);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'status' => Payment::STATUS_SETTLEMENT,
+        ]);
+    }
+
     public function test_cannot_mark_as_paid_if_not_pending(): void
     {
         $order = $this->createSampleOrder(Order::STATUS_PAID, 1);
@@ -139,6 +166,14 @@ class OrderTransitionServiceTest extends TestCase
         ]);
     }
 
+    public function test_cannot_mark_as_processing_if_not_paid(): void
+    {
+        $order = $this->createSampleOrder(Order::STATUS_PENDING, 1);
+
+        $this->expectException(LogicException::class);
+        $this->service->markAsProcessing($order, $this->admin->id);
+    }
+
     public function test_mark_as_shipped_requires_tracking_number_and_processing_status(): void
     {
         $order = $this->createSampleOrder(Order::STATUS_PROCESSING, 2);
@@ -152,6 +187,14 @@ class OrderTransitionServiceTest extends TestCase
             'order_id' => $order->id,
             'to_status' => Order::STATUS_SHIPPED,
         ]);
+    }
+
+    public function test_cannot_mark_as_shipped_if_not_processing(): void
+    {
+        $order = $this->createSampleOrder(Order::STATUS_PAID, 1);
+
+        $this->expectException(LogicException::class);
+        $this->service->markAsShipped($order, 'JNE-8823910293', $this->admin->id);
     }
 
     public function test_mark_as_shipped_throws_exception_if_tracking_empty(): void
@@ -173,6 +216,14 @@ class OrderTransitionServiceTest extends TestCase
             'order_id' => $order->id,
             'to_status' => Order::STATUS_COMPLETED,
         ]);
+    }
+
+    public function test_cannot_mark_as_completed_if_not_shipped(): void
+    {
+        $order = $this->createSampleOrder(Order::STATUS_PROCESSING, 1);
+
+        $this->expectException(LogicException::class);
+        $this->service->markAsCompleted($order, $this->admin->id);
     }
 
     public function test_cancel_order_restores_stock_if_previously_paid(): void

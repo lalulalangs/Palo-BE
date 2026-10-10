@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Collections;
 
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Filament\Resources\Collections\Pages\CreateCollection;
 use App\Filament\Resources\Collections\Pages\EditCollection;
 use App\Filament\Resources\Collections\Pages\ListCollections;
@@ -19,6 +21,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CollectionResource extends Resource
 {
+    use HasAdminFeatureAccess;
+
     protected static ?string $model = Collection::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
@@ -32,6 +36,11 @@ class CollectionResource extends Resource
     protected static ?string $pluralModelLabel = 'Koleksi Produk';
 
     protected static ?int $navigationSort = 4;
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::Collections;
+    }
 
     public static function form(Schema $schema): Schema
     {

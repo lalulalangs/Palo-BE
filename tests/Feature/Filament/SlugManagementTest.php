@@ -8,9 +8,9 @@ use App\Filament\Resources\Categories\Pages\ListCategories;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -19,7 +19,7 @@ class SlugManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Category $category;
 
@@ -27,7 +27,7 @@ class SlugManagementTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
 
@@ -39,7 +39,7 @@ class SlugManagementTest extends TestCase
 
     public function test_category_slug_is_auto_generated_on_create_page(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateCategory::class)
             ->set('data.name', 'Peralatan Tenda & Camping')
             ->assertSet('data.slug', 'peralatan-tenda-camping');
@@ -52,7 +52,7 @@ class SlugManagementTest extends TestCase
             'slug' => 'carrier-bag',
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(EditCategory::class, [
                 'record' => $category->id,
             ])
@@ -63,7 +63,7 @@ class SlugManagementTest extends TestCase
 
     public function test_category_slug_can_be_manually_customized(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateCategory::class)
             ->set('data.name', 'Sepatu Gunung Anti Air')
             ->assertSet('data.slug', 'sepatu-gunung-anti-air')
@@ -79,7 +79,7 @@ class SlugManagementTest extends TestCase
 
     public function test_product_slug_is_auto_generated_on_create_page(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateProduct::class)
             ->set('data.name', 'Jaket Gunung Rinjani Pro')
             ->assertSet('data.slug', 'jaket-gunung-rinjani-pro');
@@ -94,7 +94,7 @@ class SlugManagementTest extends TestCase
             'base_price' => 200000.00,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(EditProduct::class, [
                 'record' => $product->id,
             ])
@@ -135,7 +135,7 @@ class SlugManagementTest extends TestCase
             'base_price' => 100000.00,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListProducts::class)
             ->callTableBulkAction('delete', [$product]);
 
@@ -151,7 +151,7 @@ class SlugManagementTest extends TestCase
             'slug' => 'kategori-dihapus',
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListCategories::class)
             ->callTableBulkAction('delete', [$category]);
 
@@ -162,7 +162,7 @@ class SlugManagementTest extends TestCase
 
     public function test_can_select_category_in_product_form(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateProduct::class)
             ->set('data.category_id', $this->category->id)
             ->assertSet('data.category_id', $this->category->id);

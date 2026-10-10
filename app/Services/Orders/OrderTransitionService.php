@@ -4,6 +4,7 @@ namespace App\Services\Orders;
 
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
+use App\Models\Payment;
 use App\Models\Sku;
 use App\Models\StockMovement;
 use App\Services\Inventory\StockMovementService;
@@ -19,6 +20,12 @@ class OrderTransitionService
 
     /**
      * Tandai pesanan sebagai telah dibayar (paid) dan kurangi stok fisik inventaris.
+     *
+     * Catatan Arsitektur (F-06 Audit):
+     * Metode ini dibungkus dalam DB::transaction(). Pemanggilan ke StockMovementService::recordMovement()
+     * di dalamnya akan membuka transaksi bersarang yang secara otomatis dipetakan oleh PostgreSQL / PDO
+     * sebagai database SAVEPOINT. Komposisi ini memastikan atomisitas transisi status pesanan dan
+     * mutasi kartu stok secara bersamaan.
      */
     public function markAsPaid(Order $order, ?int $actorId = null, ?string $note = null): Order
     {
@@ -66,7 +73,7 @@ class OrderTransitionService
 
             if ($lockedOrder->payment) {
                 $lockedOrder->payment->update([
-                    'status' => 'settlement',
+                    'status' => Payment::STATUS_SETTLEMENT,
                     'paid_at' => now(),
                 ]);
             }
@@ -182,6 +189,10 @@ class OrderTransitionService
 
     /**
      * Batalkan pesanan dengan alasan jelas. Mengembalikan stok fisik jika pesanan telah lunas/diproses.
+     *
+     * Catatan Arsitektur (F-06 Audit):
+     * Metode ini dibungkus dalam DB::transaction(). Pemanggilan ke StockMovementService::recordMovement()
+     * di dalamnya memanfaatkan nested transaction SAVEPOINT database secara atomik.
      */
     public function cancelOrder(Order $order, string $reason, ?int $actorId = null): Order
     {

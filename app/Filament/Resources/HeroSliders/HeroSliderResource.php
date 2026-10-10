@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\HeroSliders;
 
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Filament\Resources\HeroSliders\Pages\CreateHeroSlider;
 use App\Filament\Resources\HeroSliders\Pages\EditHeroSlider;
 use App\Filament\Resources\HeroSliders\Pages\ListHeroSliders;
@@ -16,11 +18,18 @@ use Filament\Tables\Table;
 
 class HeroSliderResource extends Resource
 {
+    use HasAdminFeatureAccess;
+
     protected static ?string $model = HeroSlider::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPhoto;
 
     protected static ?string $recordTitleAttribute = 'title';
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::HeroSliders;
+    }
 
     public static function form(Schema $schema): Schema
     {

@@ -5,6 +5,7 @@ namespace Tests\Feature\Filament;
 use App\Filament\Resources\StockOpnames\Pages\CreateStockOpname;
 use App\Filament\Resources\StockOpnames\Pages\EditStockOpname;
 use App\Filament\Resources\StockOpnames\Pages\ListStockOpnames;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -12,7 +13,6 @@ use App\Models\Sku;
 use App\Models\StockMovement;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -21,7 +21,7 @@ class StockOpnameResourceTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Sku $sku;
 
@@ -29,7 +29,7 @@ class StockOpnameResourceTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
             'name' => 'Admin Opname',
         ]);
@@ -64,7 +64,7 @@ class StockOpnameResourceTest extends TestCase
             'notes' => 'Opname sesi 1',
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListStockOpnames::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$opname]);
@@ -72,7 +72,7 @@ class StockOpnameResourceTest extends TestCase
 
     public function test_can_create_draft_stock_opname_with_items(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateStockOpname::class)
             ->assertSee('Status Sesi')
             ->assertSee('Draft (Baru)')
@@ -128,7 +128,7 @@ class StockOpnameResourceTest extends TestCase
             'notes' => 'Hilang saat display gerai',
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(EditStockOpname::class, ['record' => $opname->getKey()])
             ->assertSee('Status Sesi')
             ->assertSee('Draft Aktif')

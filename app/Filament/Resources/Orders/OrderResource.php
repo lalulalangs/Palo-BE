@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Orders;
 
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Filament\Resources\Orders\Schemas\OrderInfolist;
@@ -17,6 +19,8 @@ use UnitEnum;
 
 class OrderResource extends Resource
 {
+    use HasAdminFeatureAccess;
+
     protected static ?string $model = Order::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingBag;
@@ -32,6 +36,11 @@ class OrderResource extends Resource
     protected static ?string $recordTitleAttribute = 'order_number';
 
     protected static ?int $navigationSort = 1;
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::Orders;
+    }
 
     public static function canCreate(): bool
     {

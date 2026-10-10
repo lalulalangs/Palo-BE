@@ -6,10 +6,8 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sku;
-use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
@@ -20,16 +18,9 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. Admin User — kredensial diambil dari .env agar login /admin
-        // selalu konsisten setiap fresh migrate/seed.
-        $admin = User::firstOrCreate(
-            ['email' => env('ADMIN_EMAIL', 'admin@palorinjani.com')],
-            [
-                'name' => env('ADMIN_NAME', 'Admin PaloRinjani'),
-                'password_hash' => Hash::make(env('ADMIN_PASSWORD', 'password')),
-                'email_verified_at' => now(),
-            ]
-        );
+        // 1. Role superadmin & akun admin panel — kredensial diambil dari .env
+        // agar login /admin selalu konsisten setiap fresh migrate/seed.
+        $this->call(RoleAndAdminUserSeeder::class);
 
         // 2. Initial Categories
         $apparel = Category::firstOrCreate(

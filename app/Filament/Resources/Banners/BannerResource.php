@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Banners;
 
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Filament\Resources\Banners\Pages\CreateBanner;
 use App\Filament\Resources\Banners\Pages\EditBanner;
 use App\Filament\Resources\Banners\Pages\ListBanners;
@@ -16,6 +18,8 @@ use Filament\Tables\Table;
 
 class BannerResource extends Resource
 {
+    use HasAdminFeatureAccess;
+
     protected static ?string $model = Banner::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPhoto;
@@ -23,6 +27,11 @@ class BannerResource extends Resource
     protected static ?string $recordTitleAttribute = 'title';
 
     protected static ?int $navigationSort = 3;
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::Banners;
+    }
 
     public static function form(Schema $schema): Schema
     {

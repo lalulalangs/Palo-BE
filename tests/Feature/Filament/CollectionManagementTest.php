@@ -6,10 +6,10 @@ use App\Filament\Resources\Collections\Pages\CreateCollection;
 use App\Filament\Resources\Collections\Pages\EditCollection;
 use App\Filament\Resources\Collections\Pages\ListCollections;
 use App\Filament\Resources\Collections\RelationManagers\ProductsRelationManager;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Collection;
 use App\Models\Product;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +20,7 @@ class CollectionManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Category $category;
 
@@ -28,7 +28,7 @@ class CollectionManagementTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
 
@@ -48,7 +48,7 @@ class CollectionManagementTest extends TestCase
             'sort_order' => 1,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListCollections::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$collection]);
@@ -56,7 +56,7 @@ class CollectionManagementTest extends TestCase
 
     public function test_can_render_create_collection_page(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateCollection::class)
             ->assertSuccessful()
             ->assertFormFieldExists('name')
@@ -68,7 +68,7 @@ class CollectionManagementTest extends TestCase
 
     public function test_can_create_collection(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateCollection::class)
             ->fillForm([
                 'name' => 'DECADE Collection',
@@ -98,7 +98,7 @@ class CollectionManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(EditCollection::class, [
                 'record' => $collection->getRouteKey(),
             ])
@@ -124,7 +124,7 @@ class CollectionManagementTest extends TestCase
 
         $collection->products()->attach($product->id, ['sort_order' => 1]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -149,7 +149,7 @@ class CollectionManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -183,7 +183,7 @@ class CollectionManagementTest extends TestCase
 
         $collection->products()->attach($product->id, ['sort_order' => 1]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -199,7 +199,7 @@ class CollectionManagementTest extends TestCase
 
     public function test_creating_collection_redirects_to_edit_page(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateCollection::class)
             ->fillForm([
                 'name' => 'Ekspedisi Segara Anak',
@@ -221,7 +221,7 @@ class CollectionManagementTest extends TestCase
         $desktop = UploadedFile::fake()->image('banner-desktop.jpg', 2400, 1200);
         $mobile = UploadedFile::fake()->image('banner-mobile.png', 1080, 1920);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateCollection::class)
             ->fillForm([
                 'name' => 'Series Rinjani Peak',
@@ -245,7 +245,7 @@ class CollectionManagementTest extends TestCase
 
     public function test_ended_at_cannot_be_before_published_at_in_collection_form(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateCollection::class)
             ->fillForm([
                 'name' => 'Flash Event Series',

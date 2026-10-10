@@ -5,11 +5,11 @@ namespace Tests\Feature\Filament;
 use App\Filament\Resources\Collections\Pages\EditCollection;
 use App\Filament\Resources\Collections\RelationManagers\ProductsRelationManager;
 use App\Filament\Resources\Products\Pages\CreateProduct;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Collection;
 use App\Models\Product;
 use App\Models\ProductMedia;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -20,7 +20,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Category $category;
 
@@ -28,7 +28,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin.qa@palorinjani.com',
         ]);
 
@@ -49,7 +49,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
             'is_active' => true,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -82,7 +82,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
             'is_active' => true,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -117,7 +117,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
 
         $collection->products()->attach($product->id, ['sort_order' => 10]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -158,7 +158,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
         $collection->products()->attach($product->id, ['sort_order' => 5]);
         $this->assertCount(1, $collection->fresh()->products);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -223,7 +223,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
 
         $this->assertCount(3, $collection->fresh()->products);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -276,7 +276,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
             $pWithoutImage->id => ['sort_order' => 2],
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ProductsRelationManager::class, [
                 'ownerRecord' => $collection,
                 'pageClass' => EditCollection::class,
@@ -357,7 +357,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
         $c1 = Collection::create(['name' => 'Koleksi 1', 'slug' => 'koleksi-1', 'is_active' => true]);
         $c2 = Collection::create(['name' => 'Koleksi 2', 'slug' => 'koleksi-2', 'is_active' => true]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateProduct::class)
             ->fillForm([
                 'category_id' => $this->category->id,

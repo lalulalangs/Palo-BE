@@ -5,8 +5,8 @@ namespace Tests\Feature\Filament;
 use App\Filament\Resources\Banners\Pages\CreateBanner;
 use App\Filament\Resources\Banners\Pages\EditBanner;
 use App\Filament\Resources\Banners\Pages\ListBanners;
+use App\Models\AdminUser;
 use App\Models\Banner;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -17,13 +17,13 @@ class BannerManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
     }
@@ -39,7 +39,7 @@ class BannerManagementTest extends TestCase
             'sort_order' => 0,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListBanners::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$banner]);
@@ -47,7 +47,7 @@ class BannerManagementTest extends TestCase
 
     public function test_can_render_create_banner_page(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateBanner::class)
             ->assertSuccessful()
             ->assertFormFieldExists('title')
@@ -63,7 +63,7 @@ class BannerManagementTest extends TestCase
 
         $file = UploadedFile::fake()->image('banner-hero.jpg', 1920, 800);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateBanner::class)
             ->fillForm([
                 'title' => 'Grand Opening Palo Rinjani',
@@ -94,7 +94,7 @@ class BannerManagementTest extends TestCase
             'sort_order' => 1,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(EditBanner::class, [
                 'record' => $banner->getRouteKey(),
             ])
@@ -178,7 +178,7 @@ class BannerManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(EditBanner::class, [
                 'record' => $banner->getRouteKey(),
             ])

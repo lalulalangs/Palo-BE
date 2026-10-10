@@ -4,6 +4,7 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -20,7 +21,7 @@ class OrderActionsWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected User $buyer;
 
@@ -30,7 +31,7 @@ class OrderActionsWorkflowTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin.warehouse@palorinjani.com',
             'name' => 'Admin Gudang',
         ]);
@@ -96,7 +97,7 @@ class OrderActionsWorkflowTest extends TestCase
     {
         $order = $this->createOrder(Order::STATUS_PAID);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->assertActionVisible('mark_as_processing')
             ->callAction('mark_as_processing')
@@ -116,7 +117,7 @@ class OrderActionsWorkflowTest extends TestCase
     {
         $order = $this->createOrder(Order::STATUS_PROCESSING);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->assertActionVisible('mark_as_shipped')
             ->callAction('mark_as_shipped', [
@@ -144,7 +145,7 @@ class OrderActionsWorkflowTest extends TestCase
             'tracking_number' => 'JNE-TYPO-001',
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->assertActionVisible('update_tracking')
             ->callAction('update_tracking', [
@@ -172,7 +173,7 @@ class OrderActionsWorkflowTest extends TestCase
             'tracking_number' => 'JNE-OK-888',
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->assertActionVisible('mark_as_completed')
             ->callAction('mark_as_completed')
@@ -193,7 +194,7 @@ class OrderActionsWorkflowTest extends TestCase
         $this->sku->update(['stock' => 18]);
         $order = $this->createOrder(Order::STATUS_PROCESSING, 2);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->assertActionVisible('cancel_order')
             ->callAction('cancel_order', [
@@ -223,7 +224,7 @@ class OrderActionsWorkflowTest extends TestCase
         $paid2 = $this->createOrder(Order::STATUS_PAID);
         $shipped = $this->createOrder(Order::STATUS_SHIPPED, 1, ['tracking_number' => 'JNE-ALREADY-SHIPPED']);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->callTableBulkAction('bulk_processing', [$paid1, $paid2, $shipped])
             ->assertHasNoTableActionErrors()
@@ -239,7 +240,7 @@ class OrderActionsWorkflowTest extends TestCase
         $order1 = $this->createOrder(Order::STATUS_PAID, 1, ['order_number' => 'UJN-CSV-001']);
         $order2 = $this->createOrder(Order::STATUS_SHIPPED, 1, ['order_number' => 'UJN-CSV-002']);
 
-        $test = Livewire::actingAs($this->admin)
+        $test = Livewire::actingAs($this->admin, 'admin')
             ->test(ListOrders::class)
             ->callTableBulkAction('bulk_export', [$order1, $order2]);
 
@@ -250,7 +251,7 @@ class OrderActionsWorkflowTest extends TestCase
     {
         // 1. Pending: hanya boleh cancel_order
         $pending = $this->createOrder(Order::STATUS_PENDING);
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $pending->getKey()])
             ->assertActionVisible('cancel_order')
             ->assertActionHidden('mark_as_processing')
@@ -260,7 +261,7 @@ class OrderActionsWorkflowTest extends TestCase
 
         // 2. Paid: boleh mark_as_processing dan cancel_order
         $paid = $this->createOrder(Order::STATUS_PAID);
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $paid->getKey()])
             ->assertActionVisible('mark_as_processing')
             ->assertActionVisible('cancel_order')
@@ -270,7 +271,7 @@ class OrderActionsWorkflowTest extends TestCase
 
         // 3. Shipped: boleh update_tracking dan mark_as_completed, tidak boleh cancel
         $shipped = $this->createOrder(Order::STATUS_SHIPPED, 1, ['tracking_number' => 'RESI-TEST']);
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $shipped->getKey()])
             ->assertActionVisible('update_tracking')
             ->assertActionVisible('mark_as_completed')
@@ -280,7 +281,7 @@ class OrderActionsWorkflowTest extends TestCase
 
         // 4. Completed: semua aksi hidden
         $completed = $this->createOrder(Order::STATUS_COMPLETED);
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $completed->getKey()])
             ->assertActionHidden('mark_as_processing')
             ->assertActionHidden('mark_as_shipped')

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Inventory;
 
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -9,7 +10,6 @@ use App\Models\Sku;
 use App\Models\StockMovement;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
-use App\Models\User;
 use App\Services\Inventory\StockMovementService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
@@ -20,7 +20,7 @@ class StockMovementServiceTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Sku $sku;
 
@@ -30,7 +30,7 @@ class StockMovementServiceTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create(['email' => 'admin@palorinjani.com']);
+        $this->admin = AdminUser::factory()->create(['email' => 'admin@palorinjani.com']);
         $this->service = app(StockMovementService::class);
 
         $category = Category::create(['name' => 'T-Shirt', 'slug' => 't-shirt']);

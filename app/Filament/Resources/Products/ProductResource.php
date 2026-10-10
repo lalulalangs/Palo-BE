@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Products;
 
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
@@ -19,11 +21,18 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ProductResource extends Resource
 {
+    use HasAdminFeatureAccess;
+
     protected static ?string $model = Product::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::Products;
+    }
 
     public static function form(Schema $schema): Schema
     {
