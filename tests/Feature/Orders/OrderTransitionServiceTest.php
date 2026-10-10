@@ -6,6 +6,7 @@ use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderStatusHistory;
 use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -117,6 +118,20 @@ class OrderTransitionServiceTest extends TestCase
             'to_status' => Order::STATUS_PAID,
             'note' => 'Pembayaran Midtrans VA sukses',
         ]);
+    }
+
+    public function test_status_history_actor_relation_resolves_to_admin_user(): void
+    {
+        $order = $this->createSampleOrder(Order::STATUS_PENDING, 1);
+
+        $this->service->markAsPaid($order, $this->admin->id, 'Pembayaran terverifikasi');
+
+        $history = OrderStatusHistory::where('order_id', $order->id)->latest('id')->firstOrFail();
+
+        $this->assertInstanceOf(AdminUser::class, $history->changedBy);
+        $this->assertInstanceOf(AdminUser::class, $history->changedByAdmin);
+        $this->assertTrue($history->changedBy->is($this->admin));
+        $this->assertTrue($history->changedByAdmin->is($this->admin));
     }
 
     public function test_mark_as_paid_updates_payment_status_if_payment_exists(): void

@@ -257,6 +257,88 @@ class AdminUserResourceTest extends TestCase
         $this->assertTrue(Hash::check('password_baru_saya_123', $manager->fresh()->password_hash));
     }
 
+    public function test_non_superadmin_cannot_change_email_of_another_user(): void
+    {
+        $manager = AdminUser::factory()->create([
+            'role_id' => Role::factory()->create([
+                'permissions' => [AdminFeature::AdminUsers->value],
+            ])->id,
+        ]);
+
+        $target = AdminUser::factory()->create(['email' => 'staff@palorinjani.test']);
+
+        Livewire::actingAs($manager, 'admin')
+            ->test(EditAdminUser::class, ['record' => $target->getKey()])
+            ->fillForm([
+                'email' => 'hijacked@palorinjani.test',
+            ])
+            ->call('save')
+            ->assertHasFormErrors(['email']);
+
+        $this->assertSame('staff@palorinjani.test', $target->fresh()->email);
+    }
+
+    public function test_non_superadmin_cannot_deactivate_another_user(): void
+    {
+        $manager = AdminUser::factory()->create([
+            'role_id' => Role::factory()->create([
+                'permissions' => [AdminFeature::AdminUsers->value],
+            ])->id,
+        ]);
+
+        $target = AdminUser::factory()->create(['is_active' => true]);
+
+        Livewire::actingAs($manager, 'admin')
+            ->test(EditAdminUser::class, ['record' => $target->getKey()])
+            ->fillForm([
+                'is_active' => false,
+            ])
+            ->call('save')
+            ->assertHasFormErrors(['is_active']);
+
+        $this->assertTrue($target->fresh()->is_active);
+    }
+
+    public function test_non_superadmin_can_change_own_email(): void
+    {
+        $manager = AdminUser::factory()->create([
+            'role_id' => Role::factory()->create([
+                'permissions' => [AdminFeature::AdminUsers->value],
+            ])->id,
+            'email' => 'manager@palorinjani.test',
+        ]);
+
+        Livewire::actingAs($manager, 'admin')
+            ->test(EditAdminUser::class, ['record' => $manager->getKey()])
+            ->fillForm([
+                'email' => 'manager.baru@palorinjani.test',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('manager.baru@palorinjani.test', $manager->fresh()->email);
+    }
+
+    public function test_superadmin_can_change_email_and_active_status_of_another_user(): void
+    {
+        $target = AdminUser::factory()->create([
+            'email' => 'old.staff@palorinjani.test',
+            'is_active' => true,
+        ]);
+
+        Livewire::actingAs($this->superAdmin, 'admin')
+            ->test(EditAdminUser::class, ['record' => $target->getKey()])
+            ->fillForm([
+                'email' => 'new.staff@palorinjani.test',
+                'is_active' => false,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('new.staff@palorinjani.test', $target->fresh()->email);
+        $this->assertFalse($target->fresh()->is_active);
+    }
+
     public function test_superadmin_can_change_role_and_password_of_any_user(): void
     {
         $targetUser = AdminUser::factory()->create([

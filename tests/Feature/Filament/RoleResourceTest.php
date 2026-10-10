@@ -5,6 +5,7 @@ namespace Tests\Feature\Filament;
 use App\Enums\AdminFeature;
 use App\Filament\Resources\Roles\Pages\CreateRole;
 use App\Filament\Resources\Roles\Pages\EditRole;
+use App\Filament\Resources\Roles\Pages\ListRoles;
 use App\Models\AdminUser;
 use App\Models\Role;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -101,6 +102,38 @@ class RoleResourceTest extends TestCase
 
         $this->assertFalse($this->superAdmin->can('update', $superAdminRole));
         $this->assertFalse($this->superAdmin->can('delete', $superAdminRole));
+    }
+
+    public function test_role_that_still_has_users_cannot_be_deleted(): void
+    {
+        $role = Role::factory()->create(['name' => 'Admin Gudang']);
+        AdminUser::factory()->create(['role_id' => $role->id]);
+
+        $this->assertFalse($this->superAdmin->can('delete', $role));
+
+        Livewire::actingAs($this->superAdmin, 'admin')
+            ->test(ListRoles::class)
+            ->assertTableActionDisabled('delete', $role);
+
+        Livewire::actingAs($this->superAdmin, 'admin')
+            ->test(EditRole::class, ['record' => $role->id])
+            ->assertActionDisabled('delete');
+
+        $this->assertDatabaseHas('roles', ['id' => $role->id]);
+    }
+
+    public function test_role_without_users_can_be_deleted(): void
+    {
+        $role = Role::factory()->create(['name' => 'Role Kosong']);
+
+        $this->assertTrue($this->superAdmin->can('delete', $role));
+
+        Livewire::actingAs($this->superAdmin, 'admin')
+            ->test(ListRoles::class)
+            ->assertTableActionEnabled('delete', $role)
+            ->callTableAction('delete', $role);
+
+        $this->assertDatabaseMissing('roles', ['id' => $role->id]);
     }
 
     public function test_user_without_roles_feature_cannot_access_role_resource(): void

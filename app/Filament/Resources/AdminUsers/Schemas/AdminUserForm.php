@@ -30,6 +30,11 @@ class AdminUserForm
                             ->email()
                             ->required()
                             ->unique(AdminUser::class, 'email', ignoreRecord: true)
+                            ->disabled(fn (string $operation, ?AdminUser $record): bool => $operation === 'edit' && ! Filament::auth()->user()?->isSuperAdmin() && ! ($record && $record->is(Filament::auth()->user())))
+                            ->dehydrated(fn (string $operation, ?AdminUser $record): bool => $operation === 'create' || (bool) Filament::auth()->user()?->isSuperAdmin() || ($record && $record->is(Filament::auth()->user())))
+                            ->helperText(fn (string $operation, ?AdminUser $record): ?string => ($operation === 'edit' && ! Filament::auth()->user()?->isSuperAdmin() && ! ($record && $record->is(Filament::auth()->user())))
+                                ? 'Hanya Superadmin yang dapat mengubah email pengguna lain.'
+                                : null)
                             ->maxLength(255),
                         TextInput::make('password_hash')
                             ->label('Password')
@@ -65,8 +70,8 @@ class AdminUserForm
                         Toggle::make('is_active')
                             ->label('Aktif')
                             ->default(true)
-                            ->disabled(fn (?AdminUser $record): bool => (bool) ($record && $record->is(Filament::auth()->user())))
-                            ->dehydrated(fn (?AdminUser $record): bool => (bool) (! ($record && $record->is(Filament::auth()->user()))))
+                            ->disabled(fn (?AdminUser $record): bool => ! Filament::auth()->user()?->isSuperAdmin())
+                            ->dehydrated(fn (?AdminUser $record): bool => (bool) Filament::auth()->user()?->isSuperAdmin())
                             ->helperText('Pengguna non-aktif tidak dapat login ke panel admin.'),
                     ]),
                 Section::make('Hak Akses Tambahan')

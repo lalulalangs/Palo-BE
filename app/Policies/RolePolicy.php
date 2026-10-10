@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Enums\AdminFeature;
 use App\Models\AdminUser;
 use App\Models\Role;
+use Illuminate\Auth\Access\Response;
 
 class RolePolicy
 {
@@ -28,9 +29,17 @@ class RolePolicy
         return $user instanceof AdminUser && $user->isSuperAdmin() && ! $role->is_super_admin;
     }
 
-    public function delete(mixed $user, Role $role): bool
+    public function delete(mixed $user, Role $role): Response|bool
     {
-        return $user instanceof AdminUser && $user->isSuperAdmin() && ! $role->is_super_admin;
+        if (! $user instanceof AdminUser || ! $user->isSuperAdmin() || $role->is_super_admin) {
+            return false;
+        }
+
+        if ($role->adminUsers()->exists()) {
+            return Response::deny('Role masih dipakai oleh pengguna aktif, jadi belum bisa dihapus.');
+        }
+
+        return true;
     }
 
     public function deleteAny(mixed $user): bool

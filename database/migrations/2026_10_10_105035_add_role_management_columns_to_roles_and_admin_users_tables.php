@@ -31,7 +31,7 @@ return new class extends Migration
         });
 
         Schema::table('admin_users', function (Blueprint $table) {
-            $table->dropColumn('permissions');
+            $table->dropColumn(['permissions', 'remember_token']);
         });
     }
 };

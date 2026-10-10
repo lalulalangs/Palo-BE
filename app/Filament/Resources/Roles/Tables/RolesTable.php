@@ -46,7 +46,8 @@ class RolesTable
             ])
             ->recordActions([
                 EditAction::make(),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->authorizationTooltip(),
             ]);
     }
 }

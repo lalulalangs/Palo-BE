@@ -64,6 +64,20 @@ class EditAdminUser extends EditRecord
                     ]);
                 }
             }
+
+            // 6. Email change on OTHER users is strictly restricted to Superadmin
+            if (! $this->record->is($currentUser) && array_key_exists('email', $rawState) && $rawState['email'] !== $this->record->email) {
+                throw ValidationException::withMessages([
+                    'data.email' => 'Hanya Superadmin yang memiliki izin untuk mengubah email pengguna lain.',
+                ]);
+            }
+
+            // 7. Active status change on OTHER users is strictly restricted to Superadmin
+            if (! $this->record->is($currentUser) && array_key_exists('is_active', $rawState) && (bool) $rawState['is_active'] !== (bool) $this->record->is_active) {
+                throw ValidationException::withMessages([
+                    'data.is_active' => 'Hanya Superadmin yang memiliki izin untuk mengubah status aktif pengguna lain.',
+                ]);
+            }
         }
     }
 }
