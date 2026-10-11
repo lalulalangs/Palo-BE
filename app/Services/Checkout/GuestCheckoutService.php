@@ -44,6 +44,19 @@ class GuestCheckoutService
         $skuIds = array_column($rawItems, 'sku_id');
         $skus = Sku::with(['variant', 'product'])->whereIn('id', $skuIds)->get()->keyBy('id');
 
+        // Consolidate duplicate items in guest payload
+        $consolidated = [];
+        foreach ($rawItems as $item) {
+            $skuId = (int) $item['sku_id'];
+            $qty = (int) $item['quantity'];
+            if (! isset($consolidated[$skuId])) {
+                $consolidated[$skuId] = ['sku_id' => $skuId, 'quantity' => $qty];
+            } else {
+                $consolidated[$skuId]['quantity'] += $qty;
+            }
+        }
+        $rawItems = array_values($consolidated);
+
         $lines = [];
         $snapshot = [];
         $estimatedTotal = 0.0;
@@ -54,7 +67,7 @@ class GuestCheckoutService
 
             /** @var Sku|null $sku */
             $sku = $skus->get($skuId);
-            if (! $sku) {
+            if (! $sku || ! $sku->is_active || ! $sku->product || ! $sku->product->is_active) {
                 continue;
             }
 

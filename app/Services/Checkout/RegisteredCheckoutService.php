@@ -74,6 +74,28 @@ class RegisteredCheckoutService
                 ]);
             }
 
+            // Consolidate duplicate SKU entries in payload to prevent double-spending
+            $consolidated = [];
+            foreach ($rawItems as $item) {
+                $skuId = (int) $item['sku_id'];
+                $qty = (int) $item['quantity'];
+                $priceSeen = isset($item['price_seen']) ? (float) $item['price_seen'] : null;
+
+                if (! isset($consolidated[$skuId])) {
+                    $consolidated[$skuId] = [
+                        'sku_id' => $skuId,
+                        'quantity' => $qty,
+                        'price_seen' => $priceSeen,
+                    ];
+                } else {
+                    $consolidated[$skuId]['quantity'] += $qty;
+                    if ($priceSeen !== null) {
+                        $consolidated[$skuId]['price_seen'] = $priceSeen;
+                    }
+                }
+            }
+            $rawItems = array_values($consolidated);
+
             $priceChanges = [];
             $preparedLines = [];
             $subtotal = 0.0;
@@ -94,6 +116,17 @@ class RegisteredCheckoutService
                     throw ValidationException::withMessages([
                         'items' => ["SKU #{$skuId} tidak ditemukan di sistem."],
                     ]);
+                }
+
+                // Verify SKU and product active status (anti soft-delete / inactive loophole)
+                if (! $sku->is_active || ! $sku->product || ! $sku->product->is_active) {
+                    $productName = $sku->product?->name ?? $sku->sku_code;
+                    throw new InsufficientStockException(
+                        message: "Produk atau varian {$productName} saat ini tidak aktif atau tidak lagi tersedia.",
+                        skuCode: $sku->sku_code,
+                        available: 0,
+                        requested: $quantity
+                    );
                 }
 
                 $reservedStock = (int) OrderItem::query()

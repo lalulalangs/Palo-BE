@@ -67,6 +67,13 @@ class CartService
     {
         /** @var Sku $sku */
         $sku = Sku::with(['product.thumbnail', 'variant'])->findOrFail($skuId);
+
+        if (! $sku->is_active || ! $sku->product || ! $sku->product->is_active) {
+            throw ValidationException::withMessages([
+                'sku_id' => ['Produk atau varian ini saat ini tidak aktif atau tidak lagi tersedia.'],
+            ]);
+        }
+
         $availableStock = $sku->available_stock;
 
         if ($user) {
@@ -240,8 +247,8 @@ class CartService
             $skuId = (int) $guestItem['sku_id'];
             $quantity = (int) $guestItem['quantity'];
 
-            $sku = Sku::find($skuId);
-            if (! $sku) {
+            $sku = Sku::with('product')->find($skuId);
+            if (! $sku || ! $sku->is_active || ! $sku->product || ! $sku->product->is_active) {
                 continue;
             }
 
@@ -340,8 +347,10 @@ class CartService
             $variant = $sku->variant;
             $unitPrice = $sku->effective_price;
             $subtotal = $unitPrice * $quantity;
-            $availableStock = $sku->available_stock;
-            $isOutOfStock = ($availableStock <= 0) || ! $sku->is_active || ($product && ! $product->is_active);
+            $isUnavailable = ($product === null) || ! $sku->is_active || ! $product->is_active;
+            $availableStock = $isUnavailable ? 0 : $sku->available_stock;
+            $isOutOfStock = $isUnavailable || ($availableStock <= 0);
+            $productName = $product?->name ?? 'Produk Tidak Lagi Tersedia';
 
             $thumbnailUrl = null;
             if ($product) {
@@ -359,7 +368,7 @@ class CartService
             $formattedItems[] = [
                 'sku_id' => $sku->id,
                 'product_id' => $product?->id,
-                'product_name' => $product?->name ?? 'Produk',
+                'product_name' => $productName,
                 'product_slug' => $product?->slug,
                 'variant_name' => $variant?->name,
                 'sku_code' => $sku->sku_code,
