@@ -50,4 +50,38 @@ class Sku extends Model
     {
         return $this->hasMany(StockMovement::class);
     }
+
+    /**
+     * Get effective unit price (respects price_override or falls back to product base_price).
+     */
+    public function getEffectivePriceAttribute(): float
+    {
+        if ($this->price_override !== null) {
+            return (float) $this->price_override;
+        }
+
+        return (float) ($this->product?->base_price ?? 0);
+    }
+
+    /**
+     * Get currently reserved stock from pending orders with active soft locks.
+     */
+    public function getReservedStockAttribute(): int
+    {
+        return (int) OrderItem::query()
+            ->where('sku_id', $this->id)
+            ->whereHas('order', function ($query): void {
+                $query->where('status', Order::STATUS_PENDING)
+                    ->where('stock_locked_until', '>', now());
+            })
+            ->sum('quantity');
+    }
+
+    /**
+     * Get real-time available stock (physical stock minus active soft locks).
+     */
+    public function getAvailableStockAttribute(): int
+    {
+        return max(0, $this->stock - $this->reserved_stock);
+    }
 }

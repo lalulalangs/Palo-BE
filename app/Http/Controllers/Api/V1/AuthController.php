@@ -7,12 +7,17 @@ use App\Http\Requests\Api\V1\LoginCustomerRequest;
 use App\Http\Requests\Api\V1\RegisterCustomerRequest;
 use App\Http\Resources\Api\V1\CustomerUserResource;
 use App\Models\User;
+use App\Services\Cart\CartService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        protected CartService $cartService
+    ) {}
+
     /**
      * Pendaftaran akun baru customer.
      */
@@ -24,6 +29,15 @@ class AuthController extends Controller
             'password_hash' => Hash::make($request->validated('password')),
             'phone' => $request->validated('phone'),
         ]);
+
+        $guestToken = $request->input('guest_token')
+            ?? $request->header('X-Guest-Token')
+            ?? $request->cookie('guest_cart_id')
+            ?? $request->cookie('guest_token');
+
+        if (filled($guestToken)) {
+            $this->cartService->mergeGuestCart($user, (string) $guestToken);
+        }
 
         $token = $user->createToken('customer-auth-token')->plainTextToken;
 
@@ -55,6 +69,15 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('customer-auth-token')->plainTextToken;
+
+        $guestToken = $request->input('guest_token')
+            ?? $request->header('X-Guest-Token')
+            ?? $request->cookie('guest_cart_id')
+            ?? $request->cookie('guest_token');
+
+        if (filled($guestToken)) {
+            $this->cartService->mergeGuestCart($user, (string) $guestToken);
+        }
 
         return response()->json([
             'success' => true,

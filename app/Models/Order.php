@@ -53,6 +53,20 @@ class Order extends Model
         };
     }
 
+    public function getFrontendStatus(): string
+    {
+        return match ($this->status) {
+            self::STATUS_PENDING => 'menunggu_pembayaran',
+            self::STATUS_PAID => 'dibayar',
+            self::STATUS_PROCESSING => 'diproses',
+            self::STATUS_SHIPPED => 'dikirim',
+            self::STATUS_COMPLETED => 'selesai',
+            self::STATUS_CANCELLED => 'dibatalkan',
+            self::STATUS_EXPIRED => 'expired',
+            default => $this->status,
+        };
+    }
+
     protected $fillable = [
         'order_number',
         'user_id',

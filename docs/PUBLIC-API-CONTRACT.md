@@ -634,15 +634,330 @@ Mengambil pengaturan dinamis brand, link media sosial resmi, nomor WhatsApp CS, 
 
 ---
 
-## 9. Ringkasan Kode Status HTTP (HTTP Status Codes)
+## 9. Keranjang Belanja (Cart Management)
+
+Modul keranjang mendukung pengunjung tanpa akun (Guest via cookie sesi / `guest_token`) maupun pembeli terdaftar (Registered User via Bearer Token).
+
+### 9.1 Lihat Keranjang Aktif
+* **Endpoint:** `GET /cart`
+* **Auth:** Opsional (Jika login kirim Bearer token; jika guest kirim cookie `guest_cart_id` atau header `X-Guest-Token`).
+
+#### Respon Berhasil (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "sku_id": 1,
+        "product_id": 1,
+        "product_name": "Kaos Dryfit Senaru Summit",
+        "product_slug": "kaos-dryfit-senaru-summit",
+        "variant_name": "Hitam / M",
+        "sku_code": "KDS-HIT-M",
+        "unit_price": 149000,
+        "unit_price_display": "Rp 149.000",
+        "quantity": 2,
+        "subtotal": 298000,
+        "subtotal_display": "Rp 298.000",
+        "available_stock": 10,
+        "is_out_of_stock": false,
+        "image": "http://localhost:8000/storage/products/kaos.webp"
+      }
+    ],
+    "summary": {
+      "item_count": 1,
+      "total_quantity": 2,
+      "subtotal": 298000,
+      "subtotal_display": "Rp 298.000"
+    },
+    "guest_token": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  }
+}
+```
+
+### 9.2 Tambah Item ke Keranjang
+* **Endpoint:** `POST /cart/items`
+* **Auth:** Opsional
+
+#### Request Body
+```json
+{
+  "sku_id": 1,
+  "quantity": 2
+}
+```
+
+#### Respon Berhasil (`200 OK`)
+Mengembalikan struktur data keranjang yang telah diperbarui. Jika stok tidak mencukupi, server mengembalikan status `422 Unprocessable Content`.
+
+### 9.3 Perbarui Jumlah Item Keranjang
+* **Endpoint:** `PATCH /cart/items/{skuId}`
+* **Auth:** Opsional
+
+#### Request Body
+```json
+{
+  "quantity": 3
+}
+```
+*(Catatan: jika `quantity` bernilai 0, item otomatis dihapus dari keranjang).*
+
+### 9.4 Hapus Item dari Keranjang
+* **Endpoint:** `DELETE /cart/items/{skuId}`
+* **Auth:** Opsional
+
+### 9.5 Penggabungan Keranjang Guest ke Akun User (Cart Merge)
+* **Endpoint:** `POST /cart/merge`
+* **Auth:** Wajib (`Bearer <token>`)
+
+#### Request Body (Opsional)
+```json
+{
+  "guest_token": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+}
+```
+*(Jika field `guest_token` tidak dikirim, server otomatis membaca dari cookie `guest_cart_id` atau header `X-Guest-Token`).*
+
+---
+
+## 10. Jalur A: Guest Checkout via WhatsApp CS (PRD §3.11)
+
+Jalur cepat untuk pengunjung tanpa login. **TIDAK** membuat order di tabel `orders` dan **TIDAK** mengurangi stok fisik (verifikasi stok & pembayaran manual via CS).
+
+### 10.1 Buat Tautan WhatsApp Checkout
+* **Endpoint:** `POST /guest/whatsapp-checkout`
+* **Auth:** Tidak (Publik, rate limit 15 req/menit)
+
+#### Request Body
+```json
+{
+  "items": [
+    {
+      "sku_id": 1,
+      "quantity": 2,
+      "price_seen": 149000
+    }
+  ],
+  "guest_name": "Budi Pendaki",
+  "guest_phone": "081234567890",
+  "note": "Kirim pagi ya kak"
+}
+```
+*(Catatan: jika array `items` tidak dikirim atau kosong, server otomatis mengambil item dari session keranjang guest).*
+
+#### Respon Berhasil (`201 Created`)
+```json
+{
+  "success": true,
+  "message": "Tautan WhatsApp pesanan berhasil dibuat.",
+  "data": {
+    "reference_code": "GC-20261011-4F2A",
+    "wa_url": "https://wa.me/6281234567890?text=Halo%20Palo%20Mountain%20Goods...",
+    "message": "Halo Palo Mountain Goods, saya ingin memesan:\n- Kaos Dryfit Senaru Summit (Hitam / M) x 2 = Rp 298.000\n\nEstimasi Total: Rp 298.000\nNama: Budi Pendaki\nNomor HP: 081234567890\nCatatan: Kirim pagi ya kak\nKode Referensi: GC-20261011-4F2A",
+    "estimated_total": 298000,
+    "estimated_total_display": "Rp 298.000",
+    "notice": "Harga dan stok final dikonfirmasi Customer Service."
+  }
+}
+```
+
+### 10.2 Konsultasi Pesanan Custom / Partai (PRD §6A)
+* **Endpoint:** `POST /guest/custom-inquiry`
+* **Auth:** Tidak (Publik, rate limit 15 req/menit)
+
+#### Request Body
+```json
+{
+  "name": "Komunitas Mapala Rinjani",
+  "phone": "081234567890",
+  "quantity": 50,
+  "note": "Pesanan jaket windbreaker bordir custom logo angkatan"
+}
+```
+
+---
+
+## 11. Estimasi Ongkir (Shipping Quotes)
+
+### 11.1 Kalkulasi Tarif Kurir
+* **Endpoint:** `POST /shipping/quote`
+* **Auth:** Wajib (`Bearer <token>`)
+
+#### Request Body
+```json
+{
+  "destination_city": "KOTA MATARAM",
+  "items": [
+    { "sku_id": 1, "quantity": 2 }
+  ]
+}
+```
+
+#### Respon Berhasil (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "services": [
+      {
+        "courier": "JNE",
+        "service": "REG",
+        "description": "Layanan Reguler",
+        "cost": 28000,
+        "etd": "2-3 hari"
+      },
+      {
+        "courier": "JNE",
+        "service": "YES",
+        "description": "Yakin Esok Sampai",
+        "cost": 45000,
+        "etd": "1 hari"
+      },
+      {
+        "courier": "J&T",
+        "service": "EZ",
+        "description": "Layanan Reguler",
+        "cost": 27000,
+        "etd": "2-3 hari"
+      },
+      {
+        "courier": "SiCepat",
+        "service": "REG",
+        "description": "SiCepat Reguler",
+        "cost": 26000,
+        "etd": "2-3 hari"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 12. Jalur B: Registered Online Checkout & Order Tracking (PRD §3.6)
+
+Jalur formal transaksi online dengan penguncian stok sementara (*soft reservation* 15 menit), validasi harga server-side, penerapan voucher, pembuatan record pesanan immutable, dan instruksi pembayaran.
+
+### 12.1 Buat Pesanan Online (Submit Order)
+* **Endpoint:** `POST /checkout/orders`
+* **Auth:** Wajib (`Bearer <token>`, rate limit 10 req/menit)
+
+#### Request Body
+```json
+{
+  "shipping_address": {
+    "recipient_name": "Rinjani Hiker",
+    "phone": "081234567890",
+    "street": "Jl. Pariwisata Senaru No. 12",
+    "city": "Lombok Utara",
+    "city_code": "2761",
+    "province": "Nusa Tenggara Barat",
+    "postal_code": "83354",
+    "notes": "Titip pos satpam jika tidak di rumah"
+  },
+  "items": [
+    {
+      "sku_id": 1,
+      "quantity": 2,
+      "price_seen": 149000
+    }
+  ],
+  "shipping_courier": "JNE",
+  "shipping_service": "REG",
+  "shipping_cost": 28000,
+  "shipping_etd": "2-3 hari",
+  "payment_method": "qris",
+  "voucher_code": "RINJANI10",
+  "acknowledge_price_change": false
+}
+```
+
+#### Respon Berhasil (`201 Created`)
+```json
+{
+  "success": true,
+  "message": "Pesanan berhasil dibuat.",
+  "data": {
+    "order_number": "UJN-20261011-00001",
+    "status": "menunggu_pembayaran",
+    "subtotal": 298000,
+    "discount_total": 29800,
+    "shipping_cost": 28000,
+    "grand_total": 296200,
+    "grand_total_display": "Rp 296.200",
+    "payment_expires_at": "2026-10-11T16:15:00.000000Z",
+    "payment": {
+      "method": "qris",
+      "instructions": {
+        "method": "qris",
+        "qr_string": "00020101021226590014ID.LINKAJA.WWW01189360001100000000005204549953033605802ID5919Palo Mountain Goods6006Senaru62190115UJN-20261011-000016304ABCD",
+        "va_number": null,
+        "bank_name": null,
+        "instructions_text": "Pindai kode QRIS di aplikasi mobile banking atau dompet digital Anda.",
+        "expires_at": "2026-10-11T16:15:00+08:00"
+      }
+    }
+  }
+}
+```
+
+#### Respon Error Khusus Checkout
+
+##### A. Deteksi Perubahan Harga (`409 Conflict` - `error_code: price_changed`)
+Jika harga produk telah diubah oleh Admin sejak pengguna membuka keranjang dan pengguna belum menyetujui perubahan harga:
+```json
+{
+  "message": "Harga produk berubah sejak keranjang dibuka. Tinjau perubahannya sebelum melanjutkan.",
+  "error_code": "price_changed",
+  "changes": [
+    {
+      "sku_id": 1,
+      "sku_code": "KDS-HIT-M",
+      "product_name": "Kaos Dryfit Senaru Summit",
+      "old_price": 129000,
+      "new_price": 149000,
+      "quantity": 2
+    }
+  ],
+  "new_grand_total": 326000
+}
+```
+*Frontend wajib menampilkan perbandingan harga ke pengguna dan mengirim ulang request dengan `"acknowledge_price_change": true`.*
+
+##### B. Stok Habis / Tidak Cukup (`409 Conflict` - `error_code: stock_unavailable`)
+```json
+{
+  "message": "Stok SKU KDS-HIT-M (Kaos Dryfit Senaru Summit) tidak mencukupi (tersedia: 1, diminta: 2).",
+  "error_code": "stock_unavailable",
+  "sku_code": "KDS-HIT-M",
+  "available_stock": 1,
+  "requested_quantity": 2
+}
+```
+
+### 12.2 Riwayat Pesanan Pengguna
+* **Endpoint:** `GET /orders`
+* **Auth:** Wajib (`Bearer <token>`)
+
+### 12.3 Detail Snapshot Pesanan
+* **Endpoint:** `GET /orders/{orderNumber}`
+* **Auth:** Wajib (`Bearer <token>`)
+
+---
+
+## 13. Ringkasan Kode Status HTTP (HTTP Status Codes)
 
 | Kode | Status | Keterangan untuk Frontend |
 |---|---|---|
 | `200` | **OK** | Request berhasil, data terlampir di body respon. |
-| `201` | **Created** | Resource baru berhasil dibuat (misal pendaftaran akun). |
+| `201` | **Created** | Resource baru berhasil dibuat (pesanan, registrasi, log checkout). |
 | `401` | **Unauthorized** | Kredensial tidak cocok, token Bearer tidak valid, kadaluarsa, atau tidak dikirim. |
 | `403` | **Forbidden** | Pengguna terautentikasi tetapi tidak memiliki hak akses terhadap resource. |
-| `404` | **Not Found** | Endpoint atau resource (produk/koleksi/slider) tidak ditemukan atau berstatus non-aktif. |
-| `422` | **Unprocessable Content** | Validasi payload gagal. Periksa objek `errors` untuk menampilkan pesan per field input form. |
-| `429` | **Too Many Requests** | Terkena limitasi frekuensi request (misal registrasi/login > 10x per menit). Periksa header `Retry-After`. |
-| `500` | **Internal Server Error** | Terjadi kesalahan pada server backend. Tampilkan pesan kesalahan ramah pengguna. |
+| `404` | **Not Found** | Endpoint atau resource (produk/koleksi/pesanan) tidak ditemukan. |
+| `409` | **Conflict** | Terjadi konflik transaksi stok habis (`stock_unavailable`) atau perubahan harga (`price_changed`). |
+| `422` | **Unprocessable Content** | Validasi payload gagal (misal email duplikat, voucher kadaluarsa). Periksa objek `errors`. |
+| `429` | **Too Many Requests** | Terkena limitasi frekuensi request (auth/checkout > 10x/menit, guest > 15x/menit). Periksa header `Retry-After`. |
+| `503` | **Service Unavailable** | Layanan eksternal (misal API ekspedisi kurir) sedang offline atau bermasalah. |
+| `500` | **Internal Server Error** | Terjadi kesalahan server backend. |
+
