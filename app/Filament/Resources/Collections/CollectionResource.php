@@ -18,6 +18,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use UnitEnum;
 
 class CollectionResource extends Resource
 {
@@ -27,6 +28,8 @@ class CollectionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedSparkles;
 
+    protected static string|UnitEnum|null $navigationGroup = 'Katalog Produk';
+
     protected static ?string $recordTitleAttribute = 'name';
 
     protected static ?string $navigationLabel = 'Koleksi (Series)';
@@ -35,7 +38,7 @@ class CollectionResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Koleksi Produk';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
 
     public static function getAdminFeature(): AdminFeature
     {

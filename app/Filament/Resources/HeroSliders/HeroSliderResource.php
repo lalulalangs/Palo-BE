@@ -15,6 +15,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use UnitEnum;
 
 class HeroSliderResource extends Resource
 {
@@ -22,7 +23,17 @@ class HeroSliderResource extends Resource
 
     protected static ?string $model = HeroSlider::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPhoto;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPresentationChartBar;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Konten & Promosi';
+
+    protected static ?string $navigationLabel = 'Hero Slider';
+
+    protected static ?string $modelLabel = 'Hero Slider';
+
+    protected static ?string $pluralModelLabel = 'Daftar Hero Slider';
+
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'title';
 
