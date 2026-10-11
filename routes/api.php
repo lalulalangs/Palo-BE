@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AdminHeroSliderController;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BannerController;
 use App\Http\Controllers\Api\V1\BrandController;
 use App\Http\Controllers\Api\V1\CategoryController;
@@ -10,6 +11,17 @@ use App\Http\Controllers\Api\V1\PublicHeroSliderController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
+    // Customer Auth (PRD §3.5 & KONTRAK-API §4)
+    Route::prefix('auth')->group(function (): void {
+        Route::post('register', [AuthController::class, 'register'])->middleware('throttle:10,1');
+        Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+
+        Route::middleware('auth:sanctum')->group(function (): void {
+            Route::get('me', [AuthController::class, 'me']);
+            Route::post('logout', [AuthController::class, 'logout']);
+        });
+    });
+
     // Brand & Settings
     Route::get('brand', [BrandController::class, 'index']);
 
