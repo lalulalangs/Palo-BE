@@ -14,7 +14,8 @@ class PublicHeroSliderController extends Controller
         $sliders = HeroSlider::query()->active()->ordered()->get();
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
+            'message' => 'Daftar hero slider berhasil diambil',
             'data' => HeroSliderResource::collection($sliders)->resolve(),
         ]);
     }
@@ -24,7 +25,8 @@ class PublicHeroSliderController extends Controller
         abort_unless($heroSlider->is_active, 404);
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
+            'message' => 'Detail hero slider berhasil diambil',
             'data' => (new HeroSliderResource($heroSlider))->resolve(),
         ]);
     }

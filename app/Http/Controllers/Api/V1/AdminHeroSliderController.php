@@ -19,7 +19,8 @@ class AdminHeroSliderController extends Controller
         $sliders = HeroSlider::query()->ordered()->get();
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
+            'message' => 'Daftar hero slider admin berhasil diambil',
             'data' => HeroSliderResource::collection($sliders)->resolve(),
         ]);
     }
@@ -37,7 +38,7 @@ class AdminHeroSliderController extends Controller
         $slider = HeroSlider::create($data);
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
             'message' => 'Hero slider created.',
             'data' => (new HeroSliderResource($slider))->resolve(),
         ], 201);
@@ -46,7 +47,8 @@ class AdminHeroSliderController extends Controller
     public function show(HeroSlider $heroSlider): JsonResponse
     {
         return response()->json([
-            'status' => 'success',
+            'success' => true,
+            'message' => 'Detail hero slider admin berhasil diambil',
             'data' => (new HeroSliderResource($heroSlider))->resolve(),
         ]);
     }
@@ -70,7 +72,7 @@ class AdminHeroSliderController extends Controller
         $heroSlider->update($data);
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
             'message' => 'Hero slider updated.',
             'data' => (new HeroSliderResource($heroSlider->fresh()))->resolve(),
         ]);
@@ -87,7 +89,7 @@ class AdminHeroSliderController extends Controller
         $heroSlider->delete();
 
         return response()->json([
-            'status' => 'success',
+            'success' => true,
             'message' => 'Hero slider deleted.',
         ]);
     }

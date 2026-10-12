@@ -541,7 +541,8 @@ Mengambil slide carousel utama untuk landing page beranda.
 #### Respon Berhasil (`200 OK`)
 ```json
 {
-  "status": "success",
+  "success": true,
+  "message": "Daftar hero slider berhasil diambil",
   "data": [
     {
       "id": 1,
@@ -550,15 +551,22 @@ Mengambil slide carousel utama untuk landing page beranda.
       "badge": "Terbaru",
       "title": "Jelajahi Puncak Rinjani Bersama Palo",
       "description": "Perlengkapan ekspedisi berkualitas tinggi teruji di jalur ekstrem.",
-      "image_desktop": "http://localhost:8000/storage/heroes/desktop-1.webp",
-      "image_mobile": "http://localhost:8000/storage/heroes/mobile-1.webp",
-      "image_alt": "Pemandangan Jalur Senaru Rinjani",
-      "primary_btn_label": "Belanja Sekarang",
-      "primary_btn_url": "/produk",
-      "secondary_btn_label": "Lihat Koleksi",
-      "secondary_btn_url": "/koleksi",
-      "sort_order": 1,
-      "is_active": true
+      "images": {
+        "desktop_url": "http://localhost:8000/storage/heroes/desktop-1.webp",
+        "mobile_url": "http://localhost:8000/storage/heroes/mobile-1.webp",
+        "alt_text": "Pemandangan Jalur Senaru Rinjani"
+      },
+      "actions": {
+        "primary": {
+          "label": "Belanja Sekarang",
+          "url": "/produk"
+        },
+        "secondary": {
+          "label": "Lihat Koleksi",
+          "url": "/koleksi"
+        }
+      },
+      "order": 1
     }
   ]
 }
@@ -573,7 +581,8 @@ Mengambil slide carousel utama untuk landing page beranda.
 #### Respon Berhasil (`200 OK`)
 ```json
 {
-  "status": "success",
+  "success": true,
+  "message": "Detail hero slider berhasil diambil",
   "data": {
     "id": 1,
     "series_tag": "Rinjani 2026",
@@ -581,15 +590,22 @@ Mengambil slide carousel utama untuk landing page beranda.
     "badge": "Terbaru",
     "title": "Jelajahi Puncak Rinjani Bersama Palo",
     "description": "Perlengkapan ekspedisi berkualitas tinggi teruji di jalur ekstrem.",
-    "image_desktop": "http://localhost:8000/storage/heroes/desktop-1.webp",
-    "image_mobile": "http://localhost:8000/storage/heroes/mobile-1.webp",
-    "image_alt": "Pemandangan Jalur Senaru Rinjani",
-    "primary_btn_label": "Belanja Sekarang",
-    "primary_btn_url": "/produk",
-    "secondary_btn_label": "Lihat Koleksi",
-    "secondary_btn_url": "/koleksi",
-    "sort_order": 1,
-    "is_active": true
+    "images": {
+      "desktop_url": "http://localhost:8000/storage/heroes/desktop-1.webp",
+      "mobile_url": "http://localhost:8000/storage/heroes/mobile-1.webp",
+      "alt_text": "Pemandangan Jalur Senaru Rinjani"
+    },
+    "actions": {
+      "primary": {
+        "label": "Belanja Sekarang",
+        "url": "/produk"
+      },
+      "secondary": {
+        "label": "Lihat Koleksi",
+        "url": "/koleksi"
+      }
+    },
+    "order": 1
   }
 }
 ```

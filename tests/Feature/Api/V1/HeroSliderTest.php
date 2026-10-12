@@ -23,12 +23,13 @@ class HeroSliderTest extends TestCase
         $response = $this->getJson('/api/v1/hero-sliders');
 
         $response->assertOk()
-            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('success', true)
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.title', 'Slider A')
             ->assertJsonPath('data.1.title', 'Slider B')
             ->assertJsonStructure([
-                'status',
+                'success',
+                'message',
                 'data' => [
                     '*' => [
                         'id',
@@ -59,9 +60,34 @@ class HeroSliderTest extends TestCase
         $response = $this->getJson('/api/v1/hero-sliders');
 
         $response->assertOk()
-            ->assertJsonPath('status', 'success')
+            ->assertJsonPath('success', true)
             ->assertJsonPath('data.0.series_tag', null)
             ->assertJsonPath('data.0.location_tag', null);
+    }
+
+    public function test_public_show_returns_active_slider_with_exact_shape(): void
+    {
+        $slider = HeroSlider::factory()->create([
+            'title' => 'Rinjani Sunrise',
+            'is_active' => true,
+        ]);
+
+        $response = $this->getJson("/api/v1/hero-sliders/{$slider->id}");
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.title', 'Rinjani Sunrise')
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'data' => [
+                    'id',
+                    'title',
+                    'images',
+                    'actions',
+                    'order',
+                ],
+            ]);
     }
 
     public function test_public_show_returns_404_for_inactive(): void
@@ -90,13 +116,15 @@ class HeroSliderTest extends TestCase
             'sort_order' => 1,
         ]);
 
-        $create->assertCreated()->assertJsonPath('status', 'success');
+        $create->assertCreated()->assertJsonPath('success', true);
         $id = $create->json('data.id');
         $this->assertNotNull($id);
         Storage::disk('public')->assertExists(HeroSlider::find($id)->image_desktop);
 
         // show (admin sees regardless of active flag)
-        $this->getJson("/api/v1/admin/hero-sliders/{$id}")->assertOk();
+        $this->getJson("/api/v1/admin/hero-sliders/{$id}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
 
         // update with new desktop image (old file must be deleted)
         $oldPath = HeroSlider::find($id)->image_desktop;
@@ -105,12 +133,16 @@ class HeroSliderTest extends TestCase
         $this->putJson("/api/v1/admin/hero-sliders/{$id}", [
             'title' => 'Stories Updated',
             'image_desktop' => $newDesktop,
-        ])->assertOk()->assertJsonPath('data.title', 'Stories Updated');
+        ])->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.title', 'Stories Updated');
 
         Storage::disk('public')->assertMissing($oldPath);
 
         // delete removes files + row
-        $this->deleteJson("/api/v1/admin/hero-sliders/{$id}")->assertOk();
+        $this->deleteJson("/api/v1/admin/hero-sliders/{$id}")
+            ->assertOk()
+            ->assertJsonPath('success', true);
         $this->assertDatabaseMissing('hero_sliders', ['id' => $id]);
     }
 
