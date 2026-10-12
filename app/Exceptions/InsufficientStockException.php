@@ -23,6 +23,7 @@ class InsufficientStockException extends Exception
     public function render(Request $request): JsonResponse
     {
         return response()->json([
+            'success' => false,
             'message' => $this->getMessage(),
             'error_code' => 'stock_unavailable',
             'sku_code' => $this->skuCode,

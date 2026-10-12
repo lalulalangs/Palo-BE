@@ -32,10 +32,13 @@ File master tersimpan di: [docs/PUBLIC-API-CONTRACT.md](file:///home/lalulalang/
 * **Bahasa Pesan:** Semua pesan respon status dan validasi disajikan dalam **Bahasa Indonesia**.
 
 ### 1.4 Format Standar Error
+Seluruh respon error (HTTP 4xx & 5xx) memiliki struktur seragam dengan root field `"success": false`.
+
 Jika terjadi kegagalan validasi (HTTP 422), format respon:
 ```json
 {
-  "message": "Pesan ringkas kegagalan validasi",
+  "success": false,
+  "message": "Pesan ringkas kegagalan validasi (bersih tanpa embel-embel teks bawaan)",
   "errors": {
     "field_name": [
       "Pesan error spesifik untuk field ini"
@@ -44,7 +47,7 @@ Jika terjadi kegagalan validasi (HTTP 422), format respon:
 }
 ```
 
-Jika terjadi error autentikasi / hak akses / rate limit (HTTP 401, 403, 429):
+Jika terjadi error autentikasi / hak akses / tidak ditemukan / rate limit / konflik / server error (HTTP 401, 403, 404, 409, 429, 500):
 ```json
 {
   "success": false,
@@ -924,6 +927,7 @@ Jalur formal transaksi online dengan penguncian stok sementara (*soft reservatio
 Jika harga produk telah diubah oleh Admin sejak pengguna membuka keranjang dan pengguna belum menyetujui perubahan harga:
 ```json
 {
+  "success": false,
   "message": "Harga produk berubah sejak keranjang dibuka. Tinjau perubahannya sebelum melanjutkan.",
   "error_code": "price_changed",
   "changes": [
@@ -944,6 +948,7 @@ Jika harga produk telah diubah oleh Admin sejak pengguna membuka keranjang dan p
 ##### B. Stok Habis / Tidak Cukup (`409 Conflict` - `error_code: stock_unavailable`)
 ```json
 {
+  "success": false,
   "message": "Stok SKU KDS-HIT-M (Kaos Dryfit Senaru Summit) tidak mencukupi (tersedia: 1, diminta: 2).",
   "error_code": "stock_unavailable",
   "sku_code": "KDS-HIT-M",

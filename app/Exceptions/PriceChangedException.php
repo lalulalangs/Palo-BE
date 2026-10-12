@@ -25,6 +25,7 @@ class PriceChangedException extends Exception
     public function render(Request $request): JsonResponse
     {
         return response()->json([
+            'success' => false,
             'message' => $this->getMessage(),
             'error_code' => 'price_changed',
             'changes' => $this->changes,
