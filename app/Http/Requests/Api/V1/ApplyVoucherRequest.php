@@ -26,7 +26,7 @@ class ApplyVoucherRequest extends FormRequest
         return [
             'code' => ['required', 'string', 'max:50'],
             'subtotal' => ['required_without:items', 'nullable', 'numeric', 'min:0'],
-            'items' => ['nullable', 'array', 'max:50'],
+            'items' => ['nullable', 'array', 'min:1', 'max:50'],
             'items.*.sku_id' => ['required_with:items', 'integer', 'exists:skus,id'],
             'items.*.quantity' => ['required_with:items', 'integer', 'min:1', 'max:100'],
         ];
@@ -43,6 +43,7 @@ class ApplyVoucherRequest extends FormRequest
             'subtotal.required_without' => 'Subtotal belanja atau daftar item barang wajib disertakan.',
             'subtotal.numeric' => 'Subtotal belanja harus berupa angka numerik.',
             'subtotal.min' => 'Subtotal belanja tidak boleh bernilai negatif.',
+            'items.min' => 'Daftar item barang tidak boleh kosong.',
             'items.*.sku_id.exists' => 'Item SKU produk tidak ditemukan.',
             'items.*.quantity.min' => 'Jumlah barang minimal 1 unit.',
         ];

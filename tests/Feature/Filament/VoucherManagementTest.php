@@ -106,6 +106,34 @@ class VoucherManagementTest extends TestCase
             ->assertHasFormErrors(['code' => 'unique']);
     }
 
+    public function test_percentage_voucher_cannot_have_value_greater_than_100(): void
+    {
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(CreateVoucher::class)
+            ->fillForm([
+                'code' => 'DISCOVER100',
+                'type' => 'percentage',
+                'value' => 150, // > 100%
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['value']);
+    }
+
+    public function test_end_date_cannot_be_before_start_date(): void
+    {
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(CreateVoucher::class)
+            ->fillForm([
+                'code' => 'DATERANGEFAIL',
+                'type' => 'fixed',
+                'value' => 10000,
+                'start_date' => '2026-10-20',
+                'end_date' => '2026-10-10', // before start_date
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['end_date']);
+    }
+
     public function test_can_edit_voucher_via_form(): void
     {
         $voucher = Voucher::create([

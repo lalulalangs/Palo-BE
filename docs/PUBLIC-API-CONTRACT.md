@@ -982,36 +982,31 @@ Mengambil daftar voucher aktif yang saat ini berlaku, memiliki sisa kuota, dan d
 ```json
 {
   "success": true,
+  "message": "Daftar voucher promosi berhasil diambil.",
   "data": [
     {
       "id": 1,
       "code": "RINJANI10",
       "type": "percentage",
-      "type_label": "Persentase",
       "value": 10,
       "formatted_value": "10%",
       "min_purchase": 100000,
       "formatted_min_purchase": "Rp 100.000",
-      "quota": 100,
-      "used_count": 5,
-      "remaining_quota": 95,
-      "start_date": "2026-10-01T00:00:00.000000Z",
-      "end_date": "2026-10-31T23:59:59.000000Z"
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-31",
+      "description": "Potongan 10% dengan minimal belanja Rp 100.000"
     },
     {
       "id": 2,
       "code": "HEMAT50K",
       "type": "fixed",
-      "type_label": "Nominal Tetap",
       "value": 50000,
       "formatted_value": "Rp 50.000",
       "min_purchase": 300000,
       "formatted_min_purchase": "Rp 300.000",
-      "quota": 50,
-      "used_count": 12,
-      "remaining_quota": 38,
-      "start_date": "2026-10-01T00:00:00.000000Z",
-      "end_date": "2026-10-31T23:59:59.000000Z"
+      "start_date": "2026-10-01",
+      "end_date": "2026-10-31",
+      "description": "Potongan Rp 50.000 dengan minimal belanja Rp 300.000"
     }
   ]
 }
@@ -1020,7 +1015,7 @@ Mengambil daftar voucher aktif yang saat ini berlaku, memiliki sisa kuota, dan d
 ---
 
 ### 13.2 Validasi & Simulasi Voucher (Apply Voucher)
-Memvalidasi kode voucher terhadap subtotal belanja sebelum checkout. Endpoint ini menghitung potensi potongan diskon tanpa mengunci kuota atau mengubah status keranjang.
+Memvalidasi kode voucher terhadap subtotal belanja atau daftar item keranjang sebelum checkout. Endpoint ini menghitung potensi potongan diskon tanpa mengunci kuota atau mengubah status keranjang.
 
 * **Endpoint:** `POST /vouchers/apply`
 * **Auth:** Bebas (Publik / Opsional Token)
@@ -1030,7 +1025,10 @@ Memvalidasi kode voucher terhadap subtotal belanja sebelum checkout. Endpoint in
 | Field | Tipe | Wajib | Keterangan |
 |---|---|---|---|
 | `code` | string | Ya | Kode voucher (case-insensitive, otomatis dinormalisasi menjadi huruf kapital). |
-| `subtotal` | integer | Ya | Subtotal belanja saat ini dalam Rupiah (min: 0). |
+| `subtotal` | numeric | Kondisional | Subtotal belanja saat ini dalam Rupiah (min: 0). Wajib jika `items` tidak disertakan. |
+| `items` | array | Kondisional | Daftar item keranjang jika subtotal dihitung otomatis oleh server (min: 1 item). |
+| `items.*.sku_id` | integer | Ya (jika items) | ID SKU yang valid dan aktif di database. |
+| `items.*.quantity` | integer | Ya (jika items) | Kuantitas belanja barang (min: 1). |
 
 ```json
 {
@@ -1043,24 +1041,19 @@ Memvalidasi kode voucher terhadap subtotal belanja sebelum checkout. Endpoint in
 ```json
 {
   "success": true,
+  "message": "Voucher berhasil diterapkan.",
   "data": {
-    "voucher": {
-      "id": 1,
-      "code": "RINJANI10",
-      "type": "percentage",
-      "type_label": "Persentase",
-      "value": 10,
-      "formatted_value": "10%",
-      "min_purchase": 100000,
-      "formatted_min_purchase": "Rp 100.000",
-      "quota": 100,
-      "used_count": 5,
-      "remaining_quota": 95,
-      "start_date": "2026-10-01T00:00:00.000000Z",
-      "end_date": "2026-10-31T23:59:59.000000Z"
-    },
+    "voucher_id": 1,
+    "code": "RINJANI10",
+    "type": "percentage",
+    "value": 10,
+    "formatted_value": "10%",
+    "min_purchase": 100000,
+    "formatted_min_purchase": "Rp 100.000",
     "discount_amount": 25000,
     "formatted_discount_amount": "Rp 25.000",
+    "subtotal": 250000,
+    "formatted_subtotal": "Rp 250.000",
     "final_subtotal": 225000,
     "formatted_final_subtotal": "Rp 225.000"
   }
@@ -1069,16 +1062,22 @@ Memvalidasi kode voucher terhadap subtotal belanja sebelum checkout. Endpoint in
 
 #### Respon Gagal Validasi Bisnis (`422 Unprocessable Content`)
 Mengembalikan envelope error standar `success: false` dengan pesan spesifik kegagalan validasi:
-* `"Kode voucher tidak ditemukan atau tidak aktif."`
-* `"Voucher belum dapat digunakan."`
-* `"Voucher telah kadaluarsa."`
-* `"Kuota penggunaan voucher telah habis."`
-* `"Subtotal belanja belum memenuhi minimum pembelian sebesar Rp 100.000."`
+* `"Kode voucher tidak ditemukan atau tidak valid."`
+* `"Voucher sedang tidak aktif."`
+* `"Voucher belum dapat digunakan (berlaku mulai dd/mm/yyyy)."`
+* `"Voucher telah kedaluwarsa."`
+* `"Kuota pemakaian voucher telah habis."`
+* `"Syarat belanja minimum Rp 100.000 belum terpenuhi."`
 
 ```json
 {
   "success": false,
-  "message": "Kode voucher tidak ditemukan atau tidak aktif."
+  "message": "Kode voucher tidak ditemukan atau tidak valid.",
+  "errors": {
+    "code": [
+      "Kode voucher tidak ditemukan atau tidak valid."
+    ]
+  }
 }
 ```
 

@@ -236,4 +236,85 @@ class VoucherApiTest extends TestCase
             ->assertJsonPath('success', false)
             ->assertJsonValidationErrors(['code']);
     }
+
+    public function test_apply_rejects_upcoming_voucher_with_422(): void
+    {
+        Voucher::factory()->upcoming()->create([
+            'code' => 'UPCOMING10',
+        ]);
+
+        $response = $this->postJson('/api/v1/vouchers/apply', [
+            'code' => 'UPCOMING10',
+            'subtotal' => 200000,
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonValidationErrors(['code']);
+    }
+
+    public function test_apply_fixed_discount_exceeding_subtotal_is_capped_to_subtotal(): void
+    {
+        Voucher::factory()->fixed(50000, 0)->create([
+            'code' => 'BIGDISC50K',
+        ]);
+
+        $response = $this->postJson('/api/v1/vouchers/apply', [
+            'code' => 'BIGDISC50K',
+            'subtotal' => 30000, // subtotal < discount value (50.000)
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.discount_amount', 30000)
+            ->assertJsonPath('data.final_subtotal', 0);
+    }
+
+    public function test_apply_rejects_whitespace_only_code_with_422(): void
+    {
+        $response = $this->postJson('/api/v1/vouchers/apply', [
+            'code' => '     ',
+            'subtotal' => 100000,
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonValidationErrors(['code']);
+    }
+
+    public function test_apply_rejects_empty_items_array_when_subtotal_omitted_with_422(): void
+    {
+        $response = $this->postJson('/api/v1/vouchers/apply', [
+            'code' => 'VALIDCODE',
+            'items' => [],
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonPath('success', false)
+            ->assertJsonValidationErrors(['items']);
+    }
+
+    public function test_apply_enforces_rate_limit_of_10_requests_per_minute(): void
+    {
+        Voucher::factory()->fixed(10000, 50000)->create([
+            'code' => 'RATELIMITVOUCHER',
+        ]);
+
+        // Send 10 valid requests
+        for ($i = 0; $i < 10; $i++) {
+            $this->postJson('/api/v1/vouchers/apply', [
+                'code' => 'RATELIMITVOUCHER',
+                'subtotal' => 100000,
+            ])->assertOk();
+        }
+
+        // The 11th request must hit 429 Too Many Requests
+        $response = $this->postJson('/api/v1/vouchers/apply', [
+            'code' => 'RATELIMITVOUCHER',
+            'subtotal' => 100000,
+        ]);
+
+        $response->assertStatus(429)
+            ->assertJsonPath('success', false);
+    }
 }

@@ -12,6 +12,7 @@ use App\Models\ProductVariant;
 use App\Models\Sku;
 use App\Models\User;
 use App\Models\Voucher;
+use App\Services\Orders\OrderTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -364,10 +365,10 @@ class RegisteredCheckoutApiTest extends TestCase
         $this->assertEquals(1, $voucher->fresh()->used_count);
     }
 
-    public function test_checkout_rejects_expired_or_insufficient_voucher(): void
+    public function test_checkout_rejects_voucher_when_minimum_purchase_not_met(): void
     {
         Voucher::create([
-            'code' => 'EXPIRED99',
+            'code' => 'MINPURCHASE99',
             'type' => 'fixed',
             'value' => 50000,
             'min_purchase' => 1000000, // min purchase 1 million, but cart is 350k
@@ -391,13 +392,183 @@ class RegisteredCheckoutApiTest extends TestCase
             'shipping_service' => 'REG',
             'shipping_cost' => 20000,
             'payment_method' => 'qris',
-            'voucher_code' => 'EXPIRED99',
+            'voucher_code' => 'MINPURCHASE99',
         ];
 
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/v1/checkout/orders', $payload);
 
         $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['voucher_code']);
+    }
+
+    public function test_checkout_rejects_expired_voucher(): void
+    {
+        Voucher::create([
+            'code' => 'EXPIREDVOUCHER',
+            'type' => 'fixed',
+            'value' => 20000,
+            'min_purchase' => 100000,
+            'quota' => 10,
+            'used_count' => 0,
+            'end_date' => now()->subDay(), // expired yesterday
+            'is_active' => true,
+        ]);
+
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Voucher User',
+                'phone' => '081234567890',
+                'street' => 'Jl. Senaru',
+                'city' => 'Mataram',
+                'province' => 'NTB',
+            ],
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+            'shipping_cost' => 20000,
+            'payment_method' => 'qris',
+            'voucher_code' => 'EXPIREDVOUCHER',
+        ];
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['voucher_code']);
+    }
+
+    public function test_checkout_rejects_exhausted_quota_voucher(): void
+    {
+        Voucher::create([
+            'code' => 'HABISKUOTA',
+            'type' => 'fixed',
+            'value' => 20000,
+            'min_purchase' => 100000,
+            'quota' => 5,
+            'used_count' => 5, // fully used
+            'is_active' => true,
+        ]);
+
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Voucher User',
+                'phone' => '081234567890',
+                'street' => 'Jl. Senaru',
+                'city' => 'Mataram',
+                'province' => 'NTB',
+            ],
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+            'shipping_cost' => 20000,
+            'payment_method' => 'qris',
+            'voucher_code' => 'HABISKUOTA',
+        ];
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['voucher_code']);
+    }
+
+    public function test_order_cancellation_refunds_voucher_usage_counter(): void
+    {
+        $voucher = Voucher::create([
+            'code' => 'REFUNDME',
+            'type' => 'fixed',
+            'value' => 20000,
+            'min_purchase' => 100000,
+            'quota' => 10,
+            'used_count' => 0,
+            'is_active' => true,
+        ]);
+
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Cancel User',
+                'phone' => '081234567890',
+                'street' => 'Jl. Senaru',
+                'city' => 'Mataram',
+                'province' => 'NTB',
+            ],
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+            'shipping_cost' => 20000,
+            'payment_method' => 'qris',
+            'voucher_code' => 'REFUNDME',
+        ];
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $response->assertCreated();
+        $this->assertEquals(1, $voucher->fresh()->used_count);
+
+        $orderNumber = $response->json('data.order_number');
+        $order = Order::where('order_number', $orderNumber)->firstOrFail();
+
+        // Cancel order via OrderTransitionService
+        app(OrderTransitionService::class)->cancelOrder(
+            order: $order,
+            reason: 'User request cancellation',
+        );
+
+        // Voucher used_count must be decremented back to 0
+        $this->assertEquals(0, $voucher->fresh()->used_count);
+    }
+
+    public function test_checkout_concurrency_race_condition_locks_and_prevents_quota_overuse(): void
+    {
+        // Only 1 remaining usage allowed (quota: 1, used_count: 0)
+        $voucher = Voucher::create([
+            'code' => 'LASTONE',
+            'type' => 'fixed',
+            'value' => 20000,
+            'min_purchase' => 100000,
+            'quota' => 1,
+            'used_count' => 0,
+            'is_active' => true,
+        ]);
+
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Buyer 1',
+                'phone' => '081234567890',
+                'street' => 'Jl. Senaru',
+                'city' => 'Mataram',
+                'province' => 'NTB',
+            ],
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+            'shipping_cost' => 20000,
+            'payment_method' => 'qris',
+            'voucher_code' => 'LASTONE',
+        ];
+
+        // First checkout succeeds
+        $firstResponse = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $firstResponse->assertCreated();
+        $this->assertEquals(1, $voucher->fresh()->used_count);
+
+        // Second checkout must fail because quota is exhausted
+        $secondResponse = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $secondResponse->assertUnprocessable()
             ->assertJsonValidationErrors(['voucher_code']);
     }
 

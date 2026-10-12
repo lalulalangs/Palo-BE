@@ -7,6 +7,7 @@ use App\Models\OrderStatusHistory;
 use App\Models\Payment;
 use App\Models\Sku;
 use App\Models\StockMovement;
+use App\Models\Voucher;
 use App\Services\Inventory\StockMovementService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -241,6 +242,14 @@ class OrderTransitionService
                 'status' => Order::STATUS_CANCELLED,
                 'cancelled_reason' => $cleanReason,
             ]);
+
+            // Kembalikan kuota voucher jika pesanan menggunakan voucher
+            if ($lockedOrder->voucher_id) {
+                $voucher = Voucher::find($lockedOrder->voucher_id);
+                if ($voucher && $voucher->used_count > 0) {
+                    $voucher->decrement('used_count');
+                }
+            }
 
             OrderStatusHistory::create([
                 'order_id' => $lockedOrder->id,

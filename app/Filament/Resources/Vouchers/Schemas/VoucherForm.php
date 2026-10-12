@@ -41,9 +41,10 @@ class VoucherForm
                             ->numeric()
                             ->required()
                             ->minValue(1)
+                            ->maxValue(fn ($get) => $get('type') === Voucher::TYPE_PERCENTAGE ? 100 : null)
                             ->prefix(fn ($get) => $get('type') === Voucher::TYPE_PERCENTAGE ? '%' : 'Rp')
                             ->helperText(fn ($get) => $get('type') === Voucher::TYPE_PERCENTAGE
-                                ? 'Persentase potongan harga dari subtotal pesanan.'
+                                ? 'Persentase potongan harga dari subtotal pesanan (maks. 100%).'
                                 : 'Nominal potongan rupiah.'),
                     ])
                     ->columns(2),
