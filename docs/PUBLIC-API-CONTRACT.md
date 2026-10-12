@@ -967,7 +967,124 @@ Jika harga produk telah diubah oleh Admin sejak pengguna membuka keranjang dan p
 
 ---
 
-## 13. Ringkasan Kode Status HTTP (HTTP Status Codes)
+## 13. Voucher & Promosi (PRD §3.6, §3.8, §3.12)
+
+Fitur voucher dan diskon promosi untuk mendapatkan potongan harga pada pesanan belanja. Voucher dapat berupa nominal tetap (*fixed*) atau persentase (*percentage*) dengan batas kuota dan periode berlaku.
+
+### 13.1 Daftar Voucher Aktif & Publik
+Mengambil daftar voucher aktif yang saat ini berlaku, memiliki sisa kuota, dan dapat digunakan oleh pelanggan di storefront/halaman promo.
+
+* **Endpoint:** `GET /vouchers`
+* **Auth:** Bebas (Publik / Opsional Token)
+* **Rate Limit:** 60 request / menit
+
+#### Respon Berhasil (`200 OK`)
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "code": "RINJANI10",
+      "type": "percentage",
+      "type_label": "Persentase",
+      "value": 10,
+      "formatted_value": "10%",
+      "min_purchase": 100000,
+      "formatted_min_purchase": "Rp 100.000",
+      "quota": 100,
+      "used_count": 5,
+      "remaining_quota": 95,
+      "start_date": "2026-10-01T00:00:00.000000Z",
+      "end_date": "2026-10-31T23:59:59.000000Z"
+    },
+    {
+      "id": 2,
+      "code": "HEMAT50K",
+      "type": "fixed",
+      "type_label": "Nominal Tetap",
+      "value": 50000,
+      "formatted_value": "Rp 50.000",
+      "min_purchase": 300000,
+      "formatted_min_purchase": "Rp 300.000",
+      "quota": 50,
+      "used_count": 12,
+      "remaining_quota": 38,
+      "start_date": "2026-10-01T00:00:00.000000Z",
+      "end_date": "2026-10-31T23:59:59.000000Z"
+    }
+  ]
+}
+```
+
+---
+
+### 13.2 Validasi & Simulasi Voucher (Apply Voucher)
+Memvalidasi kode voucher terhadap subtotal belanja sebelum checkout. Endpoint ini menghitung potensi potongan diskon tanpa mengunci kuota atau mengubah status keranjang.
+
+* **Endpoint:** `POST /vouchers/apply`
+* **Auth:** Bebas (Publik / Opsional Token)
+* **Rate Limit:** 10 request / menit (`throttle:10,1`)
+
+#### Request Body
+| Field | Tipe | Wajib | Keterangan |
+|---|---|---|---|
+| `code` | string | Ya | Kode voucher (case-insensitive, otomatis dinormalisasi menjadi huruf kapital). |
+| `subtotal` | integer | Ya | Subtotal belanja saat ini dalam Rupiah (min: 0). |
+
+```json
+{
+  "code": "RINJANI10",
+  "subtotal": 250000
+}
+```
+
+#### Respon Berhasil (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "voucher": {
+      "id": 1,
+      "code": "RINJANI10",
+      "type": "percentage",
+      "type_label": "Persentase",
+      "value": 10,
+      "formatted_value": "10%",
+      "min_purchase": 100000,
+      "formatted_min_purchase": "Rp 100.000",
+      "quota": 100,
+      "used_count": 5,
+      "remaining_quota": 95,
+      "start_date": "2026-10-01T00:00:00.000000Z",
+      "end_date": "2026-10-31T23:59:59.000000Z"
+    },
+    "discount_amount": 25000,
+    "formatted_discount_amount": "Rp 25.000",
+    "final_subtotal": 225000,
+    "formatted_final_subtotal": "Rp 225.000"
+  }
+}
+```
+
+#### Respon Gagal Validasi Bisnis (`422 Unprocessable Content`)
+Mengembalikan envelope error standar `success: false` dengan pesan spesifik kegagalan validasi:
+* `"Kode voucher tidak ditemukan atau tidak aktif."`
+* `"Voucher belum dapat digunakan."`
+* `"Voucher telah kadaluarsa."`
+* `"Kuota penggunaan voucher telah habis."`
+* `"Subtotal belanja belum memenuhi minimum pembelian sebesar Rp 100.000."`
+
+```json
+{
+  "success": false,
+  "message": "Kode voucher tidak ditemukan atau tidak aktif."
+}
+```
+
+---
+
+## 14. Ringkasan Kode Status HTTP (HTTP Status Codes)
 
 | Kode | Status | Keterangan untuk Frontend |
 |---|---|---|
@@ -981,4 +1098,5 @@ Jika harga produk telah diubah oleh Admin sejak pengguna membuka keranjang dan p
 | `429` | **Too Many Requests** | Terkena limitasi frekuensi request (auth/checkout > 10x/menit, guest > 15x/menit). Periksa header `Retry-After`. |
 | `503` | **Service Unavailable** | Layanan eksternal (misal API ekspedisi kurir) sedang offline atau bermasalah. |
 | `500` | **Internal Server Error** | Terjadi kesalahan server backend. |
+
 

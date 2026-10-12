@@ -58,6 +58,7 @@ class AdminNavigationStructureTest extends TestCase
         $this->assertSame([
             ['label' => 'Banner', 'sort' => 1],
             ['label' => 'Hero Slider', 'sort' => 2],
+            ['label' => 'Voucher', 'sort' => 3],
         ], $kontenItems);
 
         // Group: Inventaris

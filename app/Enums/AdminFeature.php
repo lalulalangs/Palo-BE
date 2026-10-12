@@ -12,6 +12,7 @@ enum AdminFeature: string implements HasLabel
     case Collections = 'collections';
     case Banners = 'banners';
     case HeroSliders = 'hero-sliders';
+    case Vouchers = 'vouchers';
     case Orders = 'orders';
     case StockOpnames = 'stock-opnames';
     case StockMovements = 'stock-movements';
@@ -27,6 +28,7 @@ enum AdminFeature: string implements HasLabel
             self::Collections => 'Koleksi (Series)',
             self::Banners => 'Banner',
             self::HeroSliders => 'Hero Slider',
+            self::Vouchers => 'Voucher & Diskon',
             self::Orders => 'Pesanan',
             self::StockOpnames => 'Opname Stok',
             self::StockMovements => 'Riwayat Mutasi Stok',
@@ -44,6 +46,7 @@ enum AdminFeature: string implements HasLabel
             self::Collections => Heroicon::OutlinedSparkles,
             self::Banners => Heroicon::OutlinedPhoto,
             self::HeroSliders => Heroicon::OutlinedPresentationChartBar,
+            self::Vouchers => Heroicon::OutlinedTicket,
             self::Orders => Heroicon::OutlinedShoppingBag,
             self::StockOpnames => Heroicon::OutlinedScale,
             self::StockMovements => Heroicon::OutlinedClipboardDocumentList,

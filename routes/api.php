@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\GuestCheckoutController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\PublicHeroSliderController;
 use App\Http\Controllers\Api\V1\ShippingController;
+use App\Http\Controllers\Api\V1\VoucherController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -53,6 +54,12 @@ Route::prefix('v1')->group(function (): void {
 
     // Brand & Settings
     Route::get('brand', [BrandController::class, 'index']);
+
+    // Vouchers & Promotions (PRD §3.6, §3.8, §3.12)
+    Route::prefix('vouchers')->group(function (): void {
+        Route::get('/', [VoucherController::class, 'index']);
+        Route::post('apply', [VoucherController::class, 'apply'])->middleware('throttle:10,1');
+    });
 
     // Public Catalog
     Route::get('banners', [BannerController::class, 'index']);

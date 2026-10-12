@@ -13,6 +13,7 @@ use App\Models\Sku;
 use App\Models\User;
 use App\Models\Voucher;
 use App\Services\Cart\CartService;
+use App\Services\Vouchers\VoucherService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -20,7 +21,8 @@ use Illuminate\Validation\ValidationException;
 class RegisteredCheckoutService
 {
     public function __construct(
-        protected CartService $cartService
+        protected CartService $cartService,
+        protected VoucherService $voucherService
     ) {}
 
     /**
@@ -176,32 +178,15 @@ class RegisteredCheckoutService
             $voucherModel = null;
 
             if (filled($voucherCode)) {
-                /** @var Voucher|null $voucherModel */
-                $voucherModel = Voucher::query()
-                    ->where('code', $voucherCode)
-                    ->lockForUpdate()
-                    ->first();
+                $voucherResult = $this->voucherService->validateAndLock(
+                    code: $voucherCode,
+                    subtotal: $subtotal,
+                    user: $user,
+                    fieldKey: 'voucher_code'
+                );
 
-                $now = now()->toDateString();
-
-                if (
-                    ! $voucherModel
-                    || ! $voucherModel->is_active
-                    || ($voucherModel->start_date && $voucherModel->start_date->toDateString() > $now)
-                    || ($voucherModel->end_date && $voucherModel->end_date->toDateString() < $now)
-                    || ($voucherModel->quota !== null && $voucherModel->used_count >= $voucherModel->quota)
-                    || ($voucherModel->min_purchase > 0 && $subtotal < (float) $voucherModel->min_purchase)
-                ) {
-                    throw ValidationException::withMessages([
-                        'voucher_code' => ['Voucher sudah tidak berlaku atau syarat belanja minimum tidak terpenuhi.'],
-                    ]);
-                }
-
-                if ($voucherModel->type === 'percentage') {
-                    $discountAmount = min($subtotal, ($subtotal * (float) $voucherModel->value) / 100);
-                } else {
-                    $discountAmount = min($subtotal, (float) $voucherModel->value);
-                }
+                $voucherModel = $voucherResult->voucher;
+                $discountAmount = $voucherResult->discountAmount;
             }
 
             $grandTotal = max(0.0, $subtotal - $discountAmount + $shippingCost);
@@ -213,7 +198,7 @@ class RegisteredCheckoutService
 
             // Increment voucher usage if valid
             if ($voucherModel) {
-                $voucherModel->increment('used_count');
+                $this->voucherService->incrementUsage($voucherModel);
             }
 
             // Generate order number
