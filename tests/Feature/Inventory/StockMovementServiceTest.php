@@ -107,7 +107,9 @@ class StockMovementServiceTest extends TestCase
         } finally {
             $this->sku->refresh();
             $this->assertEquals(10, $this->sku->stock);
-            $this->assertEquals(0, StockMovement::count());
+            // Hanya ada 1 mutasi initial_stock dari setUp; mutasi sale ter-rollback bersih
+            $this->assertEquals(1, StockMovement::count());
+            $this->assertEquals(0, StockMovement::where('type', StockMovement::TYPE_SALE)->count());
         }
     }
 

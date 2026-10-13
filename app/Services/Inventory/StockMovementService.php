@@ -12,6 +12,8 @@ use LogicException;
 
 class StockMovementService
 {
+    public static bool $isRecordingMovement = false;
+
     /**
      * Catat mutasi stok atomik dengan row-level lock untuk integritas data.
      */
@@ -28,34 +30,42 @@ class StockMovementService
                 throw new InvalidArgumentException('Perubahan kuantitas stok tidak boleh bernilai nol (0).');
             }
 
-            /** @var Sku $lockedSku */
-            $lockedSku = Sku::query()
-                ->whereKey($sku->id)
-                ->lockForUpdate()
-                ->firstOrFail();
+            self::$isRecordingMovement = true;
 
-            $stockBefore = (int) $lockedSku->stock;
-            $stockAfter = $stockBefore + $quantityChange;
+            try {
+                /** @var Sku $lockedSku */
+                $lockedSku = Sku::query()
+                    ->whereKey($sku->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            if ($stockAfter < 0) {
-                throw new InvalidArgumentException(
-                    "Stok SKU {$lockedSku->sku_code} tidak mencukupi untuk pengurangan ini (Stok saat ini: {$stockBefore}, Perubahan: {$quantityChange})."
-                );
+                $stockBefore = (int) $lockedSku->stock;
+                $stockAfter = $stockBefore + $quantityChange;
+
+                if ($stockAfter < 0) {
+                    throw new InvalidArgumentException(
+                        "Stok SKU {$lockedSku->sku_code} tidak mencukupi untuk pengurangan ini (Stok saat ini: {$stockBefore}, Perubahan: {$quantityChange})."
+                    );
+                }
+
+                Sku::withoutEvents(function () use ($lockedSku, $stockAfter) {
+                    $lockedSku->update(['stock' => $stockAfter]);
+                });
+
+                return StockMovement::create([
+                    'sku_id' => $lockedSku->id,
+                    'user_id' => $userId,
+                    'type' => $type,
+                    'quantity_change' => $quantityChange,
+                    'stock_before' => $stockBefore,
+                    'stock_after' => $stockAfter,
+                    'reference_type' => $reference ? $reference->getMorphClass() : null,
+                    'reference_id' => $reference ? $reference->getKey() : null,
+                    'notes' => $notes,
+                ]);
+            } finally {
+                self::$isRecordingMovement = false;
             }
-
-            $lockedSku->update(['stock' => $stockAfter]);
-
-            return StockMovement::create([
-                'sku_id' => $lockedSku->id,
-                'user_id' => $userId,
-                'type' => $type,
-                'quantity_change' => $quantityChange,
-                'stock_before' => $stockBefore,
-                'stock_after' => $stockAfter,
-                'reference_type' => $reference ? $reference->getMorphClass() : null,
-                'reference_id' => $reference ? $reference->getKey() : null,
-                'notes' => $notes,
-            ]);
         });
     }
 
