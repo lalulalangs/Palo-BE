@@ -85,17 +85,20 @@ class ProductController extends Controller
         $perPage = min(max((int) $request->input('per_page', 12), 1), 100);
         $products = $query->paginate($perPage);
 
+        $paginationData = [
+            'current_page' => $products->currentPage(),
+            'last_page' => $products->lastPage(),
+            'per_page' => $products->perPage(),
+            'total' => $products->total(),
+            'has_more' => $products->hasMorePages(),
+        ];
+
         return response()->json([
             'success' => true,
             'message' => 'Daftar produk berhasil diambil',
             'data' => ProductListResource::collection($products->items()),
-            'pagination' => [
-                'current_page' => $products->currentPage(),
-                'last_page' => $products->lastPage(),
-                'per_page' => $products->perPage(),
-                'total' => $products->total(),
-                'has_more' => $products->hasMorePages(),
-            ],
+            'pagination' => $paginationData,
+            'meta' => $paginationData,
         ]);
     }
 

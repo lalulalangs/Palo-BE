@@ -69,12 +69,8 @@ class CollectionController extends Controller
             ->paginate($perPage);
 
         $collectionData = (new CollectionDetailResource($collection))->toArray($request);
-        $collectionData['products'] = ProductListResource::collection($products->items());
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Detail koleksi berhasil diambil',
-            'data' => $collectionData,
+        $collectionData['products'] = [
+            'data' => ProductListResource::collection($products->items()),
             'pagination' => [
                 'current_page' => $products->currentPage(),
                 'last_page' => $products->lastPage(),
@@ -82,6 +78,12 @@ class CollectionController extends Controller
                 'total' => $products->total(),
                 'has_more' => $products->hasMorePages(),
             ],
+        ];
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Detail koleksi berhasil diambil',
+            'data' => $collectionData,
         ]);
     }
 }

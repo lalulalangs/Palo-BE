@@ -480,25 +480,27 @@ Mengambil data koleksi dan daftar produk yang dikurasi di dalamnya dengan pagina
     "banner_image_url": "http://localhost:8000/storage/collections/senaru-banner.webp",
     "is_featured": true,
     "products_count": 6,
-    "products": [
-      {
-        "id": 1,
-        "name": "Kaos Dryfit Senaru Summit",
-        "slug": "kaos-dryfit-senaru-summit",
-        "base_price": 149000,
-        "formatted_base_price": "Rp 149.000",
-        "thumbnail_url": "http://localhost:8000/storage/products/thumbnails/kaos-senaru.webp",
-        "is_featured": true,
-        "is_out_of_stock": false
+    "products": {
+      "data": [
+        {
+          "id": 1,
+          "name": "Kaos Dryfit Senaru Summit",
+          "slug": "kaos-dryfit-senaru-summit",
+          "base_price": 149000,
+          "formatted_base_price": "Rp 149.000",
+          "thumbnail_url": "http://localhost:8000/storage/products/thumbnails/kaos-senaru.webp",
+          "is_featured": true,
+          "is_out_of_stock": false
+        }
+      ],
+      "pagination": {
+        "current_page": 1,
+        "last_page": 1,
+        "per_page": 12,
+        "total": 6,
+        "has_more": false
       }
-    ]
-  },
-  "pagination": {
-    "current_page": 1,
-    "last_page": 1,
-    "per_page": 12,
-    "total": 6,
-    "has_more": false
+    }
   }
 }
 ```

@@ -617,8 +617,13 @@ class RegisteredCheckoutApiTest extends TestCase
             ->getJson('/api/v1/orders');
 
         $listResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('message', 'Daftar pesanan berhasil diambil')
             ->assertJsonPath('data.0.order_number', 'UJN-20261011-88888')
-            ->assertJsonPath('data.0.status', 'menunggu_pembayaran');
+            ->assertJsonPath('data.0.status', 'menunggu_pembayaran')
+            ->assertJsonPath('pagination.current_page', 1)
+            ->assertJsonPath('pagination.total', 1)
+            ->assertJsonPath('pagination.has_more', false);
 
         // Show single order
         $detailResponse = $this->actingAs($this->user, 'sanctum')

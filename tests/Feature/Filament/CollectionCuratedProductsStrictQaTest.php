@@ -332,7 +332,7 @@ class CollectionCuratedProductsStrictQaTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('success', true);
 
-        $items = $response->json('data.products');
+        $items = $response->json('data.products.data');
 
         // Harus berisi 2 produk (produk nonaktif disaring keluar)
         $this->assertCount(2, $items);

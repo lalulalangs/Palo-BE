@@ -172,10 +172,15 @@ class CollectionApiTest extends TestCase
             ])
             ->assertJsonPath('data.name', 'DECADE (10th Anniversary)')
             ->assertJsonPath('data.badge_label', 'Special Drop')
-            ->assertJsonCount(3, 'data.products')
-            ->assertJsonPath('data.products.0.slug', 'decade-hero-jacket')
-            ->assertJsonPath('data.products.1.slug', 'decade-cargo-pants')
-            ->assertJsonPath('data.products.2.slug', 'decade-cap');
+            ->assertJsonCount(3, 'data.products.data')
+            ->assertJsonPath('data.products.data.0.slug', 'decade-hero-jacket')
+            ->assertJsonPath('data.products.data.1.slug', 'decade-cargo-pants')
+            ->assertJsonPath('data.products.data.2.slug', 'decade-cap')
+            ->assertJsonPath('data.products.pagination.total', 3)
+            ->assertJsonPath('data.products.pagination.current_page', 1)
+            ->assertJsonPath('data.products.pagination.per_page', 12)
+            ->assertJsonPath('data.products.pagination.has_more', false)
+            ->assertJsonMissingPath('pagination');
     }
 
     public function test_inactive_products_in_collection_are_excluded(): void
@@ -208,8 +213,8 @@ class CollectionApiTest extends TestCase
         $response = $this->getJson('/api/v1/collections/decade');
 
         $response->assertOk()
-            ->assertJsonCount(1, 'data.products')
-            ->assertJsonPath('data.products.0.slug', 'active-shirt');
+            ->assertJsonCount(1, 'data.products.data')
+            ->assertJsonPath('data.products.data.0.slug', 'active-shirt');
     }
 
     public function test_out_of_stock_products_remain_visible_with_flag(): void
@@ -245,7 +250,7 @@ class CollectionApiTest extends TestCase
         $response = $this->getJson('/api/v1/collections/decade');
 
         $response->assertOk()
-            ->assertJsonPath('data.products.0.is_out_of_stock', true);
+            ->assertJsonPath('data.products.data.0.is_out_of_stock', true);
     }
 
     public function test_cannot_get_inactive_or_expired_collection(): void

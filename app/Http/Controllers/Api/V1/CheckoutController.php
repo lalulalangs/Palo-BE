@@ -68,21 +68,28 @@ class CheckoutController extends Controller
         /** @var User $user */
         $user = $request->user('sanctum');
 
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
+
         $orders = Order::query()
             ->where('user_id', $user->id)
             ->with(['items', 'voucher'])
             ->latest()
-            ->paginate(15);
+            ->paginate($perPage);
+
+        $paginationData = [
+            'current_page' => $orders->currentPage(),
+            'last_page' => $orders->lastPage(),
+            'per_page' => $orders->perPage(),
+            'total' => $orders->total(),
+            'has_more' => $orders->hasMorePages(),
+        ];
 
         return response()->json([
             'success' => true,
+            'message' => 'Daftar pesanan berhasil diambil',
             'data' => OrderSummaryResource::collection($orders->items()),
-            'meta' => [
-                'current_page' => $orders->currentPage(),
-                'last_page' => $orders->lastPage(),
-                'per_page' => $orders->perPage(),
-                'total' => $orders->total(),
-            ],
+            'pagination' => $paginationData,
+            'meta' => $paginationData,
         ]);
     }
 
