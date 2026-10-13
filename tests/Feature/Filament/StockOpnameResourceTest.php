@@ -5,6 +5,7 @@ namespace Tests\Feature\Filament;
 use App\Filament\Resources\StockOpnames\Pages\CreateStockOpname;
 use App\Filament\Resources\StockOpnames\Pages\EditStockOpname;
 use App\Filament\Resources\StockOpnames\Pages\ListStockOpnames;
+use App\Filament\Resources\StockOpnames\StockOpnameResource;
 use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
@@ -90,7 +91,8 @@ class StockOpnameResourceTest extends TestCase
                 ],
             ])
             ->call('create')
-            ->assertHasNoFormErrors();
+            ->assertHasNoFormErrors()
+            ->assertRedirect(StockOpnameResource::getUrl('index'));
 
         $this->assertDatabaseHas('stock_opnames', [
             'user_id' => $this->admin->id,
@@ -156,5 +158,114 @@ class StockOpnameResourceTest extends TestCase
             'reference_type' => StockOpname::class,
             'reference_id' => $opname->id,
         ]);
+    }
+
+    public function test_can_cancel_draft_stock_opname_from_edit_page(): void
+    {
+        $opname = StockOpname::create([
+            'opname_number' => 'OPN-CANCEL-001',
+            'user_id' => $this->admin->id,
+            'status' => StockOpname::STATUS_DRAFT,
+            'notes' => 'Sesi yang akan dibatalkan',
+        ]);
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(EditStockOpname::class, ['record' => $opname->getKey()])
+            ->callAction('cancel_opname')
+            ->assertHasNoActionErrors()
+            ->assertNotified('Sesi opname berhasil dibatalkan')
+            ->assertRedirect(StockOpnameResource::getUrl('index'));
+
+        $opname->refresh();
+        $this->assertTrue($opname->isCancelled());
+        $this->assertEquals(StockOpname::STATUS_CANCELLED, $opname->status);
+    }
+
+    public function test_can_cancel_draft_stock_opname_from_table_action(): void
+    {
+        $opname = StockOpname::create([
+            'opname_number' => 'OPN-CANCEL-TBL',
+            'user_id' => $this->admin->id,
+            'status' => StockOpname::STATUS_DRAFT,
+        ]);
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(ListStockOpnames::class)
+            ->callTableAction('cancel_opname', $opname)
+            ->assertHasNoTableActionErrors()
+            ->assertNotified('Sesi opname berhasil dibatalkan');
+
+        $opname->refresh();
+        $this->assertTrue($opname->isCancelled());
+    }
+
+    public function test_can_delete_draft_stock_opname_from_table(): void
+    {
+        $opname = StockOpname::create([
+            'opname_number' => 'OPN-DELETE-001',
+            'user_id' => $this->admin->id,
+            'status' => StockOpname::STATUS_DRAFT,
+        ]);
+
+        StockOpnameItem::create([
+            'stock_opname_id' => $opname->id,
+            'sku_id' => $this->sku->id,
+            'system_stock' => 20,
+            'physical_stock' => 20,
+            'difference' => 0,
+        ]);
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(ListStockOpnames::class)
+            ->callTableAction('delete', $opname)
+            ->assertHasNoTableActionErrors();
+
+        $this->assertDatabaseMissing('stock_opnames', ['id' => $opname->id]);
+        $this->assertDatabaseMissing('stock_opname_items', ['stock_opname_id' => $opname->id]);
+    }
+
+    public function test_completed_opname_hides_cancel_and_delete_actions(): void
+    {
+        $opname = StockOpname::create([
+            'opname_number' => 'OPN-COMPLETED-SECURE',
+            'user_id' => $this->admin->id,
+            'status' => StockOpname::STATUS_COMPLETED,
+            'completed_at' => now(),
+        ]);
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(ListStockOpnames::class)
+            ->assertTableActionHidden('cancel_opname', $opname)
+            ->assertTableActionHidden('delete', $opname)
+            ->assertTableActionHidden('apply_opname', $opname);
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(EditStockOpname::class, ['record' => $opname->getKey()])
+            ->assertActionHidden('cancel_opname')
+            ->assertActionHidden('delete')
+            ->assertActionHidden('apply_opname');
+    }
+
+    public function test_editing_draft_opname_redirects_to_index_after_save(): void
+    {
+        $opname = StockOpname::create([
+            'opname_number' => 'OPN-EDIT-SAVE',
+            'user_id' => $this->admin->id,
+            'status' => StockOpname::STATUS_DRAFT,
+            'notes' => 'Catatan sebelum diedit',
+        ]);
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(EditStockOpname::class, ['record' => $opname->getKey()])
+            ->fillForm([
+                'notes' => 'Catatan setelah diperbarui',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotified('Perubahan draft opname berhasil disimpan')
+            ->assertRedirect(StockOpnameResource::getUrl('index'));
+
+        $opname->refresh();
+        $this->assertEquals('Catatan setelah diperbarui', $opname->notes);
     }
 }
