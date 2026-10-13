@@ -146,8 +146,9 @@ class StockEdgeCasesTest extends TestCase
         $opname->refresh();
         $this->assertEquals(StockOpname::STATUS_COMPLETED, $opname->status);
 
-        // Tidak ada baris mutasi mubazir yang terbuat
-        $this->assertEquals(0, StockMovement::where('sku_id', $this->skuA->id)->count());
+        // Tidak ada baris mutasi mubazir yang terbuat (hanya ada 1 initial_stock dari setup)
+        $this->assertEquals(1, StockMovement::where('sku_id', $this->skuA->id)->count());
+        $this->assertEquals(0, StockMovement::where('sku_id', $this->skuA->id)->where('type', StockMovement::TYPE_OPNAME_ADJUSTMENT)->count());
     }
 
     public function test_opname_rejects_negative_physical_stock(): void

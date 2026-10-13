@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StockOpnames\Tables;
 use App\Models\StockOpname;
 use App\Services\Inventory\StockMovementService;
 use Filament\Actions\Action;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
@@ -66,7 +67,8 @@ class StockOpnamesTable
                     ->modalHeading('Terapkan Penyesuaian Stok Opname')
                     ->modalDescription('Apakah Anda yakin ingin menerapkan hasil opname fisik ini? Saldo stok SKU akan disesuaikan dan log mutasi stok akan dicatat secara otomatis ke sistem.')
                     ->modalSubmitActionLabel('Ya, Terapkan Penyesuaian')
-                    ->visible(fn (StockOpname $record): bool => ! $record->isCompleted())
+                    ->modalCancelActionLabel('Tidak')
+                    ->visible(fn (StockOpname $record): bool => $record->isDraft())
                     ->action(function (StockOpname $record, StockMovementService $service): void {
                         try {
                             $service->applyOpname($record, Auth::id() ? (int) Auth::id() : null);
@@ -83,6 +85,31 @@ class StockOpnamesTable
                                 ->send();
                         }
                     }),
+                Action::make('cancel_opname')
+                    ->label('Batalkan')
+                    ->icon(Heroicon::OutlinedXCircle)
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Batalkan Sesi Opname')
+                    ->modalDescription(fn (StockOpname $record): string => "Apakah Anda yakin ingin membatalkan sesi opname {$record->opname_number}? Status dokumen akan diubah menjadi Dibatalkan dan saldo stok tidak akan dipengaruhi.")
+                    ->modalSubmitActionLabel('Ya, Batalkan Sesi')
+                    ->modalCancelActionLabel('Tidak')
+                    ->visible(fn (StockOpname $record): bool => $record->isDraft())
+                    ->action(function (StockOpname $record): void {
+                        $record->update(['status' => StockOpname::STATUS_CANCELLED]);
+
+                        Notification::make()
+                            ->title('Sesi opname berhasil dibatalkan')
+                            ->warning()
+                            ->send();
+                    }),
+                DeleteAction::make()
+                    ->label('Hapus')
+                    ->modalHeading('Hapus Dokumen Opname')
+                    ->modalDescription(fn (StockOpname $record): string => "Apakah Anda yakin ingin menghapus sesi opname {$record->opname_number}? Data hasil input yang belum diterapkan akan dibersihkan secara permanen.")
+                    ->modalSubmitActionLabel('Ya, Hapus')
+                    ->modalCancelActionLabel('Tidak')
+                    ->visible(fn (StockOpname $record): bool => ! $record->isCompleted()),
             ]);
     }
 }

@@ -47,6 +47,16 @@ class StockOpname extends Model
         return $this->status === self::STATUS_COMPLETED;
     }
 
+    public function isDraft(): bool
+    {
+        return $this->status === self::STATUS_DRAFT;
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
+
     public static function generateNumber(): string
     {
         $prefix = 'OPN-'.date('Ymd');

@@ -11,6 +11,8 @@ class StockMovement extends Model
 {
     use HasFactory;
 
+    public const TYPE_INITIAL_STOCK = 'initial_stock';
+
     public const TYPE_RESTOCK = 'restock';
 
     public const TYPE_SALE = 'sale';
@@ -60,6 +62,7 @@ class StockMovement extends Model
     public static function getTypeLabels(): array
     {
         return [
+            self::TYPE_INITIAL_STOCK => 'Stok Awal',
             self::TYPE_RESTOCK => 'Restock / Masuk',
             self::TYPE_SALE => 'Penjualan',
             self::TYPE_CANCELLATION => 'Batal Pesanan',

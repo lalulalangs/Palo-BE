@@ -35,6 +35,7 @@ class StockMovementsTable
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => StockMovement::getTypeLabels()[$state] ?? $state)
                     ->color(fn (string $state): string => match ($state) {
+                        StockMovement::TYPE_INITIAL_STOCK => 'info',
                         StockMovement::TYPE_RESTOCK => 'success',
                         StockMovement::TYPE_SALE => 'danger',
                         StockMovement::TYPE_CANCELLATION => 'info',
