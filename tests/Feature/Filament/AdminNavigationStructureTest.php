@@ -44,7 +44,7 @@ class AdminNavigationStructureTest extends TestCase
         $this->assertSame([
             ['label' => 'Produk', 'sort' => 1],
             ['label' => 'Kategori', 'sort' => 2],
-            ['label' => 'Koleksi (Series)', 'sort' => 3],
+            ['label' => 'Koleksi', 'sort' => 3],
         ], $katalogItems);
 
         // Group: Konten & Promosi

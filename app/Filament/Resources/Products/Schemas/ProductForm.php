@@ -104,25 +104,27 @@ class ProductForm
 
                 Section::make('Status & Visibilitas Produk')
                     ->description('Atur ketersediaan produk di etalase toko dan penyorotan di halaman depan.')
+                    ->columnSpanFull()
                     ->schema([
                         Toggle::make('is_active')
-                            ->label('Status Produk (Tampilkan di Toko)')
+                            ->label('Status Produk')
                             ->helperText('Jika diaktifkan, produk langsung dapat dilihat, dicari, dan dibeli oleh pelanggan di website. Jika nonaktif, produk disimpan sebagai draf/disembunyikan.')
+                            ->inline(false)
                             ->onColor('success')
                             ->offColor('danger')
                             ->onIcon('heroicon-m-eye')
                             ->offIcon('heroicon-m-eye-slash')
                             ->default(true),
                         Toggle::make('is_featured')
-                            ->label('Jadikan Produk Unggulan (Rekomendasi Utama)')
+                            ->label('Jadikan Produk Unggulan')
                             ->helperText('Jika diaktifkan, produk ini akan disorot di bagian "Produk Pilihan / Rekomendasi" pada halaman depan (homepage) website.')
+                            ->inline(false)
                             ->onColor('warning')
                             ->offColor('gray')
                             ->onIcon('heroicon-m-star')
-                            ->offIcon('heroicon-m-star')
                             ->default(false),
                     ])
-                    ->columns(2),
+                    ->columns(['default' => 1, 'md' => 2]),
             ]);
     }
 }

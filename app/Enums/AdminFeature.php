@@ -25,7 +25,7 @@ enum AdminFeature: string implements HasLabel
         return match ($this) {
             self::Products => 'Produk',
             self::Categories => 'Kategori',
-            self::Collections => 'Koleksi (Series)',
+            self::Collections => 'Koleksi',
             self::Banners => 'Banner',
             self::HeroSliders => 'Hero Slider',
             self::Vouchers => 'Voucher & Diskon',

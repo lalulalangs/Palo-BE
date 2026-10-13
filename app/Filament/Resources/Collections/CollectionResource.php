@@ -32,7 +32,7 @@ class CollectionResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'name';
 
-    protected static ?string $navigationLabel = 'Koleksi (Series)';
+    protected static ?string $navigationLabel = 'Koleksi';
 
     protected static ?string $modelLabel = 'Koleksi';
 
