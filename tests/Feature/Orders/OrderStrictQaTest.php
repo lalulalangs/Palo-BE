@@ -145,8 +145,8 @@ class OrderStrictQaTest extends TestCase
             $this->assertEquals(3, $this->skuSecondary->fresh()->stock);
             // Status order harus tetap pending
             $this->assertEquals(Order::STATUS_PENDING, $order->fresh()->status);
-            // Tidak boleh ada pergerakan stok tersimpan
-            $this->assertEquals(0, StockMovement::count());
+            // Tidak boleh ada pergerakan stok penjualan tersimpan (hanya ada initial_stock dari setup)
+            $this->assertEquals(0, StockMovement::where('type', StockMovement::TYPE_SALE)->count());
             // Tidak boleh ada histori transisi
             $this->assertEquals(0, OrderStatusHistory::count());
         }
