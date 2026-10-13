@@ -27,6 +27,8 @@ class VariantsRelationManager extends RelationManager
 {
     protected static string $relationship = 'variants';
 
+    protected static ?string $title = 'Varian & Stok Produk';
+
     public function form(Schema $schema): Schema
     {
         return $schema
@@ -80,6 +82,8 @@ class VariantsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modelLabel('Varian')
+            ->pluralModelLabel('Daftar Varian')
             ->recordTitleAttribute('name')
             ->columns([
                 TextColumn::make('name')

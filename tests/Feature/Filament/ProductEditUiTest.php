@@ -3,6 +3,7 @@
 namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\Products\Pages\EditProduct;
+use App\Filament\Resources\Products\RelationManagers\VariantsRelationManager;
 use App\Filament\Resources\Products\Schemas\ProductForm;
 use App\Models\AdminUser;
 use App\Models\Category;
@@ -100,5 +101,25 @@ class ProductEditUiTest extends TestCase
         $this->product->refresh();
         $this->assertFalse((bool) $this->product->is_active);
         $this->assertTrue((bool) $this->product->is_featured);
+    }
+
+    public function test_admin_texts_and_buttons_are_localized_to_indonesian(): void
+    {
+        $this->assertEquals('id', config('app.locale'));
+        $this->assertEquals('Simpan', __('Save'));
+        $this->assertEquals('Tambah', __('Add'));
+
+        $page = new EditProduct;
+        $page->record = $this->product;
+
+        $refSave = new \ReflectionMethod($page, 'getSaveFormAction');
+        $this->assertEquals('Simpan', $refSave->invoke($page)->getLabel());
+
+        $refCancel = new \ReflectionMethod($page, 'getCancelFormAction');
+        $this->assertEquals('Batal', $refCancel->invoke($page)->getLabel());
+
+        $variantsRel = new VariantsRelationManager;
+        $variantsRel->ownerRecord = $this->product;
+        $this->assertEquals('Varian & Stok Produk', $variantsRel->getTitle($this->product, 'variants'));
     }
 }
