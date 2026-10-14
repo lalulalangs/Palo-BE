@@ -2,15 +2,13 @@
 
 namespace App\Filament\Resources\Collections\Pages;
 
+use App\Filament\Concerns\RedirectsToIndexAfterSubmission;
 use App\Filament\Resources\Collections\CollectionResource;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateCollection extends CreateRecord
 {
-    protected static string $resource = CollectionResource::class;
+    use RedirectsToIndexAfterSubmission;
 
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('edit', ['record' => $this->getRecord()]);
-    }
+    protected static string $resource = CollectionResource::class;
 }

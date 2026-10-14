@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockOpnames\Pages;
 
+use App\Filament\Concerns\RedirectsToIndexAfterSubmission;
 use App\Filament\Resources\StockOpnames\StockOpnameResource;
 use App\Models\StockOpname;
 use App\Services\Inventory\StockMovementService;
@@ -15,14 +16,11 @@ use Illuminate\Support\Facades\Auth;
 
 class EditStockOpname extends EditRecord
 {
+    use RedirectsToIndexAfterSubmission;
+
     protected static string $resource = StockOpnameResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
-
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
-    }
 
     protected function getSavedNotificationTitle(): ?string
     {

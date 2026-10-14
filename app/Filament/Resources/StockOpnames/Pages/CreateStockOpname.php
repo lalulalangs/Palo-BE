@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockOpnames\Pages;
 
+use App\Filament\Concerns\RedirectsToIndexAfterSubmission;
 use App\Filament\Resources\StockOpnames\StockOpnameResource;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
@@ -9,14 +10,11 @@ use Filament\Support\Enums\Width;
 
 class CreateStockOpname extends CreateRecord
 {
+    use RedirectsToIndexAfterSubmission;
+
     protected static string $resource = StockOpnameResource::class;
 
     protected Width|string|null $maxContentWidth = Width::Full;
-
-    protected function getRedirectUrl(): string
-    {
-        return $this->getResource()::getUrl('index');
-    }
 
     protected function getCreatedNotificationTitle(): ?string
     {

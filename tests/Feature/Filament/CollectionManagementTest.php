@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\Collections\CollectionResource;
 use App\Filament\Resources\Collections\Pages\CreateCollection;
 use App\Filament\Resources\Collections\Pages\EditCollection;
 use App\Filament\Resources\Collections\Pages\ListCollections;
@@ -197,7 +198,7 @@ class CollectionManagementTest extends TestCase
         ]);
     }
 
-    public function test_creating_collection_redirects_to_edit_page(): void
+    public function test_creating_collection_redirects_to_index_page(): void
     {
         Livewire::actingAs($this->admin, 'admin')
             ->test(CreateCollection::class)
@@ -208,7 +209,7 @@ class CollectionManagementTest extends TestCase
             ])
             ->call('create')
             ->assertHasNoFormErrors()
-            ->assertRedirect();
+            ->assertRedirect(CollectionResource::getUrl('index'));
 
         $created = Collection::where('slug', 'ekspedisi-segara-anak')->first();
         $this->assertNotNull($created);

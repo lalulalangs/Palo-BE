@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AdminUsers\Pages;
 
+use App\Filament\Concerns\RedirectsToIndexAfterSubmission;
 use App\Filament\Resources\AdminUsers\AdminUserResource;
 use App\Models\Role;
 use Filament\Actions\DeleteAction;
@@ -11,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class EditAdminUser extends EditRecord
 {
+    use RedirectsToIndexAfterSubmission;
+
     protected static string $resource = AdminUserResource::class;
 
     protected function getHeaderActions(): array
