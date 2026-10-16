@@ -24,11 +24,28 @@ class OrdersTable
             ->columns([
                 TextColumn::make('order_number')
                     ->label('No. Pesanan')
-                    ->searchable()
+                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $q) use ($search) {
+                        $q->where('order_number', 'like', "%{$search}%")
+                            ->orWhere('cod_reference_code', 'like', "%{$search}%");
+                    }))
                     ->sortable()
                     ->weight('bold')
                     ->copyable()
-                    ->fontFamily(FontFamily::Mono),
+                    ->fontFamily(FontFamily::Mono)
+                    ->description(fn (Order $record): ?string => $record->isCod() && $record->cod_reference_code ? "COD: {$record->cod_reference_code}" : null),
+
+                TextColumn::make('payment_method')
+                    ->label('Metode Bayar')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        Order::PAYMENT_METHOD_COD => 'COD',
+                        Order::PAYMENT_METHOD_ONLINE => 'Online',
+                        default => strtoupper($state ?? 'ONLINE'),
+                    })
+                    ->color(fn (?string $state): string => match ($state) {
+                        Order::PAYMENT_METHOD_COD => 'warning',
+                        default => 'info',
+                    }),
 
                 TextColumn::make('created_at')
                     ->label('Waktu Checkout')
@@ -49,7 +66,8 @@ class OrdersTable
                     ->label('Status')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => Order::getStatusLabels()[$state] ?? $state)
-                    ->color(fn (string $state): string => Order::getStatusColor($state)),
+                    ->color(fn (string $state): string => Order::getStatusColor($state))
+                    ->description(fn (Order $record): ?string => $record->hasRefund() ? (Order::getRefundStatusLabels()[$record->refund_status] ?? $record->refund_status) : null),
 
                 TextColumn::make('total')
                     ->label('Total Belanja')
@@ -64,9 +82,20 @@ class OrdersTable
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
+                SelectFilter::make('payment_method')
+                    ->label('Metode Pembayaran')
+                    ->options([
+                        Order::PAYMENT_METHOD_ONLINE => 'Online',
+                        Order::PAYMENT_METHOD_COD => 'Cash On Delivery (COD)',
+                    ]),
+
                 SelectFilter::make('status')
                     ->label('Status Pesanan')
                     ->options(Order::getStatusLabels()),
+
+                SelectFilter::make('refund_status')
+                    ->label('Status Refund')
+                    ->options(Order::getRefundStatusLabels()),
 
                 SelectFilter::make('shipping_courier')
                     ->label('Kurir Ekspedisi')
@@ -119,9 +148,14 @@ class OrdersTable
             ])
             ->recordActions([
                 ViewAction::make(),
+                OrderActions::makeConfirmCodAction(),
                 OrderActions::makeProcessingAction(),
                 OrderActions::makeShipAction(),
                 OrderActions::makeCompleteAction(),
+                OrderActions::makeRequestRefundAction(),
+                OrderActions::makeApproveRefundAction(),
+                OrderActions::makeRejectRefundAction(),
+                OrderActions::makeCompleteRefundAction(),
                 OrderActions::makeCancelAction(),
             ])
             ->bulkActions([
