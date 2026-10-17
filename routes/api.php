@@ -38,6 +38,7 @@ Route::prefix('v1')->group(function (): void {
 
     // Guest Flow (PRD §3.11, §6A & KONTRAK-API §5)
     Route::prefix('guest')->middleware('throttle:15,1')->group(function (): void {
+        Route::post('cod-checkout', [GuestCheckoutController::class, 'codCheckout']);
         Route::post('whatsapp-checkout', [GuestCheckoutController::class, 'whatsappCheckout']);
         Route::post('custom-inquiry', [GuestCheckoutController::class, 'customInquiry']);
     });

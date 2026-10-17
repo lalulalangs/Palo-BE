@@ -22,7 +22,8 @@ class RegisteredCheckoutService
 {
     public function __construct(
         protected CartService $cartService,
-        protected VoucherService $voucherService
+        protected VoucherService $voucherService,
+        protected CodWhatsAppService $codWhatsAppService
     ) {}
 
     /**
@@ -41,7 +42,8 @@ class RegisteredCheckoutService
         ?string $shippingEtd,
         string $paymentMethod,
         ?string $voucherCode = null,
-        bool $acknowledgePriceChange = false
+        bool $acknowledgePriceChange = false,
+        ?string $note = null
     ): Order {
         return DB::transaction(function () use (
             $user,
@@ -52,8 +54,14 @@ class RegisteredCheckoutService
             $shippingCost,
             $paymentMethod,
             $voucherCode,
-            $acknowledgePriceChange
+            $acknowledgePriceChange,
+            $note
         ) {
+            if ($paymentMethod === Order::PAYMENT_METHOD_COD && ! $this->codWhatsAppService->isCodEnabled()) {
+                throw ValidationException::withMessages([
+                    'payment_method' => ['Metode pembayaran COD sedang dinonaktifkan.'],
+                ]);
+            }
             $rawItems = $itemsInput;
 
             if (empty($rawItems)) {
@@ -222,12 +230,20 @@ class RegisteredCheckoutService
                 $shippingAddress['postal_code'] ?? ''
             ), ', ');
 
+            $isCod = $paymentMethod === Order::PAYMENT_METHOD_COD;
+            $orderStatus = $isCod ? Order::STATUS_AWAITING_CONFIRMATION : Order::STATUS_PENDING;
+            $orderPaymentMethod = $isCod ? Order::PAYMENT_METHOD_COD : Order::PAYMENT_METHOD_ONLINE;
+            $codReferenceCode = $isCod ? $this->codWhatsAppService->generateReferenceCode() : null;
+            $stockLockedUntil = $isCod ? null : now()->addMinutes(15);
+
             /** @var Order $order */
             $order = Order::create([
                 'order_number' => $orderNumber,
                 'user_id' => $user->id,
                 'voucher_id' => $voucherModel?->id,
-                'status' => Order::STATUS_PENDING,
+                'status' => $orderStatus,
+                'payment_method' => $orderPaymentMethod,
+                'cod_reference_code' => $codReferenceCode,
                 'subtotal' => $subtotal,
                 'discount_amount' => $discountAmount,
                 'shipping_cost' => $shippingCost,
@@ -237,7 +253,7 @@ class RegisteredCheckoutService
                 'shipping_full_address' => $fullAddress,
                 'shipping_courier' => $shippingCourier,
                 'shipping_service' => $shippingService,
-                'stock_locked_until' => now()->addMinutes(15),
+                'stock_locked_until' => $stockLockedUntil,
             ]);
 
             // Create immutable order item snapshots
@@ -258,27 +274,61 @@ class RegisteredCheckoutService
             }
 
             // Create pending payment record
-            $paymentInstructions = $this->generatePaymentInstructions($paymentMethod, $order);
+            if ($isCod) {
+                $noteText = $note ?? $shippingAddress['notes'] ?? null;
+                $waMessage = $this->codWhatsAppService->buildMessage($order, $noteText);
+                $waUrl = $this->codWhatsAppService->generateWhatsAppUrl($waMessage);
 
-            Payment::create([
-                'order_id' => $order->id,
-                'gateway' => 'midtrans',
-                'payment_method' => $paymentMethod,
-                'amount' => $grandTotal,
-                'status' => Payment::STATUS_PENDING,
-                'expired_at' => $order->stock_locked_until,
-                'raw_response' => $paymentInstructions,
-            ]);
+                $paymentInstructions = [
+                    'method' => 'cod',
+                    'cod_reference_code' => $order->cod_reference_code,
+                    'whatsapp_url' => $waUrl,
+                    'whatsapp_message' => $waMessage,
+                    'instructions_text' => 'Silakan konfirmasi pesanan Anda melalui WhatsApp ke Customer Service kami.',
+                ];
 
-            // Record status history audit
-            OrderStatusHistory::create([
-                'order_id' => $order->id,
-                'changed_by_admin_id' => null,
-                'from_status' => null,
-                'to_status' => Order::STATUS_PENDING,
-                'note' => 'Pesanan dibuat oleh pembeli.',
-                'created_at' => now(),
-            ]);
+                Payment::create([
+                    'order_id' => $order->id,
+                    'gateway' => 'cod',
+                    'payment_method' => Order::PAYMENT_METHOD_COD,
+                    'amount' => $grandTotal,
+                    'status' => Payment::STATUS_PENDING,
+                    'expired_at' => null,
+                    'raw_response' => $paymentInstructions,
+                ]);
+
+                // Record status history audit
+                OrderStatusHistory::create([
+                    'order_id' => $order->id,
+                    'changed_by_admin_id' => null,
+                    'from_status' => null,
+                    'to_status' => Order::STATUS_AWAITING_CONFIRMATION,
+                    'note' => 'Pesanan COD dibuat oleh pembeli, menunggu konfirmasi CS.',
+                    'created_at' => now(),
+                ]);
+            } else {
+                $paymentInstructions = $this->generatePaymentInstructions($paymentMethod, $order);
+
+                Payment::create([
+                    'order_id' => $order->id,
+                    'gateway' => 'midtrans',
+                    'payment_method' => $paymentMethod,
+                    'amount' => $grandTotal,
+                    'status' => Payment::STATUS_PENDING,
+                    'expired_at' => $order->stock_locked_until,
+                    'raw_response' => $paymentInstructions,
+                ]);
+
+                // Record status history audit
+                OrderStatusHistory::create([
+                    'order_id' => $order->id,
+                    'changed_by_admin_id' => null,
+                    'from_status' => null,
+                    'to_status' => Order::STATUS_PENDING,
+                    'note' => 'Pesanan dibuat oleh pembeli.',
+                    'created_at' => now(),
+                ]);
+            }
 
             // Clear registered user cart
             $this->cartService->clearCart($user);

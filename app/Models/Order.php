@@ -194,6 +194,16 @@ class Order extends Model
         return $this->belongsTo(AdminUser::class, 'refund_approved_by');
     }
 
+    public function guestCheckoutLog(): HasOne
+    {
+        return $this->hasOne(GuestCheckoutLog::class);
+    }
+
+    public function isGuest(): bool
+    {
+        return $this->user_id === null;
+    }
+
     public function isCod(): bool
     {
         return $this->payment_method === self::PAYMENT_METHOD_COD;
