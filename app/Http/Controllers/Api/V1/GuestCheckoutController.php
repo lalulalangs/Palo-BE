@@ -31,11 +31,7 @@ class GuestCheckoutController extends Controller
             sessionId: $sessionId
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Tautan WhatsApp pesanan berhasil dibuat.',
-            'data' => $result,
-        ], 201);
+        return $this->respond($result, 'Tautan WhatsApp pesanan berhasil dibuat.', status: 201);
     }
 
     /**
@@ -54,10 +50,6 @@ class GuestCheckoutController extends Controller
             sessionId: $sessionId
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Tautan WhatsApp konsultasi berhasil dibuat.',
-            'data' => $result,
-        ], 201);
+        return $this->respond($result, 'Tautan WhatsApp konsultasi berhasil dibuat.', status: 201);
     }
 }

@@ -40,24 +40,20 @@ class CheckoutController extends Controller
             acknowledgePriceChange: (bool) $request->input('acknowledge_price_change', false)
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Pesanan berhasil dibuat.',
-            'data' => [
-                'order_number' => $order->order_number,
-                'status' => $order->getFrontendStatus(),
-                'subtotal' => (float) $order->subtotal,
-                'discount_total' => (float) $order->discount_amount,
-                'shipping_cost' => (float) $order->shipping_cost,
-                'grand_total' => (float) $order->total,
-                'grand_total_display' => Number::currency($order->total, 'IDR', 'id'),
-                'payment_expires_at' => $order->stock_locked_until?->toIso8601String(),
-                'payment' => [
-                    'method' => $order->payment?->payment_method,
-                    'instructions' => $order->payment?->raw_response,
-                ],
+        return $this->respond([
+            'order_number' => $order->order_number,
+            'status' => $order->getFrontendStatus(),
+            'subtotal' => (float) $order->subtotal,
+            'discount_total' => (float) $order->discount_amount,
+            'shipping_cost' => (float) $order->shipping_cost,
+            'grand_total' => (float) $order->total,
+            'grand_total_display' => Number::currency($order->total, 'IDR', 'id'),
+            'payment_expires_at' => $order->stock_locked_until?->toIso8601String(),
+            'payment' => [
+                'method' => $order->payment?->payment_method,
+                'instructions' => $order->payment?->raw_response,
             ],
-        ], 201);
+        ], 'Pesanan berhasil dibuat.', status: 201);
     }
 
     /**
@@ -72,7 +68,7 @@ class CheckoutController extends Controller
 
         $orders = Order::query()
             ->where('user_id', $user->id)
-            ->with(['items', 'voucher'])
+            ->with(['items', 'voucher', 'payment'])
             ->latest()
             ->paginate($perPage);
 
@@ -84,13 +80,11 @@ class CheckoutController extends Controller
             'has_more' => $orders->hasMorePages(),
         ];
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar pesanan berhasil diambil',
-            'data' => OrderSummaryResource::collection($orders->items()),
-            'pagination' => $paginationData,
-            'meta' => $paginationData,
-        ]);
+        return $this->respond(
+            OrderSummaryResource::collection($orders->items()),
+            'Daftar pesanan berhasil diambil',
+            $paginationData,
+        );
     }
 
     /**
@@ -107,9 +101,6 @@ class CheckoutController extends Controller
             ->with(['items.sku.product.thumbnail', 'payment', 'voucher', 'statusHistories'])
             ->firstOrFail();
 
-        return response()->json([
-            'success' => true,
-            'data' => new OrderDetailResource($order),
-        ]);
+        return $this->respond(new OrderDetailResource($order));
     }
 }

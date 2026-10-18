@@ -16,9 +16,7 @@ class VoucherResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $desc = $this->type === Voucher::TYPE_PERCENTAGE
-            ? "Potongan {$this->formattedValue()}"
-            : "Potongan {$this->formattedValue()}";
+        $desc = "Potongan {$this->formattedValue()}";
 
         if ($this->min_purchase > 0) {
             $desc .= " dengan minimal belanja {$this->formattedMinPurchase()}";

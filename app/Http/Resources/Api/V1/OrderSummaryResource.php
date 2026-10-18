@@ -37,7 +37,7 @@ class OrderSummaryResource extends JsonResource
             'grand_total_display' => Number::currency($this->total, 'IDR', 'id'),
             'voucher_code' => $this->voucher?->code,
             'payment_expires_at' => $this->stock_locked_until?->toIso8601String(),
-            'needs_reconciliation' => false,
+            'needs_reconciliation' => $this->needsReconciliation(),
             'placed_at' => $this->created_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];

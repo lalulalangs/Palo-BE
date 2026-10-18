@@ -154,8 +154,14 @@ class CartService
         }
 
         /** @var Sku $sku */
-        $sku = Sku::findOrFail($skuId);
+        $sku = Sku::with('product')->findOrFail($skuId);
         $availableStock = $sku->available_stock;
+
+        if (! $sku->is_active || ! $sku->product || ! $sku->product->is_active) {
+            throw ValidationException::withMessages([
+                'sku_id' => ['Produk atau varian ini saat ini tidak aktif atau tidak lagi tersedia.'],
+            ]);
+        }
 
         if ($quantity > $availableStock) {
             throw ValidationException::withMessages([
@@ -168,10 +174,18 @@ class CartService
                 ->where('status', 'active')
                 ->first();
 
+            $affected = 0;
+
             if ($cart) {
-                CartItem::where('cart_id', $cart->id)
+                $affected = CartItem::where('cart_id', $cart->id)
                     ->where('sku_id', $skuId)
                     ->update(['quantity' => $quantity]);
+            }
+
+            if ($affected === 0) {
+                throw ValidationException::withMessages([
+                    'sku_id' => ['Item tidak ditemukan di keranjang.'],
+                ]);
             }
 
             return $this->getUserCart($user);
@@ -179,12 +193,20 @@ class CartService
 
         $token = $guestToken ?? (string) Str::uuid();
         $items = $this->getRawGuestItems($token);
+        $found = false;
 
         foreach ($items as $index => $item) {
             if ((int) $item['sku_id'] === $skuId) {
                 $items[$index]['quantity'] = $quantity;
+                $found = true;
                 break;
             }
+        }
+
+        if (! $found) {
+            throw ValidationException::withMessages([
+                'sku_id' => ['Item tidak ditemukan di keranjang.'],
+            ]);
         }
 
         $this->saveRawGuestItems($token, $items);
@@ -276,7 +298,13 @@ class CartService
         // Clear guest session cart from cache
         $this->clearGuestCart($guestToken);
 
-        return $this->getUserCart($user);
+        $cart = $this->getUserCart($user);
+
+        // Rotasi token: token lama sudah tidak berlaku, browser diberi token baru
+        // agar token yang mungkin bocor tidak dapat dipakai ulang.
+        $cart['guest_token'] = (string) Str::uuid();
+
+        return $cart;
     }
 
     /**
@@ -441,9 +469,16 @@ class CartService
      */
     public function getRawGuestItems(string $guestToken): array
     {
-        $key = self::GUEST_CACHE_PREFIX.$guestToken;
+        return Cache::get($this->guestCacheKey($guestToken), []);
+    }
 
-        return Cache::get($key, []);
+    /**
+     * Cache key memakai hash agar token mentah tidak pernah menjadi key cache
+     * (mencegah key injection dan kebocoran token lewat dump cache).
+     */
+    private function guestCacheKey(string $guestToken): string
+    {
+        return self::GUEST_CACHE_PREFIX.hash('sha256', $guestToken);
     }
 
     /**
@@ -453,8 +488,7 @@ class CartService
      */
     private function saveRawGuestItems(string $guestToken, array $items): void
     {
-        $key = self::GUEST_CACHE_PREFIX.$guestToken;
-        Cache::put($key, $items, now()->addDays(self::GUEST_CACHE_TTL_DAYS));
+        Cache::put($this->guestCacheKey($guestToken), $items, now()->addDays(self::GUEST_CACHE_TTL_DAYS));
     }
 
     /**
@@ -462,7 +496,6 @@ class CartService
      */
     private function clearGuestCart(string $guestToken): void
     {
-        $key = self::GUEST_CACHE_PREFIX.$guestToken;
-        Cache::forget($key);
+        Cache::forget($this->guestCacheKey($guestToken));
     }
 }

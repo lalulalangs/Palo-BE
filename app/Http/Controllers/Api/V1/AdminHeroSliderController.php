@@ -18,11 +18,7 @@ class AdminHeroSliderController extends Controller
     {
         $sliders = HeroSlider::query()->ordered()->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar hero slider admin berhasil diambil',
-            'data' => HeroSliderResource::collection($sliders)->resolve(),
-        ]);
+        return $this->respond(HeroSliderResource::collection($sliders)->resolve(), 'Daftar hero slider admin berhasil diambil');
     }
 
     public function store(StoreHeroSliderRequest $request): JsonResponse
@@ -37,20 +33,12 @@ class AdminHeroSliderController extends Controller
 
         $slider = HeroSlider::create($data);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Hero slider created.',
-            'data' => (new HeroSliderResource($slider))->resolve(),
-        ], 201);
+        return $this->respond((new HeroSliderResource($slider))->resolve(), 'Hero slider created.', status: 201);
     }
 
     public function show(HeroSlider $heroSlider): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'message' => 'Detail hero slider admin berhasil diambil',
-            'data' => (new HeroSliderResource($heroSlider))->resolve(),
-        ]);
+        return $this->respond((new HeroSliderResource($heroSlider))->resolve(), 'Detail hero slider admin berhasil diambil');
     }
 
     public function update(UpdateHeroSliderRequest $request, HeroSlider $heroSlider): JsonResponse
@@ -71,11 +59,7 @@ class AdminHeroSliderController extends Controller
 
         $heroSlider->update($data);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Hero slider updated.',
-            'data' => (new HeroSliderResource($heroSlider->fresh()))->resolve(),
-        ]);
+        return $this->respond((new HeroSliderResource($heroSlider->fresh()))->resolve(), 'Hero slider updated.');
     }
 
     public function destroy(HeroSlider $heroSlider): JsonResponse
@@ -88,9 +72,6 @@ class AdminHeroSliderController extends Controller
 
         $heroSlider->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Hero slider deleted.',
-        ]);
+        return $this->respond(null, 'Hero slider deleted.');
     }
 }

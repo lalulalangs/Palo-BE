@@ -125,7 +125,7 @@ class Voucher extends Model
             $discount = (float) $this->value;
         }
 
-        return min($subtotal, max(0.0, $discount));
+        return round(min($subtotal, max(0.0, $discount)), 2);
     }
 
     /**

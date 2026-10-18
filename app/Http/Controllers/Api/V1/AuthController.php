@@ -30,25 +30,18 @@ class AuthController extends Controller
             'phone' => $request->validated('phone'),
         ]);
 
-        $guestToken = $request->input('guest_token')
-            ?? $request->header('X-Guest-Token')
-            ?? $request->cookie('guest_cart_id')
-            ?? $request->cookie('guest_token');
+        $rotatedGuestToken = $this->mergeGuestCartIfPresent($request, $user);
 
-        if (filled($guestToken)) {
-            $this->cartService->mergeGuestCart($user, (string) $guestToken);
-        }
-
-        $token = $user->createToken('customer-auth-token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Pendaftaran akun berhasil.',
-            'data' => [
-                'token' => $token,
+        $response = $this->respond(
+            [
+                'token' => $user->createToken('customer-auth-token')->plainTextToken,
                 'user' => (new CustomerUserResource($user))->resolve(),
             ],
-        ], 201);
+            'Pendaftaran akun berhasil.',
+            status: 201,
+        );
+
+        return $this->withRotatedGuestTokenCookie($response, $rotatedGuestToken);
     }
 
     /**
@@ -68,25 +61,17 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $token = $user->createToken('customer-auth-token')->plainTextToken;
+        $rotatedGuestToken = $this->mergeGuestCartIfPresent($request, $user);
 
-        $guestToken = $request->input('guest_token')
-            ?? $request->header('X-Guest-Token')
-            ?? $request->cookie('guest_cart_id')
-            ?? $request->cookie('guest_token');
-
-        if (filled($guestToken)) {
-            $this->cartService->mergeGuestCart($user, (string) $guestToken);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Berhasil masuk.',
-            'data' => [
-                'token' => $token,
+        $response = $this->respond(
+            [
+                'token' => $user->createToken('customer-auth-token')->plainTextToken,
                 'user' => (new CustomerUserResource($user))->resolve(),
             ],
-        ]);
+            'Berhasil masuk.',
+        );
+
+        return $this->withRotatedGuestTokenCookie($response, $rotatedGuestToken);
     }
 
     /**
@@ -94,11 +79,10 @@ class AuthController extends Controller
      */
     public function me(Request $request): JsonResponse
     {
-        return response()->json([
-            'success' => true,
-            'message' => 'Profil berhasil diambil.',
-            'data' => (new CustomerUserResource($request->user()))->resolve(),
-        ]);
+        return $this->respond(
+            (new CustomerUserResource($request->user()))->resolve(),
+            'Profil berhasil diambil.',
+        );
     }
 
     /**
@@ -108,9 +92,35 @@ class AuthController extends Controller
     {
         $request->user()->currentAccessToken()->delete();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Berhasil keluar.',
-        ]);
+        return $this->respond(null, 'Berhasil keluar.');
+    }
+
+    /**
+     * Gabungkan keranjang tamu bila token guest dikirim, lalu kembalikan token
+     * guest baru agar token lama tidak dapat dipakai ulang.
+     */
+    private function mergeGuestCartIfPresent(Request $request, User $user): ?string
+    {
+        $guestToken = $request->input('guest_token')
+            ?? $request->header('X-Guest-Token')
+            ?? $request->cookie('guest_cart_id')
+            ?? $request->cookie('guest_token');
+
+        if (! is_string($guestToken) || ! filled($guestToken)) {
+            return null;
+        }
+
+        $cart = $this->cartService->mergeGuestCart($user, $guestToken);
+
+        return filled($cart['guest_token'] ?? null) ? (string) $cart['guest_token'] : null;
+    }
+
+    private function withRotatedGuestTokenCookie(JsonResponse $response, ?string $token): JsonResponse
+    {
+        if (filled($token)) {
+            $response->withCookie($this->guestCartCookie((string) $token));
+        }
+
+        return $response;
     }
 }

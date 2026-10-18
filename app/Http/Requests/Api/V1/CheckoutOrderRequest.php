@@ -60,7 +60,6 @@ class CheckoutOrderRequest extends FormRequest
             'payment_method' => ['required', 'string', 'in:qris,virtual_account,ewallet,bank_transfer,credit_card'],
             'voucher_code' => ['nullable', 'string', 'max:50'],
             'acknowledge_price_change' => ['nullable', 'boolean'],
-            'shipping_address_id' => ['nullable', 'integer'],
         ];
     }
 

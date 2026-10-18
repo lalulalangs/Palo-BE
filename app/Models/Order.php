@@ -67,6 +67,36 @@ class Order extends Model
         };
     }
 
+    /**
+     * Apakah status pembayaran dan status pesanan saling bertentangan sehingga
+     * memerlukan rekonsiliasi manual.
+     */
+    public function needsReconciliation(): bool
+    {
+        $payment = $this->payment;
+
+        if (! $payment) {
+            return false;
+        }
+
+        $paidStatuses = [
+            self::STATUS_PAID,
+            self::STATUS_PROCESSING,
+            self::STATUS_SHIPPED,
+            self::STATUS_COMPLETED,
+        ];
+
+        if (in_array($payment->status, [Payment::STATUS_CAPTURE, Payment::STATUS_SETTLEMENT], true)) {
+            return ! in_array($this->status, $paidStatuses, true);
+        }
+
+        if (in_array($payment->status, [Payment::STATUS_DENY, Payment::STATUS_EXPIRE, Payment::STATUS_CANCEL], true)) {
+            return ! in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_EXPIRED], true);
+        }
+
+        return false;
+    }
+
     protected $fillable = [
         'order_number',
         'user_id',

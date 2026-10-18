@@ -151,7 +151,7 @@ class RegisteredCheckoutService
                 }
 
                 $effectivePrice = $sku->effective_price;
-                $lineSubtotal = $effectivePrice * $quantity;
+                $lineSubtotal = round($effectivePrice * $quantity, 2);
                 $subtotal += $lineSubtotal;
 
                 if ($priceSeen !== null && abs($priceSeen - $effectivePrice) >= 0.01 && ! $acknowledgePriceChange) {
@@ -173,6 +173,8 @@ class RegisteredCheckoutService
                 ];
             }
 
+            $subtotal = round($subtotal, 2);
+
             // Calculate voucher discount before throwing price changed if any
             $discountAmount = 0.0;
             $voucherModel = null;
@@ -189,7 +191,7 @@ class RegisteredCheckoutService
                 $discountAmount = $voucherResult->discountAmount;
             }
 
-            $grandTotal = max(0.0, $subtotal - $discountAmount + $shippingCost);
+            $grandTotal = max(0.0, round($subtotal - $discountAmount + $shippingCost, 2));
 
             // If price changes detected and not acknowledged, reject with 409
             if (! empty($priceChanges) && ! $acknowledgePriceChange) {

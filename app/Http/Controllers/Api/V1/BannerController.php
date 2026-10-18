@@ -16,12 +16,9 @@ class BannerController extends Controller
     {
         $banners = Banner::active()
             ->orderBy('sort_order', 'asc')
+            ->limit(100)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar banner berhasil diambil',
-            'data' => BannerResource::collection($banners),
-        ]);
+        return $this->respond(BannerResource::collection($banners), 'Daftar banner berhasil diambil');
     }
 }

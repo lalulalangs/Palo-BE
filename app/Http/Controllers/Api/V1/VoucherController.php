@@ -24,13 +24,10 @@ class VoucherController extends Controller
         $vouchers = Voucher::query()
             ->available()
             ->orderBy('min_purchase', 'asc')
+            ->limit(100)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar voucher promosi berhasil diambil.',
-            'data' => VoucherResource::collection($vouchers),
-        ]);
+        return $this->respond(VoucherResource::collection($vouchers), 'Daftar voucher promosi berhasil diambil.');
     }
 
     /**
@@ -58,24 +55,20 @@ class VoucherController extends Controller
             fieldKey: 'code'
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Voucher berhasil diterapkan.',
-            'data' => [
-                'voucher_id' => $result->voucher->id,
-                'code' => $result->voucher->code,
-                'type' => $result->voucher->type,
-                'value' => (float) $result->voucher->value,
-                'formatted_value' => $result->voucher->formattedValue(),
-                'min_purchase' => (float) $result->voucher->min_purchase,
-                'formatted_min_purchase' => $result->voucher->formattedMinPurchase(),
-                'discount_amount' => $result->discountAmount,
-                'formatted_discount_amount' => 'Rp '.number_format($result->discountAmount, 0, ',', '.'),
-                'subtotal' => $result->subtotal,
-                'formatted_subtotal' => 'Rp '.number_format($result->subtotal, 0, ',', '.'),
-                'final_subtotal' => $result->finalSubtotal,
-                'formatted_final_subtotal' => 'Rp '.number_format($result->finalSubtotal, 0, ',', '.'),
-            ],
-        ]);
+        return $this->respond([
+            'voucher_id' => $result->voucher->id,
+            'code' => $result->voucher->code,
+            'type' => $result->voucher->type,
+            'value' => (float) $result->voucher->value,
+            'formatted_value' => $result->voucher->formattedValue(),
+            'min_purchase' => (float) $result->voucher->min_purchase,
+            'formatted_min_purchase' => $result->voucher->formattedMinPurchase(),
+            'discount_amount' => $result->discountAmount,
+            'formatted_discount_amount' => 'Rp '.number_format($result->discountAmount, 0, ',', '.'),
+            'subtotal' => $result->subtotal,
+            'formatted_subtotal' => 'Rp '.number_format($result->subtotal, 0, ',', '.'),
+            'final_subtotal' => $result->finalSubtotal,
+            'formatted_final_subtotal' => 'Rp '.number_format($result->finalSubtotal, 0, ',', '.'),
+        ], 'Voucher berhasil diterapkan.');
     }
 }

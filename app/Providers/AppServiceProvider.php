@@ -8,6 +8,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +25,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        self::ensureDatabaseConnectionIsSafe(
+            environment: app()->environment(),
+            defaultConnection: (string) config('database.default'),
+        );
+
         Gate::before(function (mixed $user, string $ability): ?bool {
             if (! $user instanceof AdminUser) {
                 return null;
@@ -43,5 +49,18 @@ class AppServiceProvider extends ServiceProvider
             $picker->displayFormat('d/m/Y H:i')
                 ->native(false);
         });
+    }
+
+    /**
+     * Tolak boot aplikasi produksi yang tidak memakai PostgreSQL, agar salah
+     * konfigurasi `.env` tidak diam-diam menulis ke SQLite lokal.
+     */
+    public static function ensureDatabaseConnectionIsSafe(string $environment, string $defaultConnection): void
+    {
+        if ($environment === 'production' && $defaultConnection !== 'pgsql') {
+            throw new RuntimeException(
+                "Koneksi database produksi harus pgsql, ditemukan '{$defaultConnection}'. Periksa DB_CONNECTION pada .env produksi."
+            );
+        }
     }
 }

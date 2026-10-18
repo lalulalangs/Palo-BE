@@ -44,11 +44,6 @@ class ShippingController extends Controller
             items: $rawItems ?? []
         );
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'services' => $services,
-            ],
-        ]);
+        return $this->respond(['services' => $services]);
     }
 }

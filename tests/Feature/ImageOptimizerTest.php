@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Services\ImageOptimizer;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 class ImageOptimizerTest extends TestCase
@@ -66,20 +67,20 @@ class ImageOptimizerTest extends TestCase
         $this->assertSame(200, $height);
     }
 
-    public function test_image_exceeding_pixel_budget_falls_back_to_original(): void
+    public function test_image_exceeding_pixel_budget_is_rejected(): void
     {
         Storage::fake('public');
         config()->set('image.max_pixels', 100);
 
         $source = $this->noisyPng(300, 200);
 
-        $path = app(ImageOptimizer::class)->optimize(
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('Resolusi gambar melebihi batas');
+
+        app(ImageOptimizer::class)->optimize(
             new UploadedFile($source, 'huge.png', 'image/png', null, true),
             'products',
         );
-
-        $this->assertStringEndsWith('.png', $path);
-        $this->assertSame(file_get_contents($source), Storage::disk('public')->get($path));
     }
 
     public function test_small_image_is_not_upscaled_and_keeps_aspect_ratio(): void
@@ -98,17 +99,16 @@ class ImageOptimizerTest extends TestCase
         $this->assertSame(200, $height);
     }
 
-    public function test_corrupt_image_falls_back_to_storing_original(): void
+    public function test_corrupt_image_is_rejected(): void
     {
         Storage::fake('public');
 
         $file = UploadedFile::fake()->create('broken.png', 512, 'image/png');
 
-        $path = app(ImageOptimizer::class)->optimize($file, 'products');
+        $this->expectException(ValidationException::class);
+        $this->expectExceptionMessage('tidak dapat dibaca');
 
-        Storage::disk('public')->assertExists($path);
-        $this->assertStringEndsWith('.png', $path);
-        $this->assertSame($file->getContent(), Storage::disk('public')->get($path));
+        app(ImageOptimizer::class)->optimize($file, 'products');
     }
 
     private function noisyPng(int $width, int $height): string

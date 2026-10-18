@@ -29,13 +29,9 @@ class CollectionController extends Controller
             $query->where('is_featured', filter_var($request->input('featured'), FILTER_VALIDATE_BOOLEAN));
         }
 
-        $collections = $query->get();
+        $collections = $query->limit(100)->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar koleksi berhasil diambil',
-            'data' => CollectionListResource::collection($collections),
-        ]);
+        return $this->respond(CollectionListResource::collection($collections), 'Daftar koleksi berhasil diambil');
     }
 
     /**
@@ -80,10 +76,6 @@ class CollectionController extends Controller
             ],
         ];
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Detail koleksi berhasil diambil',
-            'data' => $collectionData,
-        ]);
+        return $this->respond($collectionData, 'Detail koleksi berhasil diambil');
     }
 }

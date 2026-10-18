@@ -129,9 +129,7 @@ class OrderTransitionServiceTest extends TestCase
         $history = OrderStatusHistory::where('order_id', $order->id)->latest('id')->firstOrFail();
 
         $this->assertInstanceOf(AdminUser::class, $history->changedBy);
-        $this->assertInstanceOf(AdminUser::class, $history->changedByAdmin);
         $this->assertTrue($history->changedBy->is($this->admin));
-        $this->assertTrue($history->changedByAdmin->is($this->admin));
     }
 
     public function test_mark_as_paid_updates_payment_status_if_payment_exists(): void

@@ -27,12 +27,9 @@ class CategoryController extends Controller
                 $pq->where('is_active', true);
             }])
             ->orderBy('name', 'asc')
+            ->limit(100)
             ->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar kategori berhasil diambil',
-            'data' => CategoryResource::collection($categories),
-        ]);
+        return $this->respond(CategoryResource::collection($categories), 'Daftar kategori berhasil diambil');
     }
 }

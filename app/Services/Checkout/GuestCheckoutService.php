@@ -74,7 +74,7 @@ class GuestCheckoutService
             $productName = $sku->product?->name ?? 'Produk';
             $variantName = $sku->variant?->name ? " ({$sku->variant->name})" : '';
             $unitPrice = $sku->effective_price;
-            $lineSubtotal = $unitPrice * $quantity;
+            $lineSubtotal = round($unitPrice * $quantity, 2);
             $estimatedTotal += $lineSubtotal;
 
             $lines[] = "- {$productName}{$variantName} x {$quantity} = ".Number::currency($lineSubtotal, 'IDR', 'id');
@@ -95,6 +95,8 @@ class GuestCheckoutService
                 'items' => ['Tidak ada produk valid yang dapat dicheckout.'],
             ]);
         }
+
+        $estimatedTotal = round($estimatedTotal, 2);
 
         $referenceCode = 'GC-'.date('Ymd').'-'.strtoupper(Str::random(4));
         $formattedTotal = Number::currency($estimatedTotal, 'IDR', 'id');

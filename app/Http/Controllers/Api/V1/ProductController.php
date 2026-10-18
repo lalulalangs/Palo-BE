@@ -93,13 +93,11 @@ class ProductController extends Controller
             'has_more' => $products->hasMorePages(),
         ];
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar produk berhasil diambil',
-            'data' => ProductListResource::collection($products->items()),
-            'pagination' => $paginationData,
-            'meta' => $paginationData,
-        ]);
+        return $this->respond(
+            ProductListResource::collection($products->items()),
+            'Daftar produk berhasil diambil',
+            $paginationData,
+        );
     }
 
     /**
@@ -125,10 +123,6 @@ class ProductController extends Controller
             ], 404);
         }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Detail produk berhasil diambil',
-            'data' => new ProductDetailResource($product),
-        ]);
+        return $this->respond(new ProductDetailResource($product), 'Detail produk berhasil diambil');
     }
 }
