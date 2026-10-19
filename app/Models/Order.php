@@ -15,6 +15,8 @@ class Order extends Model
 
     public const STATUS_PENDING = 'pending';
 
+    public const STATUS_AWAITING_CONFIRMATION = 'awaiting_confirmation';
+
     public const STATUS_PAID = 'paid';
 
     public const STATUS_PROCESSING = 'processing';

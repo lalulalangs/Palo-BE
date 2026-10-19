@@ -5,6 +5,7 @@ namespace App\Enums;
 enum OrderStatus: string
 {
     case Pending = 'pending';
+    case AwaitingConfirmation = 'awaiting_confirmation';
     case Paid = 'paid';
     case Processing = 'processing';
     case Shipped = 'shipped';
@@ -16,6 +17,7 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::Pending => 'Menunggu Pembayaran',
+            self::AwaitingConfirmation => 'Menunggu Konfirmasi',
             self::Paid => 'Dibayar',
             self::Processing => 'Diproses',
             self::Shipped => 'Dikirim',
@@ -29,6 +31,7 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::Pending => 'warning',
+            self::AwaitingConfirmation => 'warning',
             self::Paid => 'info',
             self::Processing => 'primary',
             self::Shipped => 'info',
@@ -42,6 +45,7 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::Pending => 'menunggu_pembayaran',
+            self::AwaitingConfirmation => 'menunggu_konfirmasi',
             self::Paid => 'dibayar',
             self::Processing => 'diproses',
             self::Shipped => 'dikirim',

@@ -8,7 +8,7 @@ return new class extends Migration
     public function up(): void
     {
         if (DB::getDriverName() === 'pgsql') {
-            DB::statement("ALTER TABLE orders ADD CONSTRAINT chk_orders_status CHECK (status IN ('pending', 'paid', 'processing', 'shipped', 'completed', 'cancelled', 'expired'));");
+            DB::statement("ALTER TABLE orders ADD CONSTRAINT chk_orders_status CHECK (status IN ('pending', 'awaiting_confirmation', 'paid', 'processing', 'shipped', 'completed', 'cancelled', 'expired'));");
         }
     }
 
