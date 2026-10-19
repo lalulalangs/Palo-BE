@@ -93,7 +93,9 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 4. Seed manual verification orders for Filament Admin
-        $this->call(OrderManualVerificationSeeder::class);
+        // 4. Seed manual verification orders hanya untuk lingkungan lokal/pengujian.
+        if (app()->environment(['local', 'testing'])) {
+            $this->call(OrderManualVerificationSeeder::class);
+        }
     }
 }

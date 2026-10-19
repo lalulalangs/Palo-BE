@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Orders;
 
+use App\Enums\OrderStatus;
 use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Order;
@@ -97,7 +98,7 @@ class OrderTransitionServiceTest extends TestCase
 
         $result = $this->service->markAsPaid($order, $this->admin->id, 'Pembayaran Midtrans VA sukses');
 
-        $this->assertEquals(Order::STATUS_PAID, $result->status);
+        $this->assertEquals(OrderStatus::Paid, $result->status);
         $this->assertEquals(12, $this->sku->fresh()->stock);
 
         $this->assertDatabaseHas('stock_movements', [
@@ -147,7 +148,7 @@ class OrderTransitionServiceTest extends TestCase
 
         $result = $this->service->markAsPaid($order, $this->admin->id);
 
-        $this->assertEquals(Order::STATUS_PAID, $result->status);
+        $this->assertEquals(OrderStatus::Paid, $result->status);
         $this->assertNotNull($result->payment);
         $this->assertEquals(Payment::STATUS_SETTLEMENT, $result->payment->status);
         $this->assertNotNull($result->payment->paid_at);
@@ -171,7 +172,7 @@ class OrderTransitionServiceTest extends TestCase
 
         $result = $this->service->markAsProcessing($order, $this->admin->id);
 
-        $this->assertEquals(Order::STATUS_PROCESSING, $result->status);
+        $this->assertEquals(OrderStatus::Processing, $result->status);
         $this->assertDatabaseHas('order_status_histories', [
             'order_id' => $order->id,
             'from_status' => Order::STATUS_PAID,
@@ -193,7 +194,7 @@ class OrderTransitionServiceTest extends TestCase
 
         $result = $this->service->markAsShipped($order, 'JNE-8823910293', $this->admin->id);
 
-        $this->assertEquals(Order::STATUS_SHIPPED, $result->status);
+        $this->assertEquals(OrderStatus::Shipped, $result->status);
         $this->assertEquals('JNE-8823910293', $result->tracking_number);
 
         $this->assertDatabaseHas('order_status_histories', [
@@ -224,7 +225,7 @@ class OrderTransitionServiceTest extends TestCase
 
         $result = $this->service->markAsCompleted($order, $this->admin->id);
 
-        $this->assertEquals(Order::STATUS_COMPLETED, $result->status);
+        $this->assertEquals(OrderStatus::Completed, $result->status);
         $this->assertDatabaseHas('order_status_histories', [
             'order_id' => $order->id,
             'to_status' => Order::STATUS_COMPLETED,
@@ -250,7 +251,7 @@ class OrderTransitionServiceTest extends TestCase
         // Batalkan pesanan lunas
         $cancelledOrder = $this->service->cancelOrder($order, 'Buyer request refund sebelum dikirim', $this->admin->id);
 
-        $this->assertEquals(Order::STATUS_CANCELLED, $cancelledOrder->status);
+        $this->assertEquals(OrderStatus::Cancelled, $cancelledOrder->status);
         $this->assertEquals('Buyer request refund sebelum dikirim', $cancelledOrder->cancelled_reason);
 
         // Stok harus kembali ke 15
@@ -273,7 +274,7 @@ class OrderTransitionServiceTest extends TestCase
 
         $cancelled = $this->service->cancelOrder($order, 'Batal sebelum bayar', $this->admin->id);
 
-        $this->assertEquals(Order::STATUS_CANCELLED, $cancelled->status);
+        $this->assertEquals(OrderStatus::Cancelled, $cancelled->status);
         $this->assertEquals(15, $this->sku->fresh()->stock);
         $this->assertDatabaseMissing('stock_movements', [
             'reference_id' => $order->id,

@@ -20,6 +20,7 @@ class Sku extends Model
         'sku_code',
         'price_override',
         'stock',
+        'weight_grams',
         'is_active',
     ];
 
@@ -28,6 +29,7 @@ class Sku extends Model
         return [
             'price_override' => 'decimal:2',
             'stock' => 'integer',
+            'weight_grams' => 'integer',
             'is_active' => 'boolean',
         ];
     }

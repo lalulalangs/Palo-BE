@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Orders\Schemas;
 
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Filament\Infolists\Components\ImageEntry;
@@ -36,8 +37,8 @@ class OrderInfolist
                                 TextEntry::make('status')
                                     ->label('Status Pesanan')
                                     ->badge()
-                                    ->formatStateUsing(fn (string $state): string => Order::getStatusLabels()[$state] ?? $state)
-                                    ->color(fn (string $state): string => Order::getStatusColor($state)),
+                                    ->formatStateUsing(fn (OrderStatus|string $state): string => OrderStatus::labelFor($state))
+                                    ->color(fn (OrderStatus|string $state): string => OrderStatus::colorFor($state)),
 
                                 TextEntry::make('created_at')
                                     ->label('Waktu Checkout')

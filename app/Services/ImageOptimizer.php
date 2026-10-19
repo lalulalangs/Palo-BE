@@ -23,6 +23,8 @@ class ImageOptimizer
      */
     public function optimize(UploadedFile $file, string $directory, string $disk = 'public'): string
     {
+        $this->ensureMemoryLimit(256 * 1024 * 1024);
+
         $processed = $this->process($file);
 
         try {
@@ -92,5 +94,36 @@ class ImageOptimizer
         }
 
         return $target;
+    }
+
+    /**
+     * Pastikan batas memori minimal tersedia sebelum decode gambar besar.
+     * Tidak menurunkan batas yang sudah lebih tinggi / unlimited.
+     */
+    private function ensureMemoryLimit(int $minimumBytes): void
+    {
+        $current = $this->parseMemoryLimit((string) ini_get('memory_limit'));
+
+        if ($current !== -1 && $current < $minimumBytes) {
+            ini_set('memory_limit', '256M');
+        }
+    }
+
+    private function parseMemoryLimit(string $limit): int
+    {
+        $limit = trim($limit);
+
+        if ($limit === '' || $limit === '-1') {
+            return -1;
+        }
+
+        $value = (int) $limit;
+
+        return match (strtolower(substr($limit, -1))) {
+            'g' => $value * 1024 * 1024 * 1024,
+            'm' => $value * 1024 * 1024,
+            'k' => $value * 1024,
+            default => $value,
+        };
     }
 }

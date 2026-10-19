@@ -13,20 +13,27 @@ class DatabaseConnectionGuardTest extends TestCase
     {
         $this->expectException(RuntimeException::class);
 
-        AppServiceProvider::ensureDatabaseConnectionIsSafe('production', 'sqlite');
+        AppServiceProvider::ensureDatabaseConnectionIsSafe('production', 'sqlite', hasEnvironmentFile: true);
     }
 
     public function test_production_rejects_non_pgsql_connection(): void
     {
         $this->expectException(RuntimeException::class);
 
-        AppServiceProvider::ensureDatabaseConnectionIsSafe('production', 'mysql');
+        AppServiceProvider::ensureDatabaseConnectionIsSafe('production', 'mysql', hasEnvironmentFile: true);
+    }
+
+    public function test_production_without_env_file_does_not_throw(): void
+    {
+        AppServiceProvider::ensureDatabaseConnectionIsSafe('production', 'sqlite', hasEnvironmentFile: false);
+
+        $this->addToAssertionCount(1);
     }
 
     #[DataProvider('safeCombinations')]
     public function test_safe_combinations_do_not_throw(string $environment, string $connection): void
     {
-        AppServiceProvider::ensureDatabaseConnectionIsSafe($environment, $connection);
+        AppServiceProvider::ensureDatabaseConnectionIsSafe($environment, $connection, hasEnvironmentFile: true);
 
         $this->addToAssertionCount(1);
     }

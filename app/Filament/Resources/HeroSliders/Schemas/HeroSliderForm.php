@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\HeroSliders\Schemas;
 
 use App\Filament\Components\ImageFileUpload;
+use App\Rules\SafeLinkUrl;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -64,13 +65,15 @@ class HeroSliderForm
                         TextInput::make('primary_btn_url')
                             ->required()
                             ->placeholder('/katalog/rinjani-series')
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->rules([new SafeLinkUrl]),
                         TextInput::make('secondary_btn_label')
                             ->default('CERITA SENARU')
                             ->maxLength(50),
                         TextInput::make('secondary_btn_url')
                             ->placeholder('/cerita/senaru')
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->rules([new SafeLinkUrl]),
                         TextInput::make('sort_order')
                             ->label('Urutan Tampil')
                             ->numeric()

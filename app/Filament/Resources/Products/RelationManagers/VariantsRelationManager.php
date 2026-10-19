@@ -59,6 +59,13 @@ class VariantsRelationManager extends RelationManager
                             ->minValue(0)
                             ->default(0)
                             ->required(),
+                        TextInput::make('weight_grams')
+                            ->label('Berat (gram)')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->default(350)
+                            ->helperText('Dipakai untuk menghitung ongkir. Default 350 gram.'),
                         TextInput::make('price_override')
                             ->label('Harga Khusus Varian (Override)')
                             ->numeric()

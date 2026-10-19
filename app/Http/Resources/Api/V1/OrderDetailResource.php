@@ -23,7 +23,6 @@ class OrderDetailResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $statusLabels = Order::getStatusLabels();
         $firstItem = $this->relationLoaded('items') ? $this->items->first() : null;
         $itemCount = $this->relationLoaded('items') ? $this->items->sum('quantity') : 0;
 
@@ -84,7 +83,7 @@ class OrderDetailResource extends JsonResource
         return [
             'order_number' => $this->order_number,
             'status' => $this->getFrontendStatus(),
-            'status_label' => $statusLabels[$this->status] ?? $this->status,
+            'status_label' => $this->status->label(),
             'first_item_name' => $firstItem?->product_name_snapshot,
             'item_count' => $itemCount,
             'subtotal' => (float) $this->subtotal,
@@ -101,14 +100,7 @@ class OrderDetailResource extends JsonResource
             'items' => $items,
             'history' => $history,
             'status_histories' => $history,
-            'shipping_address' => [
-                'recipient_name' => $this->shipping_recipient_name,
-                'phone' => $this->shipping_phone,
-                'street' => $this->shipping_full_address,
-                'full_address' => $this->shipping_full_address,
-                'city' => '',
-                'province' => '',
-            ],
+            'shipping_address' => $this->shippingAddressData(),
             'shipping_courier' => $this->shipping_courier,
             'shipping_service' => $this->shipping_service,
             'tracking_number' => $this->tracking_number,

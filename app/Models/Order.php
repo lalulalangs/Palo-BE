@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\OrderStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,45 +27,24 @@ class Order extends Model
 
     public const STATUS_EXPIRED = 'expired';
 
+    /**
+     * @return array<string, string>
+     */
     public static function getStatusLabels(): array
     {
-        return [
-            self::STATUS_PENDING => 'Menunggu Pembayaran',
-            self::STATUS_PAID => 'Dibayar',
-            self::STATUS_PROCESSING => 'Diproses',
-            self::STATUS_SHIPPED => 'Dikirim',
-            self::STATUS_COMPLETED => 'Selesai',
-            self::STATUS_CANCELLED => 'Dibatalkan',
-            self::STATUS_EXPIRED => 'Kedaluwarsa',
-        ];
+        return OrderStatus::labels();
     }
 
-    public static function getStatusColor(string $status): string
+    public static function getStatusColor(string|OrderStatus $status): string
     {
-        return match ($status) {
-            self::STATUS_PENDING => 'warning',
-            self::STATUS_PAID => 'info',
-            self::STATUS_PROCESSING => 'primary',
-            self::STATUS_SHIPPED => 'info',
-            self::STATUS_COMPLETED => 'success',
-            self::STATUS_CANCELLED => 'danger',
-            self::STATUS_EXPIRED => 'gray',
-            default => 'gray',
-        };
+        return OrderStatus::colorFor($status);
     }
 
     public function getFrontendStatus(): string
     {
-        return match ($this->status) {
-            self::STATUS_PENDING => 'menunggu_pembayaran',
-            self::STATUS_PAID => 'dibayar',
-            self::STATUS_PROCESSING => 'diproses',
-            self::STATUS_SHIPPED => 'dikirim',
-            self::STATUS_COMPLETED => 'selesai',
-            self::STATUS_CANCELLED => 'dibatalkan',
-            self::STATUS_EXPIRED => 'expired',
-            default => $this->status,
-        };
+        return $this->status instanceof OrderStatus
+            ? $this->status->frontend()
+            : OrderStatus::tryFrom((string) $this->status)?->frontend() ?? (string) $this->status;
     }
 
     /**
@@ -80,10 +60,10 @@ class Order extends Model
         }
 
         $paidStatuses = [
-            self::STATUS_PAID,
-            self::STATUS_PROCESSING,
-            self::STATUS_SHIPPED,
-            self::STATUS_COMPLETED,
+            OrderStatus::Paid,
+            OrderStatus::Processing,
+            OrderStatus::Shipped,
+            OrderStatus::Completed,
         ];
 
         if (in_array($payment->status, [Payment::STATUS_CAPTURE, Payment::STATUS_SETTLEMENT], true)) {
@@ -91,10 +71,36 @@ class Order extends Model
         }
 
         if (in_array($payment->status, [Payment::STATUS_DENY, Payment::STATUS_EXPIRE, Payment::STATUS_CANCEL], true)) {
-            return ! in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_EXPIRED], true);
+            return ! in_array($this->status, [OrderStatus::Cancelled, OrderStatus::Expired], true);
         }
 
         return false;
+    }
+
+    /**
+     * Data alamat pengiriman untuk API: prioritaskan snapshot terstruktur dan
+     * fallback ke kolom lama untuk pesanan yang dibuat sebelum snapshot ada.
+     *
+     * @return array<string, mixed>
+     */
+    public function shippingAddressData(): array
+    {
+        $snapshot = $this->shipping_address_snapshot ?? [];
+
+        return [
+            'recipient_name' => $snapshot['recipient_name'] ?? $this->shipping_recipient_name,
+            'phone' => $snapshot['phone'] ?? $this->shipping_phone,
+            'street' => $snapshot['street'] ?? $this->shipping_full_address,
+            'full_address' => $this->shipping_full_address,
+            'district' => $snapshot['district'] ?? null,
+            'subdistrict' => $snapshot['subdistrict'] ?? null,
+            'city' => $snapshot['city'] ?? null,
+            'city_code' => $snapshot['city_code'] ?? null,
+            'province' => $snapshot['province'] ?? null,
+            'province_code' => $snapshot['province_code'] ?? null,
+            'postal_code' => $snapshot['postal_code'] ?? null,
+            'notes' => $snapshot['notes'] ?? null,
+        ];
     }
 
     protected $fillable = [
@@ -110,6 +116,7 @@ class Order extends Model
         'shipping_recipient_name',
         'shipping_phone',
         'shipping_full_address',
+        'shipping_address_snapshot',
         'shipping_courier',
         'shipping_service',
         'tracking_number',
@@ -120,10 +127,12 @@ class Order extends Model
     protected function casts(): array
     {
         return [
+            'status' => OrderStatus::class,
             'subtotal' => 'decimal:2',
             'discount_amount' => 'decimal:2',
             'shipping_cost' => 'decimal:2',
             'total' => 'decimal:2',
+            'shipping_address_snapshot' => 'array',
             'stock_locked_until' => 'datetime',
         ];
     }

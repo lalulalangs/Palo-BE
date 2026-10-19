@@ -4,10 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class AppSetting extends Model
 {
     use HasFactory;
+
+    private const CACHE_KEY = 'settings:all';
+
+    private const CACHE_TTL_SECONDS = 3600;
 
     protected $fillable = [
         'key',
@@ -19,9 +24,9 @@ class AppSetting extends Model
      */
     public static function getValue(string $key, ?string $default = null): ?string
     {
-        $setting = static::query()->where('key', $key)->first();
+        $settings = static::allValues();
 
-        return $setting !== null ? $setting->value : $default;
+        return array_key_exists($key, $settings) ? $settings[$key] : $default;
     }
 
     /**
@@ -29,10 +34,14 @@ class AppSetting extends Model
      */
     public static function setValue(string $key, ?string $value): static
     {
-        return static::updateOrCreate(
+        $setting = static::updateOrCreate(
             ['key' => $key],
             ['value' => $value]
         );
+
+        Cache::forget(self::CACHE_KEY);
+
+        return $setting;
     }
 
     /**
@@ -43,11 +52,7 @@ class AppSetting extends Model
      */
     public static function getMany(array $defaults = []): array
     {
-        $keys = array_keys($defaults);
-        $settings = static::query()
-            ->when(! empty($keys), fn ($query) => $query->whereIn('key', $keys))
-            ->pluck('value', 'key')
-            ->toArray();
+        $settings = static::allValues();
 
         $result = [];
         foreach ($defaults as $key => $defaultValue) {
@@ -67,5 +72,20 @@ class AppSetting extends Model
         foreach ($values as $key => $value) {
             static::setValue($key, $value);
         }
+    }
+
+    /**
+     * Seluruh pengaturan sebagai map key => value, di-cache agar tidak
+     * menembak database pada setiap request.
+     *
+     * @return array<string, string|null>
+     */
+    private static function allValues(): array
+    {
+        return Cache::remember(
+            self::CACHE_KEY,
+            self::CACHE_TTL_SECONDS,
+            fn (): array => static::query()->pluck('value', 'key')->toArray(),
+        );
     }
 }

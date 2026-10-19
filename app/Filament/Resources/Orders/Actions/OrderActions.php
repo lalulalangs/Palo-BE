@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Orders\Actions;
 
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Services\Orders\OrderTransitionService;
 use Filament\Actions\Action;
@@ -26,7 +27,7 @@ class OrderActions
             ->label('Proses Pesanan')
             ->icon(Heroicon::OutlinedArchiveBox)
             ->color('primary')
-            ->visible(fn (Order $record): bool => $record->status === Order::STATUS_PAID)
+            ->visible(fn (Order $record): bool => $record->status === OrderStatus::Paid)
             ->requiresConfirmation()
             ->modalHeading('Mulai Siapkan Pesanan')
             ->modalDescription('Apakah Anda yakin ingin mulai memproses pesanan ini? Tim gudang akan mengambil barang dari rak (picking) dan mengemasnya (packing).')
@@ -59,7 +60,7 @@ class OrderActions
             ->label('Kirim Pesanan')
             ->icon(Heroicon::OutlinedTruck)
             ->color('info')
-            ->visible(fn (Order $record): bool => $record->status === Order::STATUS_PROCESSING)
+            ->visible(fn (Order $record): bool => $record->status === OrderStatus::Processing)
             ->modalHeading('Input Nomor Resi & Serahkan ke Kurir')
             ->modalDescription('Masukkan nomor resi resmi dari pihak ekspedisi untuk memperbarui status pesanan menjadi Dikirim.')
             ->modalSubmitActionLabel('Konfirmasi Pengiriman')
@@ -106,7 +107,7 @@ class OrderActions
             ->label('Koreksi Resi')
             ->icon(Heroicon::OutlinedPencilSquare)
             ->color('warning')
-            ->visible(fn (Order $record): bool => $record->status === Order::STATUS_SHIPPED)
+            ->visible(fn (Order $record): bool => $record->status === OrderStatus::Shipped)
             ->modalHeading('Koreksi Nomor Resi Pengiriman')
             ->modalDescription('Gunakan aksi ini jika terjadi kesalahan ketik nomor resi. Riwayat nomor resi lama vs baru akan dicatat pada log audit.')
             ->modalSubmitActionLabel('Simpan Koreksi Resi')
@@ -153,7 +154,7 @@ class OrderActions
             ->label('Tandai Selesai')
             ->icon(Heroicon::OutlinedCheckCircle)
             ->color('success')
-            ->visible(fn (Order $record): bool => $record->status === Order::STATUS_SHIPPED)
+            ->visible(fn (Order $record): bool => $record->status === OrderStatus::Shipped)
             ->requiresConfirmation()
             ->modalHeading('Konfirmasi Pesanan Selesai')
             ->modalDescription('Pastikan paket telah terkonfirmasi diterima dengan baik oleh pembeli atau periode komplain telah terlewati.')
@@ -186,13 +187,13 @@ class OrderActions
             ->label('Batalkan Pesanan')
             ->icon(Heroicon::OutlinedXCircle)
             ->color('danger')
-            ->visible(fn (Order $record): bool => in_array($record->status, [Order::STATUS_PENDING, Order::STATUS_PAID, Order::STATUS_PROCESSING], true))
+            ->visible(fn (Order $record): bool => in_array($record->status, [OrderStatus::Pending, OrderStatus::Paid, OrderStatus::Processing], true))
             ->modalHeading('Batalkan Pesanan')
             ->modalSubmitActionLabel('Konfirmasi Pembatalan')
             ->form([
                 Placeholder::make('warning_notice')
                     ->label('Informasi Restock & Refund')
-                    ->content(fn (Order $record): string => in_array($record->status, [Order::STATUS_PAID, Order::STATUS_PROCESSING], true)
+                    ->content(fn (Order $record): string => in_array($record->status, [OrderStatus::Paid, OrderStatus::Processing], true)
                         ? 'Pesanan ini telah lunas/diproses. Pembatalan akan otomatis mengembalikan stok unit fisik ke inventori. Harap koordinasikan pengembalian dana (refund) secara manual dengan tim finance.'
                         : 'Pesanan masih berstatus menunggu pembayaran. Pembatalan akan membatalkan transaksi ini tanpa mutasi stok.'
                     ),
@@ -242,7 +243,7 @@ class OrderActions
                 $skippedCount = 0;
 
                 foreach ($records as $record) {
-                    if ($record->status === Order::STATUS_PAID) {
+                    if ($record->status === OrderStatus::Paid) {
                         try {
                             $service->markAsProcessing($record, Auth::id() ? (int) Auth::id() : null);
                             $processedCount++;
@@ -305,7 +306,7 @@ class OrderActions
                             $order->shipping_courier ?? '-',
                             $order->shipping_service ?? '-',
                             $order->tracking_number ?? '-',
-                            Order::getStatusLabels()[$order->status] ?? $order->status,
+                            $order->status->label(),
                             $order->subtotal,
                             $order->discount_amount,
                             $order->shipping_cost,

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Orders\Tables;
 
+use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\Actions\OrderActions;
 use App\Models\Order;
 use Filament\Actions\BulkActionGroup;
@@ -48,8 +49,8 @@ class OrdersTable
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn (string $state): string => Order::getStatusLabels()[$state] ?? $state)
-                    ->color(fn (string $state): string => Order::getStatusColor($state)),
+                    ->formatStateUsing(fn (OrderStatus|string $state): string => OrderStatus::labelFor($state))
+                    ->color(fn (OrderStatus|string $state): string => OrderStatus::colorFor($state)),
 
                 TextColumn::make('total')
                     ->label('Total Belanja')

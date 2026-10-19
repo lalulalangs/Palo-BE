@@ -8,12 +8,15 @@ use App\Http\Requests\Api\V1\RegisterCustomerRequest;
 use App\Http\Resources\Api\V1\CustomerUserResource;
 use App\Models\User;
 use App\Services\Cart\CartService;
+use App\Traits\ResolvesGuestToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    use ResolvesGuestToken;
+
     public function __construct(
         protected CartService $cartService
     ) {}
@@ -101,12 +104,9 @@ class AuthController extends Controller
      */
     private function mergeGuestCartIfPresent(Request $request, User $user): ?string
     {
-        $guestToken = $request->input('guest_token')
-            ?? $request->header('X-Guest-Token')
-            ?? $request->cookie('guest_cart_id')
-            ?? $request->cookie('guest_token');
+        $guestToken = $this->getGuestToken($request);
 
-        if (! is_string($guestToken) || ! filled($guestToken)) {
+        if ($guestToken === null) {
             return null;
         }
 

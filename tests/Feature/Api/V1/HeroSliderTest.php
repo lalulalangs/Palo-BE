@@ -153,25 +153,57 @@ class HeroSliderTest extends TestCase
             ->assertJsonValidationErrors(['title', 'image_desktop', 'primary_btn_url']);
     }
 
-    public function test_admin_store_accepts_image_over_2mb_and_converts_to_webp(): void
+    public function test_admin_store_rejects_image_over_2mb(): void
     {
         Storage::fake('public');
 
         $source = $this->noisyPng(1200, 1200);
         $this->assertGreaterThan(2 * 1024 * 1024, filesize($source));
 
-        $create = $this->postJson('/api/v1/admin/hero-sliders', [
+        $this->postJson('/api/v1/admin/hero-sliders', [
             'title' => 'Big upload',
             'image_desktop' => new UploadedFile($source, 'big.png', 'image/png', null, true),
             'primary_btn_url' => '/katalog',
-        ]);
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['image_desktop']);
+    }
 
-        $create->assertCreated();
+    public function test_admin_store_rejects_image_with_excessive_dimensions(): void
+    {
+        Storage::fake('public');
 
-        $slider = HeroSlider::find($create->json('data.id'));
-        $this->assertStringEndsWith('.webp', $slider->image_desktop);
-        Storage::disk('public')->assertExists($slider->image_desktop);
-        $this->assertLessThan(2 * 1024 * 1024, Storage::disk('public')->size($slider->image_desktop));
+        $source = UploadedFile::fake()->image('wide.png', 3000, 1000);
+
+        $this->postJson('/api/v1/admin/hero-sliders', [
+            'title' => 'Wide upload',
+            'image_desktop' => $source,
+            'primary_btn_url' => '/katalog',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['image_desktop']);
+    }
+
+    public function test_admin_store_rejects_unsafe_button_url(): void
+    {
+        Storage::fake('public');
+
+        $this->postJson('/api/v1/admin/hero-sliders', [
+            'title' => 'Unsafe link',
+            'image_desktop' => UploadedFile::fake()->image('desktop.webp', 1200, 800),
+            'primary_btn_url' => 'javascript:alert(1)',
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['primary_btn_url']);
+    }
+
+    public function test_admin_store_accepts_relative_and_https_button_urls(): void
+    {
+        Storage::fake('public');
+
+        $this->postJson('/api/v1/admin/hero-sliders', [
+            'title' => 'Safe relative',
+            'image_desktop' => UploadedFile::fake()->image('desktop.webp', 1200, 800),
+            'primary_btn_url' => '/katalog',
+            'secondary_btn_url' => 'https://palorinjani.com/cerita',
+        ])->assertCreated();
     }
 
     private function noisyPng(int $width, int $height): string

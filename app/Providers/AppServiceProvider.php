@@ -54,13 +54,28 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Tolak boot aplikasi produksi yang tidak memakai PostgreSQL, agar salah
      * konfigurasi `.env` tidak diam-diam menulis ke SQLite lokal.
+     *
+     * Bila berkas `.env` belum ada (mis. `composer install` pada clone baru),
+     * nilai "production" hanya default framework dan guard dilewati agar
+     * instalasi tidak gagal.
      */
-    public static function ensureDatabaseConnectionIsSafe(string $environment, string $defaultConnection): void
-    {
-        if ($environment === 'production' && $defaultConnection !== 'pgsql') {
-            throw new RuntimeException(
-                "Koneksi database produksi harus pgsql, ditemukan '{$defaultConnection}'. Periksa DB_CONNECTION pada .env produksi."
-            );
+    public static function ensureDatabaseConnectionIsSafe(
+        string $environment,
+        string $defaultConnection,
+        ?bool $hasEnvironmentFile = null
+    ): void {
+        if ($environment !== 'production' || $defaultConnection === 'pgsql') {
+            return;
         }
+
+        $hasEnvironmentFile ??= is_file(app()->environmentFilePath());
+
+        if (! $hasEnvironmentFile) {
+            return;
+        }
+
+        throw new RuntimeException(
+            "Koneksi database produksi harus pgsql, ditemukan '{$defaultConnection}'. Periksa DB_CONNECTION pada .env produksi."
+        );
     }
 }

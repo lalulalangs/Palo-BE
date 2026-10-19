@@ -19,14 +19,13 @@ class OrderSummaryResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $statusLabels = Order::getStatusLabels();
         $firstItem = $this->relationLoaded('items') ? $this->items->first() : null;
         $itemCount = $this->relationLoaded('items') ? $this->items->sum('quantity') : 0;
 
         return [
             'order_number' => $this->order_number,
             'status' => $this->getFrontendStatus(),
-            'status_label' => $statusLabels[$this->status] ?? $this->status,
+            'status_label' => $this->status->label(),
             'first_item_name' => $firstItem?->product_name_snapshot,
             'item_count' => $itemCount,
             'subtotal' => (float) $this->subtotal,

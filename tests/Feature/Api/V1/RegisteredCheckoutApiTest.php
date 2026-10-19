@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Enums\OrderStatus;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -173,7 +174,7 @@ class RegisteredCheckoutApiTest extends TestCase
         // Verify order in database
         $order = Order::where('order_number', $orderNumber)->firstOrFail();
         $this->assertEquals($this->user->id, $order->user_id);
-        $this->assertEquals(Order::STATUS_PENDING, $order->status);
+        $this->assertEquals(OrderStatus::Pending, $order->status);
         $this->assertEquals(728000, (float) $order->total);
         $this->assertNotNull($order->stock_locked_until);
         $this->assertTrue($order->stock_locked_until->isFuture());

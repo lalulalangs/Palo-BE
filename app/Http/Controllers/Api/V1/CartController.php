@@ -7,11 +7,14 @@ use App\Http\Requests\Api\V1\AddToCartRequest;
 use App\Http\Requests\Api\V1\UpdateCartItemRequest;
 use App\Models\User;
 use App\Services\Cart\CartService;
+use App\Traits\ResolvesGuestToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
+    use ResolvesGuestToken;
+
     public function __construct(
         protected CartService $cartService
     ) {}
@@ -81,16 +84,13 @@ class CartController extends Controller
         /** @var User $user */
         $user = $request->user('sanctum');
 
-        $guestToken = $request->input('guest_token')
-            ?? $request->header('X-Guest-Token')
-            ?? $request->cookie('guest_cart_id')
-            ?? $request->cookie('guest_token');
+        $guestToken = $this->getGuestToken($request);
 
-        if (! $guestToken) {
+        if ($guestToken === null) {
             return $this->respond($this->cartService->getCart($user));
         }
 
-        $cart = $this->cartService->mergeGuestCart($user, (string) $guestToken);
+        $cart = $this->cartService->mergeGuestCart($user, $guestToken);
 
         return $this->withGuestCartCookie(
             $this->respond($cart, 'Keranjang tamu berhasil digabungkan ke akun Anda.'),

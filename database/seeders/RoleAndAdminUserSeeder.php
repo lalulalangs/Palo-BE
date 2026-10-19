@@ -7,6 +7,7 @@ use App\Models\AdminUser;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
+use RuntimeException;
 
 class RoleAndAdminUserSeeder extends Seeder
 {
@@ -31,9 +32,26 @@ class RoleAndAdminUserSeeder extends Seeder
             [
                 'role_id' => $superAdminRole->id,
                 'name' => env('ADMIN_NAME', 'Admin PaloRinjani'),
-                'password_hash' => Hash::make(env('ADMIN_PASSWORD', 'password')),
+                'password_hash' => Hash::make(self::resolveAdminPassword(env('ADMIN_PASSWORD'), app()->environment())),
                 'is_active' => true,
             ],
         );
+    }
+
+    /**
+     * Tentukan password superadmin: wajib dari .env di produksi, sedangkan
+     * lingkungan lokal/pengujian boleh memakai fallback agar mudah dipakai.
+     */
+    public static function resolveAdminPassword(?string $envPassword, string $environment): string
+    {
+        if (filled($envPassword)) {
+            return (string) $envPassword;
+        }
+
+        if ($environment === 'production') {
+            throw new RuntimeException('ADMIN_PASSWORD wajib diisi untuk membuat akun superadmin di produksi.');
+        }
+
+        return 'password';
     }
 }

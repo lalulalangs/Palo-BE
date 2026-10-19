@@ -2,12 +2,16 @@
 
 namespace App\Services\Shipping;
 
+use App\Models\Sku;
 use Illuminate\Support\Str;
 
 class ShippingRateService
 {
     /**
      * Calculate shipping rates for given destination city and items.
+     *
+     * Berat total diambil dari `skus.weight_grams` (default 350 g) agar
+     * perhitungan tidak lagi memukul rata per kuantitas.
      *
      * @param  array<int, array{sku_id: int, quantity: int}>  $items
      * @return array<int, array{courier: string, service: string, description: string, cost: int, etd: string}>
@@ -21,12 +25,28 @@ class ShippingRateService
             abort(503, 'Layanan kurir pengiriman sedang tidak dapat dihubungi. Silakan coba beberapa saat lagi.');
         }
 
-        $totalQuantity = 0;
+        $skuIds = collect($items)
+            ->pluck('sku_id')
+            ->filter()
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $skus = $skuIds->isEmpty()
+            ? collect()
+            : Sku::query()->whereIn('id', $skuIds)->get()->keyBy('id');
+
+        $totalWeightGrams = 0;
+
         foreach ($items as $item) {
-            $totalQuantity += (int) ($item['quantity'] ?? 1);
+            $skuId = (int) ($item['sku_id'] ?? 0);
+            $quantity = (int) ($item['quantity'] ?? 1);
+            $weightGrams = (int) ($skus->get($skuId)?->weight_grams ?? 350);
+
+            $totalWeightGrams += $weightGrams * $quantity;
         }
 
-        $weightKg = max(1, (int) ceil(($totalQuantity * 350) / 1000));
+        $weightKg = max(1, (int) ceil($totalWeightGrams / 1000));
 
         // Distance base multiplier: Mataram / NTB is local, Java / Bali is medium, other regions higher
         $multiplier = 1.0;

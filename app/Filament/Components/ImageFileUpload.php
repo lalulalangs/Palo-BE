@@ -17,6 +17,7 @@ class ImageFileUpload extends FileUpload
             ->image()
             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
             ->maxSize(config('image.max_upload_kb'))
+            ->rules(['dimensions:max_width=2560,max_height=2560'])
             ->saveUploadedFileUsing(fn (BaseFileUpload $component, TemporaryUploadedFile $file): string => app(ImageOptimizer::class)->optimize($file, (string) $component->getDirectory(), $component->getDiskName()))
             ->getUploadedFileUsing(function (BaseFileUpload $component, string $file, string|array|null $storedFileNames): ?array {
                 $info = $component->getUploadedFile($file, $storedFileNames);

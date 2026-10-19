@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Models\AdminUser;
@@ -104,7 +105,7 @@ class OrderActionsWorkflowTest extends TestCase
             ->assertHasNoActionErrors()
             ->assertNotified();
 
-        $this->assertEquals(Order::STATUS_PROCESSING, $order->fresh()->status);
+        $this->assertEquals(OrderStatus::Processing, $order->fresh()->status);
         $this->assertDatabaseHas('order_status_histories', [
             'order_id' => $order->id,
             'from_status' => Order::STATUS_PAID,
@@ -128,7 +129,7 @@ class OrderActionsWorkflowTest extends TestCase
             ->assertNotified();
 
         $freshOrder = $order->fresh();
-        $this->assertEquals(Order::STATUS_SHIPPED, $freshOrder->status);
+        $this->assertEquals(OrderStatus::Shipped, $freshOrder->status);
         $this->assertEquals('JNE-EXP-99228811', $freshOrder->tracking_number);
 
         $this->assertDatabaseHas('order_status_histories', [
@@ -157,7 +158,7 @@ class OrderActionsWorkflowTest extends TestCase
 
         $freshOrder = $order->fresh();
         $this->assertEquals('JNE-CORRECT-002', $freshOrder->tracking_number);
-        $this->assertEquals(Order::STATUS_SHIPPED, $freshOrder->status);
+        $this->assertEquals(OrderStatus::Shipped, $freshOrder->status);
 
         $this->assertDatabaseHas('order_status_histories', [
             'order_id' => $order->id,
@@ -180,7 +181,7 @@ class OrderActionsWorkflowTest extends TestCase
             ->assertHasNoActionErrors()
             ->assertNotified();
 
-        $this->assertEquals(Order::STATUS_COMPLETED, $order->fresh()->status);
+        $this->assertEquals(OrderStatus::Completed, $order->fresh()->status);
         $this->assertDatabaseHas('order_status_histories', [
             'order_id' => $order->id,
             'from_status' => Order::STATUS_SHIPPED,
@@ -204,7 +205,7 @@ class OrderActionsWorkflowTest extends TestCase
             ->assertNotified();
 
         $freshOrder = $order->fresh();
-        $this->assertEquals(Order::STATUS_CANCELLED, $freshOrder->status);
+        $this->assertEquals(OrderStatus::Cancelled, $freshOrder->status);
         $this->assertEquals('Pembeli membatalkan pesanan sebelum kurir tiba', $freshOrder->cancelled_reason);
 
         // Stok SKU harus kembali bertambah 2 unit menjadi 20
@@ -230,9 +231,9 @@ class OrderActionsWorkflowTest extends TestCase
             ->assertHasNoTableActionErrors()
             ->assertNotified();
 
-        $this->assertEquals(Order::STATUS_PROCESSING, $paid1->fresh()->status);
-        $this->assertEquals(Order::STATUS_PROCESSING, $paid2->fresh()->status);
-        $this->assertEquals(Order::STATUS_SHIPPED, $shipped->fresh()->status); // tetap shipped, tidak terganggu
+        $this->assertEquals(OrderStatus::Processing, $paid1->fresh()->status);
+        $this->assertEquals(OrderStatus::Processing, $paid2->fresh()->status);
+        $this->assertEquals(OrderStatus::Shipped, $shipped->fresh()->status); // tetap shipped, tidak terganggu
     }
 
     public function test_bulk_export_action_downloads_csv(): void
