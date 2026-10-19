@@ -275,7 +275,7 @@ class RegisteredCheckoutService
 
                 Payment::create([
                     'order_id' => $order->id,
-                    'gateway' => 'midtrans',
+                    'gateway' => 'manual',
                     'payment_method' => $paymentMethod,
                     'amount' => $grandTotal,
                     'status' => Payment::STATUS_PENDING,
@@ -328,7 +328,9 @@ class RegisteredCheckoutService
     }
 
     /**
-     * Generate mock payment instruction payload for payment gateway integration.
+     * Instruksi pembayaran netral. Integrasi gateway resmi belum ada, sehingga
+     * tidak ada QR/VA yang dikarang: customer diarahkan ke Customer Service
+     * sampai vendor pembayaran ditetapkan.
      *
      * @return array<string, mixed>
      */
@@ -336,31 +338,19 @@ class RegisteredCheckoutService
     {
         $expiresAt = $order->stock_locked_until?->toIso8601String() ?? now()->addMinutes(15)->toIso8601String();
 
-        return match ($method) {
-            'qris' => [
-                'method' => 'qris',
-                'qr_string' => '00020101021226590014ID.LINKAJA.WWW01189360001100000000005204549953033605802ID5919Palo Mountain Goods6006Senaru62190115'.$order->order_number.'6304ABCD',
-                'va_number' => null,
-                'bank_name' => null,
-                'instructions_text' => 'Pindai kode QRIS di aplikasi mobile banking atau dompet digital Anda.',
-                'expires_at' => $expiresAt,
-            ],
-            'virtual_account', 'bank_transfer' => [
-                'method' => 'virtual_account',
-                'qr_string' => null,
-                'va_number' => '8801'.str_pad((string) $order->id, 8, '0', STR_PAD_LEFT),
-                'bank_name' => 'BCA',
-                'instructions_text' => 'Transfer ke nomor Virtual Account BCA sebelum batas waktu pembayaran.',
-                'expires_at' => $expiresAt,
-            ],
-            default => [
-                'method' => $method,
-                'qr_string' => null,
-                'va_number' => null,
-                'bank_name' => null,
-                'instructions_text' => 'Silakan selesaikan pembayaran sesuai instruksi penyedia.',
-                'expires_at' => $expiresAt,
-            ],
+        $instructionsText = match ($method) {
+            'qris' => 'Pembayaran QRIS belum tersedia. Silakan hubungi Customer Service untuk instruksi pembayaran pesanan ini.',
+            'virtual_account', 'bank_transfer' => 'Nomor Virtual Account belum tersedia. Silakan hubungi Customer Service untuk instruksi transfer pesanan ini.',
+            default => 'Silakan hubungi Customer Service untuk menyelesaikan pembayaran pesanan ini.',
         };
+
+        return [
+            'method' => in_array($method, ['virtual_account', 'bank_transfer'], true) ? 'virtual_account' : $method,
+            'qr_string' => null,
+            'va_number' => null,
+            'bank_name' => null,
+            'instructions_text' => $instructionsText,
+            'expires_at' => $expiresAt,
+        ];
     }
 }

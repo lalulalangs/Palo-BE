@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // Retensi data pribadi (UU PDP): bersihkan pesan WA checkout tamu yang lama.
 Schedule::command('pii:anonymize')->daily();
+
+// Lepaskan pesanan pending yang melewati batas tahan stok 15 menit.
+Schedule::command('orders:expire-unpaid')->everyMinute();

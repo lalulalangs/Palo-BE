@@ -14,6 +14,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
@@ -78,5 +79,15 @@ class OrderResource extends Resource
             'index' => ListOrders::route('/'),
             'view' => ViewOrder::route('/{record}'),
         ];
+    }
+
+    /**
+     * Eager load relasi yang dipakai halaman detail (infolist) agar tidak
+     * terjadi N+1 saat membuka pesanan dengan banyak item/riwayat.
+     */
+    public static function getRecordRouteBindingEloquentQuery(): Builder
+    {
+        return parent::getRecordRouteBindingEloquentQuery()
+            ->with(['user', 'payment', 'statusHistories.changedBy', 'items.sku.product.thumbnail']);
     }
 }

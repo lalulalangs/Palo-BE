@@ -2,10 +2,13 @@
 
 namespace App\Services\Cart;
 
+use App\Enums\OrderStatus;
 use App\Models\Cart;
 use App\Models\CartItem;
+use App\Models\OrderItem;
 use App\Models\Sku;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -356,6 +359,19 @@ class CartService
             ->get()
             ->keyBy('id');
 
+        // Satu query untuk seluruh SKU di keranjang (menghindari N+1 dari
+        // accessor Sku::available_stock yang menembak DB per baris).
+        $activeReservations = OrderItem::query()
+            ->whereIn('sku_id', $skuIds)
+            ->whereHas('order', function (Builder $query): void {
+                $query->where('status', OrderStatus::Pending->value)
+                    ->where('stock_locked_until', '>', now());
+            })
+            ->groupBy('sku_id')
+            ->selectRaw('sku_id, SUM(quantity) as total_reserved')
+            ->get()
+            ->mapWithKeys(fn ($row): array => [(int) $row->sku_id => (int) $row->total_reserved]);
+
         $formattedItems = [];
         $totalSubtotal = 0;
         $totalQuantity = 0;
@@ -376,7 +392,8 @@ class CartService
             $unitPrice = $sku->effective_price;
             $subtotal = $unitPrice * $quantity;
             $isUnavailable = ($product === null) || ! $sku->is_active || ! $product->is_active;
-            $availableStock = $isUnavailable ? 0 : $sku->available_stock;
+            $reserved = (int) ($activeReservations->get($skuId) ?? 0);
+            $availableStock = $isUnavailable ? 0 : max(0, $sku->stock - $reserved);
             $isOutOfStock = $isUnavailable || ($availableStock <= 0);
             $productName = $product?->name ?? 'Produk Tidak Lagi Tersedia';
 

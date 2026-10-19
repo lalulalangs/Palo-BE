@@ -4,6 +4,10 @@ namespace App\Providers;
 
 use App\Enums\AdminFeature;
 use App\Models\AdminUser;
+use App\Models\Order;
+use App\Models\Sku;
+use App\Observers\OrderAuditObserver;
+use App\Observers\SkuAuditObserver;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Illuminate\Support\Facades\Gate;
@@ -39,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
 
             return $feature ? $user->hasFeatureAccess($feature) : null;
         });
+
+        // Audit trail aksi admin (harga/stok SKU dan status/resi pesanan).
+        Sku::observe(SkuAuditObserver::class);
+        Order::observe(OrderAuditObserver::class);
 
         DatePicker::configureUsing(function (DatePicker $picker): void {
             $picker->displayFormat('d/m/Y')

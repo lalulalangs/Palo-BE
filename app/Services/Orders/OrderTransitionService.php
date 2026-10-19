@@ -260,6 +260,13 @@ class OrderTransitionService
                     'cancelled_reason' => $cleanReason,
                 ]);
 
+                if ($lockedOrder->payment && $lockedOrder->payment->status === Payment::STATUS_PENDING) {
+                    $isExpired = str_contains(strtolower($cleanReason), 'kedaluwarsa') || str_contains(strtolower($cleanReason), 'expired');
+                    $lockedOrder->payment->update([
+                        'status' => $isExpired ? Payment::STATUS_EXPIRE : Payment::STATUS_CANCEL,
+                    ]);
+                }
+
                 $this->restoreVoucherQuota($lockedOrder);
 
                 OrderStatusHistory::create([
@@ -332,9 +339,9 @@ class OrderTransitionService
      *
      * TODO: Konfirmasi aturan bisnis dengan klien — ada kemungkinan klien menginginkan kebijakan
      * bahwa voucher bersifat "sekali pakai hangus" (one-time use), di mana jika pengguna sudah checkout
-     * menggunakan voucher kemudian membatalkan pesanan, kuota voucher TIDAK dikembalikan (voucher hangus).
-     * Jika aturan bisnis ini disepakati klien, nonaktifkan pemanggilan restoreVoucherQuota() atau buat
-     * flag per-voucher (misal: is_burnable_on_cancel / non-refundable quota).
+     * menggunakan voucher kemudian membatalkan pesanan atau pesanannya kedaluwarsa (expired), kuota voucher
+     * TIDAK dikembalikan (voucher hangus). Jika aturan bisnis ini disepakati klien, nonaktifkan pemanggilan
+     * restoreVoucherQuota() pada alur cancel/expire atau buat flag per-voucher (misal: is_burnable_on_cancel / non-refundable quota).
      */
     private function restoreVoucherQuota(Order $order): void
     {
