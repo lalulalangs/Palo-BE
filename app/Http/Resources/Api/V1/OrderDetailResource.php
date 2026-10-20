@@ -23,7 +23,6 @@ class OrderDetailResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $statusLabels = Order::getStatusLabels();
         $firstItem = $this->relationLoaded('items') ? $this->items->first() : null;
         $itemCount = $this->relationLoaded('items') ? $this->items->sum('quantity') : 0;
 
@@ -84,7 +83,7 @@ class OrderDetailResource extends JsonResource
         return [
             'order_number' => $this->order_number,
             'status' => $this->getFrontendStatus(),
-            'status_label' => $statusLabels[$this->status] ?? $this->status,
+            'status_label' => $this->status->label(),
             'first_item_name' => $firstItem?->product_name_snapshot,
             'item_count' => $itemCount,
             'subtotal' => (float) $this->subtotal,
@@ -95,24 +94,21 @@ class OrderDetailResource extends JsonResource
             'grand_total_display' => Number::currency($this->total, 'IDR', 'id'),
             'voucher_code' => $this->voucher?->code,
             'payment_expires_at' => $this->stock_locked_until?->toIso8601String(),
-            'needs_reconciliation' => false,
+            'needs_reconciliation' => $this->needsReconciliation(),
             'placed_at' => $this->created_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
             'items' => $items,
             'history' => $history,
             'status_histories' => $history,
-            'shipping_address' => [
-                'recipient_name' => $this->shipping_recipient_name,
-                'phone' => $this->shipping_phone,
-                'street' => $this->shipping_full_address,
-                'full_address' => $this->shipping_full_address,
-                'city' => '',
-                'province' => '',
-            ],
+            'shipping_address' => $this->shippingAddressData(),
             'shipping_courier' => $this->shipping_courier,
             'shipping_service' => $this->shipping_service,
             'tracking_number' => $this->tracking_number,
-            'payment_method' => $this->payment?->payment_method,
+            'payment_method' => $this->payment_method ?? $this->payment?->payment_method,
+            'is_cod' => $this->isCod(),
+            'cod_reference_code' => $this->cod_reference_code,
+            'confirmed_at' => $this->confirmed_at?->toIso8601String(),
+            'refund_status' => $this->refund_status,
             'payment' => $paymentData,
         ];
     }

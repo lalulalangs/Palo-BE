@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\AppSetting;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
@@ -93,7 +94,15 @@ class DatabaseSeeder extends Seeder
             ]
         );
 
-        // 4. Seed manual verification orders for Filament Admin
-        $this->call(OrderManualVerificationSeeder::class);
+        // 4. Seed manual verification orders hanya untuk lingkungan lokal/pengujian.
+        if (app()->environment(['local', 'testing'])) {
+            $this->call(OrderManualVerificationSeeder::class);
+        }
+
+        // 5. Default AppSettings for WhatsApp CS & COD configuration (Spesifikasi COD §7 & §8)
+        AppSetting::setValue('whatsapp_cs', AppSetting::getValue('whatsapp_cs', '081234567890'));
+        AppSetting::setValue('cod_enabled', AppSetting::getValue('cod_enabled', 'true'));
+        AppSetting::setValue('cod_cs_whatsapp_number', AppSetting::getValue('cod_cs_whatsapp_number', '081234567890'));
+        AppSetting::setValue('cod_confirmation_timeout_hours', AppSetting::getValue('cod_confirmation_timeout_hours', '24'));
     }
 }

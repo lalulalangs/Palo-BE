@@ -34,9 +34,4 @@ class OrderStatusHistory extends Model
     {
         return $this->belongsTo(AdminUser::class, 'changed_by_admin_id');
     }
-
-    public function changedByAdmin(): BelongsTo
-    {
-        return $this->belongsTo(AdminUser::class, 'changed_by_admin_id');
-    }
 }

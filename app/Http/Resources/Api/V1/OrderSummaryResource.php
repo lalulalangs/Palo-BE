@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -19,14 +20,13 @@ class OrderSummaryResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $statusLabels = Order::getStatusLabels();
         $firstItem = $this->relationLoaded('items') ? $this->items->first() : null;
         $itemCount = $this->relationLoaded('items') ? $this->items->sum('quantity') : 0;
 
         return [
             'order_number' => $this->order_number,
             'status' => $this->getFrontendStatus(),
-            'status_label' => $statusLabels[$this->status] ?? $this->status,
+            'status_label' => $this->status instanceof OrderStatus ? $this->status->label() : (Order::getStatusLabels()[$this->status] ?? (string) $this->status),
             'first_item_name' => $firstItem?->product_name_snapshot,
             'item_count' => $itemCount,
             'subtotal' => (float) $this->subtotal,
@@ -37,7 +37,12 @@ class OrderSummaryResource extends JsonResource
             'grand_total_display' => Number::currency($this->total, 'IDR', 'id'),
             'voucher_code' => $this->voucher?->code,
             'payment_expires_at' => $this->stock_locked_until?->toIso8601String(),
-            'needs_reconciliation' => false,
+            'payment_method' => $this->payment_method ?? $this->payment?->payment_method,
+            'is_cod' => $this->isCod(),
+            'cod_reference_code' => $this->cod_reference_code,
+            'confirmed_at' => $this->confirmed_at?->toIso8601String(),
+            'refund_status' => $this->refund_status,
+            'needs_reconciliation' => $this->needsReconciliation(),
             'placed_at' => $this->created_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
         ];

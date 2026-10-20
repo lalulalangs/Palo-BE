@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Enums\OrderStatus;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -163,8 +164,9 @@ class RegisteredCheckoutApiTest extends TestCase
             ->assertJsonPath('message', 'Pesanan berhasil dibuat.')
             ->assertJsonPath('data.status', 'menunggu_pembayaran')
             ->assertJsonPath('data.subtotal', 700000)
-            ->assertJsonPath('data.shipping_cost', 28000)
-            ->assertJsonPath('data.grand_total', 728000)
+            // Ongkir server: 'Lombok Utara' (multiplier 0,5) x 700 g (2 x 350 g) = 1 kg x Rp 28.000 = 14.000
+            ->assertJsonPath('data.shipping_cost', 14000)
+            ->assertJsonPath('data.grand_total', 714000)
             ->assertJsonPath('data.payment.method', 'qris');
 
         $orderNumber = $response->json('data.order_number');
@@ -173,14 +175,75 @@ class RegisteredCheckoutApiTest extends TestCase
         // Verify order in database
         $order = Order::where('order_number', $orderNumber)->firstOrFail();
         $this->assertEquals($this->user->id, $order->user_id);
-        $this->assertEquals(Order::STATUS_PENDING, $order->status);
-        $this->assertEquals(728000, (float) $order->total);
+        $this->assertEquals(OrderStatus::Pending, $order->status);
+        $this->assertEquals(714000, (float) $order->total);
         $this->assertNotNull($order->stock_locked_until);
         $this->assertTrue($order->stock_locked_until->isFuture());
 
         // Verify user cart is cleared
         $cartCheck = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/cart');
         $cartCheck->assertOk()->assertJsonPath('data.summary.item_count', 0);
+    }
+
+    public function test_checkout_ignores_client_shipping_cost_and_records_server_rate(): void
+    {
+        // Manipulasi audit S-02: client mengirim shipping_cost 0 (atau nilai
+        // miring apa pun). Server wajib mengabaikan dan menegakkan tarif resmi:
+        // 'Mataram' (multiplier 0,5) x 350 g = 1 kg x Rp 28.000 = 14.000.
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Tamper Attempt',
+                'phone' => '081234567890',
+                'street' => 'Jl. Manipulasi Ongkir No. 0',
+                'city' => 'Mataram',
+                'province' => 'NTB',
+            ],
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+            'shipping_cost' => 0,
+            'payment_method' => 'qris',
+        ];
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $response->assertCreated()
+            ->assertJsonPath('data.shipping_cost', 14000)
+            ->assertJsonPath('data.grand_total', 364000); // 350.000 + 14.000
+
+        $order = Order::where('order_number', $response->json('data.order_number'))->firstOrFail();
+        $this->assertSame(14000.0, (float) $order->shipping_cost);
+        $this->assertSame(364000.0, (float) $order->total);
+    }
+
+    public function test_checkout_rejects_unknown_courier_service_combination(): void
+    {
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Courier Fuzzer',
+                'phone' => '081234567890',
+                'street' => 'Jl. Kurir Fiktif No. 1',
+                'city' => 'Mataram',
+                'province' => 'NTB',
+            ],
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'shipping_courier' => 'GHOST',
+            'shipping_service' => 'EXPRESS',
+            'payment_method' => 'qris',
+        ];
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $response->assertUnprocessable()
+            ->assertJsonValidationErrors(['shipping_courier']);
+
+        $this->assertDatabaseMissing('orders', ['user_id' => $this->user->id]);
     }
 
     public function test_order_creation_creates_immutable_item_snapshots(): void
@@ -283,7 +346,7 @@ class RegisteredCheckoutApiTest extends TestCase
             ->assertJsonPath('error_code', 'price_changed')
             ->assertJsonPath('changes.0.old_price', 300000)
             ->assertJsonPath('changes.0.new_price', 350000)
-            ->assertJsonPath('new_grand_total', 370000); // 350.000 + 20.000
+            ->assertJsonPath('new_grand_total', 364000); // 350.000 + ongkir server 14.000
 
         // Ensure no order created
         $this->assertDatabaseMissing('orders', ['user_id' => $this->user->id]);
@@ -318,7 +381,7 @@ class RegisteredCheckoutApiTest extends TestCase
 
         $response->assertCreated()
             ->assertJsonPath('data.subtotal', 350000)
-            ->assertJsonPath('data.grand_total', 370000);
+            ->assertJsonPath('data.grand_total', 364000);
     }
 
     public function test_checkout_validates_and_applies_active_voucher(): void
@@ -356,10 +419,10 @@ class RegisteredCheckoutApiTest extends TestCase
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/v1/checkout/orders', $payload);
 
-        // Subtotal = 350.000, 10% discount = 35.000, shipping = 20.000 -> Grand Total = 335.000
+        // Subtotal = 350.000, 10% discount = 35.000, shipping server = 14.000 -> Grand Total = 329.000
         $response->assertCreated()
             ->assertJsonPath('data.discount_total', 35000)
-            ->assertJsonPath('data.grand_total', 335000);
+            ->assertJsonPath('data.grand_total', 329000);
 
         // Voucher used_count incremented
         $this->assertEquals(1, $voucher->fresh()->used_count);

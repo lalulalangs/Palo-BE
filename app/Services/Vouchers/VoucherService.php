@@ -97,7 +97,7 @@ class VoucherService
         }
 
         $discountAmount = $voucher->calculateDiscount($subtotal);
-        $finalSubtotal = max(0.0, $subtotal - $discountAmount);
+        $finalSubtotal = max(0.0, round($subtotal - $discountAmount, 2));
 
         return new VoucherValidationResult(
             voucher: $voucher,

@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Services\Checkout\CodWhatsAppService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CheckoutOrderRequest extends FormRequest
@@ -21,6 +22,10 @@ class CheckoutOrderRequest extends FormRequest
 
         if ($this->has('acknowledge_price_change')) {
             $merge['acknowledge_price_change'] = filter_var($this->acknowledge_price_change, FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($this->has('note') && is_string($this->note)) {
+            $merge['note'] = trim($this->note);
         }
 
         if ($merge !== []) {
@@ -54,14 +59,28 @@ class CheckoutOrderRequest extends FormRequest
 
             'shipping_courier' => ['required', 'string', 'max:50'],
             'shipping_service' => ['required', 'string', 'max:50'],
-            'shipping_cost' => ['required', 'numeric', 'min:0'],
+            // shipping_cost sengaja TIDAK dipercaya dari client (remediasi audit
+            // S-02): tarif resmi dihitung ulang server-side di RegisteredCheckoutService.
             'shipping_etd' => ['nullable', 'string', 'max:50'],
 
-            'payment_method' => ['required', 'string', 'in:qris,virtual_account,ewallet,bank_transfer,credit_card'],
+            'payment_method' => ['required', 'string', 'in:qris,virtual_account,ewallet,bank_transfer,credit_card,cod'],
             'voucher_code' => ['nullable', 'string', 'max:50'],
             'acknowledge_price_change' => ['nullable', 'boolean'],
             'shipping_address_id' => ['nullable', 'integer'],
+            'note' => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    public function withValidator($validator): void
+    {
+        $validator->after(function ($validator): void {
+            if ($this->input('payment_method') === 'cod') {
+                $codService = app(CodWhatsAppService::class);
+                if (! $codService->isCodEnabled()) {
+                    $validator->errors()->add('payment_method', 'Metode pembayaran COD sedang dinonaktifkan.');
+                }
+            }
+        });
     }
 
     /**
@@ -81,7 +100,6 @@ class CheckoutOrderRequest extends FormRequest
             'items.*.quantity.min' => 'Jumlah barang minimal 1.',
             'shipping_courier.required' => 'Kurir pengiriman wajib dipilih.',
             'shipping_service.required' => 'Layanan kurir wajib dipilih.',
-            'shipping_cost.required' => 'Biaya ongkos kirim wajib ditentukan.',
             'payment_method.required' => 'Metode pembayaran wajib dipilih.',
             'payment_method.in' => 'Metode pembayaran tidak valid.',
         ];

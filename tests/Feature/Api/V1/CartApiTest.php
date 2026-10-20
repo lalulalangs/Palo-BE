@@ -10,7 +10,9 @@ use App\Models\ProductVariant;
 use App\Models\Sku;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class CartApiTest extends TestCase
@@ -356,5 +358,87 @@ class CartApiTest extends TestCase
         $responseValid->assertOk()
             ->assertJsonPath('data.items.0.quantity', 3)
             ->assertJsonPath('data.items.0.available_stock', 3);
+    }
+
+    public function test_guest_cart_is_cached_under_hashed_token_key(): void
+    {
+        $response = $this->postJson('/api/v1/cart/items', [
+            'sku_id' => $this->sku->id,
+            'quantity' => 2,
+        ])->assertOk();
+
+        $token = $response->getCookie('guest_cart_id', false)?->getValue();
+
+        $this->assertNotEmpty($token);
+        $this->assertFalse(Cache::has('cart:session:'.$token));
+        $this->assertTrue(Cache::has('cart:session:'.hash('sha256', $token)));
+    }
+
+    public function test_merge_rotates_guest_token_and_clears_old_cache_entry(): void
+    {
+        $guestToken = 'guest-token-to-rotate';
+
+        $this->withHeader('X-Guest-Token', $guestToken)
+            ->postJson('/api/v1/cart/items', [
+                'sku_id' => $this->sku->id,
+                'quantity' => 2,
+            ])->assertOk();
+
+        /** @var User $user */
+        $user = User::create([
+            'name' => 'Rotating Customer',
+            'email' => 'rotate@example.test',
+            'password_hash' => Hash::make('password123'),
+        ]);
+
+        $response = $this->actingAs($user, 'sanctum')
+            ->postJson('/api/v1/cart/merge', ['guest_token' => $guestToken])
+            ->assertOk();
+
+        $rotatedToken = $response->json('data.guest_token');
+
+        $this->assertIsString($rotatedToken);
+        $this->assertTrue(Str::isUuid($rotatedToken));
+        $this->assertNotSame($guestToken, $rotatedToken);
+        $this->assertFalse(Cache::has('cart:session:'.hash('sha256', $guestToken)));
+        $this->assertSame($rotatedToken, $response->getCookie('guest_cart_id', false)?->getValue());
+    }
+
+    public function test_guest_cart_cookie_is_http_only_and_lax(): void
+    {
+        $response = $this->postJson('/api/v1/cart/items', [
+            'sku_id' => $this->sku->id,
+            'quantity' => 1,
+        ]);
+
+        $cookie = $response->getCookie('guest_cart_id', false);
+
+        $this->assertNotNull($cookie);
+        $this->assertTrue($cookie->isHttpOnly());
+        $this->assertSame('lax', $cookie->getSameSite());
+        $this->assertSame('/', $cookie->getPath());
+    }
+
+    public function test_updating_missing_cart_item_fails_for_registered_user(): void
+    {
+        /** @var User $user */
+        $user = User::create([
+            'name' => 'Empty Cart Buyer',
+            'email' => 'emptycart@example.test',
+            'password_hash' => Hash::make('password123'),
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson('/api/v1/cart/items/'.$this->sku->id, ['quantity' => 2])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['sku_id']);
+    }
+
+    public function test_updating_missing_cart_item_fails_for_guest(): void
+    {
+        $this->withHeader('X-Guest-Token', 'guest-with-empty-cart')
+            ->patchJson('/api/v1/cart/items/'.$this->sku->id, ['quantity' => 2])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['sku_id']);
     }
 }

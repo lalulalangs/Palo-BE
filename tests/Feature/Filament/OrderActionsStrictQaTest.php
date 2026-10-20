@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Models\AdminUser;
@@ -165,9 +166,9 @@ class OrderActionsStrictQaTest extends TestCase
             ->assertNotified('0 pesanan berhasil ditandai sedang diproses (3 dilewati karena bukan status Dibayar)');
 
         // Seluruh status tetap tidak berubah
-        $this->assertEquals(Order::STATUS_PENDING, $orderPending->fresh()->status);
-        $this->assertEquals(Order::STATUS_SHIPPED, $orderShipped->fresh()->status);
-        $this->assertEquals(Order::STATUS_COMPLETED, $orderCompleted->fresh()->status);
+        $this->assertEquals(OrderStatus::Pending, $orderPending->fresh()->status);
+        $this->assertEquals(OrderStatus::Shipped, $orderShipped->fresh()->status);
+        $this->assertEquals(OrderStatus::Completed, $orderCompleted->fresh()->status);
     }
 
     /**
@@ -233,7 +234,7 @@ class OrderActionsStrictQaTest extends TestCase
             ->assertHasNoActionErrors()
             ->assertNotified();
 
-        $this->assertEquals(Order::STATUS_CANCELLED, $order->fresh()->status);
+        $this->assertEquals(OrderStatus::Cancelled, $order->fresh()->status);
 
         // Verifikasi stok SkuA kembali dari 7 ke 10 (+3)
         $this->assertEquals(10, $this->skuA->fresh()->stock);
@@ -273,7 +274,7 @@ class OrderActionsStrictQaTest extends TestCase
             ->assertHasNoTableActionErrors()
             ->assertNotified();
 
-        $this->assertEquals(Order::STATUS_PROCESSING, $paidOrder->fresh()->status);
+        $this->assertEquals(OrderStatus::Processing, $paidOrder->fresh()->status);
 
         // B. Kirim pesanan langsung dari tombol tabel
         Livewire::actingAs($this->admin, 'admin')
@@ -284,7 +285,7 @@ class OrderActionsStrictQaTest extends TestCase
             ->assertHasNoTableActionErrors()
             ->assertNotified();
 
-        $this->assertEquals(Order::STATUS_SHIPPED, $paidOrder->fresh()->status);
+        $this->assertEquals(OrderStatus::Shipped, $paidOrder->fresh()->status);
         $this->assertEquals('JNT-ROW-TEST-123', $paidOrder->fresh()->tracking_number);
 
         // C. Selesaikan pesanan langsung dari tombol tabel
@@ -294,7 +295,7 @@ class OrderActionsStrictQaTest extends TestCase
             ->assertHasNoTableActionErrors()
             ->assertNotified();
 
-        $this->assertEquals(Order::STATUS_COMPLETED, $paidOrder->fresh()->status);
+        $this->assertEquals(OrderStatus::Completed, $paidOrder->fresh()->status);
     }
 
     /**

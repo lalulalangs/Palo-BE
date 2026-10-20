@@ -11,23 +11,15 @@ class PublicHeroSliderController extends Controller
 {
     public function index(): JsonResponse
     {
-        $sliders = HeroSlider::query()->active()->ordered()->get();
+        $sliders = HeroSlider::query()->active()->ordered()->limit(100)->get();
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar hero slider berhasil diambil',
-            'data' => HeroSliderResource::collection($sliders)->resolve(),
-        ]);
+        return $this->respond(HeroSliderResource::collection($sliders)->resolve(), 'Daftar hero slider berhasil diambil');
     }
 
     public function show(HeroSlider $heroSlider): JsonResponse
     {
         abort_unless($heroSlider->is_active, 404);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Detail hero slider berhasil diambil',
-            'data' => (new HeroSliderResource($heroSlider))->resolve(),
-        ]);
+        return $this->respond((new HeroSliderResource($heroSlider))->resolve(), 'Detail hero slider berhasil diambil');
     }
 }

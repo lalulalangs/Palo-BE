@@ -33,31 +33,31 @@ class CheckoutController extends Controller
             itemsInput: $request->input('items'),
             shippingCourier: (string) $request->input('shipping_courier'),
             shippingService: (string) $request->input('shipping_service'),
-            shippingCost: (float) $request->input('shipping_cost'),
-            shippingEtd: $request->input('shipping_etd'),
             paymentMethod: (string) $request->input('payment_method'),
             voucherCode: $request->input('voucher_code'),
-            acknowledgePriceChange: (bool) $request->input('acknowledge_price_change', false)
+            acknowledgePriceChange: (bool) $request->input('acknowledge_price_change', false),
+            note: $request->input('note')
         );
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Pesanan berhasil dibuat.',
-            'data' => [
-                'order_number' => $order->order_number,
-                'status' => $order->getFrontendStatus(),
-                'subtotal' => (float) $order->subtotal,
-                'discount_total' => (float) $order->discount_amount,
-                'shipping_cost' => (float) $order->shipping_cost,
-                'grand_total' => (float) $order->total,
-                'grand_total_display' => Number::currency($order->total, 'IDR', 'id'),
-                'payment_expires_at' => $order->stock_locked_until?->toIso8601String(),
-                'payment' => [
-                    'method' => $order->payment?->payment_method,
-                    'instructions' => $order->payment?->raw_response,
-                ],
+        $whatsappUrl = $order->isCod() ? ($order->payment?->raw_response['whatsapp_url'] ?? null) : null;
+
+        return $this->respond([
+            'order_number' => $order->order_number,
+            'cod_reference_code' => $order->cod_reference_code,
+            'status' => $order->getFrontendStatus(),
+            'subtotal' => (float) $order->subtotal,
+            'discount_total' => (float) $order->discount_amount,
+            'shipping_cost' => (float) $order->shipping_cost,
+            'grand_total' => (float) $order->total,
+            'grand_total_display' => Number::currency($order->total, 'IDR', 'id'),
+            'payment_expires_at' => $order->stock_locked_until?->toIso8601String(),
+            'payment' => [
+                'method' => $order->payment?->payment_method,
+                'instructions' => $order->payment?->raw_response,
+                'whatsapp_url' => $whatsappUrl,
             ],
-        ], 201);
+            'whatsapp_url' => $whatsappUrl,
+        ], 'Pesanan berhasil dibuat.', status: 201);
     }
 
     /**
@@ -72,7 +72,7 @@ class CheckoutController extends Controller
 
         $orders = Order::query()
             ->where('user_id', $user->id)
-            ->with(['items', 'voucher'])
+            ->with(['items', 'voucher', 'payment'])
             ->latest()
             ->paginate($perPage);
 
@@ -84,13 +84,11 @@ class CheckoutController extends Controller
             'has_more' => $orders->hasMorePages(),
         ];
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Daftar pesanan berhasil diambil',
-            'data' => OrderSummaryResource::collection($orders->items()),
-            'pagination' => $paginationData,
-            'meta' => $paginationData,
-        ]);
+        return $this->respond(
+            OrderSummaryResource::collection($orders->items()),
+            'Daftar pesanan berhasil diambil',
+            $paginationData,
+        );
     }
 
     /**
@@ -107,9 +105,6 @@ class CheckoutController extends Controller
             ->with(['items.sku.product.thumbnail', 'payment', 'voucher', 'statusHistories'])
             ->firstOrFail();
 
-        return response()->json([
-            'success' => true,
-            'data' => new OrderDetailResource($order),
-        ]);
+        return $this->respond(new OrderDetailResource($order));
     }
 }

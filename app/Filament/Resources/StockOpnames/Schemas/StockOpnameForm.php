@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockOpnames\Schemas;
 
+use App\Filament\Components\SkuSelect;
 use App\Models\Sku;
 use App\Models\StockOpname;
 use Filament\Forms\Components\Placeholder;
@@ -81,19 +82,8 @@ class StockOpnameForm
                             ->disabled(fn (?StockOpname $record): bool => $record?->isCompleted() ?? false)
                             ->columnSpanFull()
                             ->schema([
-                                Select::make('sku_id')
+                                SkuSelect::make('sku_id')
                                     ->label('Pilih SKU')
-                                    ->options(function () {
-                                        return Sku::with(['product', 'variant'])
-                                            ->get()
-                                            ->mapWithKeys(function (Sku $sku) {
-                                                $productName = $sku->product?->name ?? 'Produk';
-                                                $variantName = $sku->variant?->name ? " ({$sku->variant->name})" : '';
-
-                                                return [$sku->id => "{$sku->sku_code} — {$productName}{$variantName}"];
-                                            });
-                                    })
-                                    ->searchable()
                                     ->distinct()
                                     ->required()
                                     ->live()

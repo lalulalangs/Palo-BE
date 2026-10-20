@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\StockMovements\Pages;
 
+use App\Filament\Components\SkuSelect;
 use App\Filament\Resources\StockMovements\StockMovementResource;
 use App\Models\Sku;
 use App\Models\StockMovement;
@@ -26,19 +27,9 @@ class ListStockMovements extends ListRecords
                 ->icon(Heroicon::OutlinedPlusCircle)
                 ->color('primary')
                 ->form([
-                    Select::make('sku_id')
+                    SkuSelect::make('sku_id')
                         ->label('Pilih SKU')
-                        ->options(function () {
-                            return Sku::with(['product', 'variant'])
-                                ->get()
-                                ->mapWithKeys(function (Sku $sku) {
-                                    $productName = $sku->product?->name ?? 'Produk';
-                                    $variantName = $sku->variant?->name ? " ({$sku->variant->name})" : '';
-
-                                    return [$sku->id => "{$sku->sku_code} — {$productName}{$variantName} [Stok Saat Ini: {$sku->stock}]"];
-                                });
-                        })
-                        ->searchable()
+                        ->withStock()
                         ->required(),
                     Select::make('type')
                         ->label('Tipe Mutasi')

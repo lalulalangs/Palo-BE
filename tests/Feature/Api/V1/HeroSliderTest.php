@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Api\V1;
 
+use App\Models\AdminUser;
 use App\Models\HeroSlider;
+use App\Models\Role;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +14,75 @@ use Tests\TestCase;
 class HeroSliderTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected AdminUser $authorizedAdmin;
+
+    protected AdminUser $unpermittedAdmin;
+
+    protected User $customer;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Role default factory sudah memuat seluruh AdminFeature::values().
+        $this->authorizedAdmin = AdminUser::factory()->create();
+
+        $restrictedRole = Role::create([
+            'name' => 'Tanpa Akses Hero Slider',
+            'permissions' => [],
+        ]);
+        $this->unpermittedAdmin = AdminUser::factory()->create(['role_id' => $restrictedRole->id]);
+
+        $this->customer = User::factory()->create();
+    }
+
+    public function test_admin_routes_reject_guest_without_token_with_401(): void
+    {
+        $slider = HeroSlider::factory()->create();
+
+        $this->getJson('/api/v1/admin/hero-sliders')->assertUnauthorized();
+        $this->postJson('/api/v1/admin/hero-sliders')->assertUnauthorized();
+        $this->getJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertUnauthorized();
+        $this->putJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertUnauthorized();
+        $this->deleteJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertUnauthorized();
+    }
+
+    public function test_admin_routes_reject_regular_customer_with_403(): void
+    {
+        $slider = HeroSlider::factory()->create();
+
+        $this->actingAs($this->customer, 'sanctum')
+            ->getJson('/api/v1/admin/hero-sliders')->assertForbidden();
+        $this->actingAs($this->customer, 'sanctum')
+            ->postJson('/api/v1/admin/hero-sliders')->assertForbidden();
+        $this->actingAs($this->customer, 'sanctum')
+            ->getJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertForbidden();
+        $this->actingAs($this->customer, 'sanctum')
+            ->putJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertForbidden();
+        $this->actingAs($this->customer, 'sanctum')
+            ->deleteJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertForbidden();
+
+        $this->assertDatabaseHas('hero_sliders', ['id' => $slider->id]);
+    }
+
+    public function test_admin_routes_reject_admin_without_hero_slider_permission_with_403(): void
+    {
+        $slider = HeroSlider::factory()->create();
+
+        $this->actingAs($this->unpermittedAdmin, 'sanctum')
+            ->getJson('/api/v1/admin/hero-sliders')->assertForbidden();
+        $this->actingAs($this->unpermittedAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/hero-sliders')->assertForbidden();
+        $this->actingAs($this->unpermittedAdmin, 'sanctum')
+            ->getJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertForbidden();
+        $this->actingAs($this->unpermittedAdmin, 'sanctum')
+            ->putJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertForbidden();
+        $this->actingAs($this->unpermittedAdmin, 'sanctum')
+            ->deleteJson("/api/v1/admin/hero-sliders/{$slider->id}")->assertForbidden();
+
+        $this->assertDatabaseHas('hero_sliders', ['id' => $slider->id]);
+    }
 
     public function test_public_index_returns_only_active_ordered_with_exact_shape(): void
     {
@@ -105,16 +177,17 @@ class HeroSliderTest extends TestCase
         $mobile = UploadedFile::fake()->image('rinjani-mobile.webp', 768, 1024);
 
         // store
-        $create = $this->postJson('/api/v1/admin/hero-sliders', [
-            'title' => 'Stories from the Land of Rinjani',
-            'description' => 'Dirancang di lembah Senaru.',
-            'image_desktop' => $desktop,
-            'image_mobile' => $mobile,
-            'image_alt' => 'Model mengenakan pakaian Rinjani Series di Senaru',
-            'primary_btn_url' => '/katalog/rinjani-series',
-            'secondary_btn_url' => '/cerita/senaru',
-            'sort_order' => 1,
-        ]);
+        $create = $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/hero-sliders', [
+                'title' => 'Stories from the Land of Rinjani',
+                'description' => 'Dirancang di lembah Senaru.',
+                'image_desktop' => $desktop,
+                'image_mobile' => $mobile,
+                'image_alt' => 'Model mengenakan pakaian Rinjani Series di Senaru',
+                'primary_btn_url' => '/katalog/rinjani-series',
+                'secondary_btn_url' => '/cerita/senaru',
+                'sort_order' => 1,
+            ]);
 
         $create->assertCreated()->assertJsonPath('success', true);
         $id = $create->json('data.id');
@@ -122,7 +195,8 @@ class HeroSliderTest extends TestCase
         Storage::disk('public')->assertExists(HeroSlider::find($id)->image_desktop);
 
         // show (admin sees regardless of active flag)
-        $this->getJson("/api/v1/admin/hero-sliders/{$id}")
+        $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->getJson("/api/v1/admin/hero-sliders/{$id}")
             ->assertOk()
             ->assertJsonPath('success', true);
 
@@ -130,17 +204,19 @@ class HeroSliderTest extends TestCase
         $oldPath = HeroSlider::find($id)->image_desktop;
         $newDesktop = UploadedFile::fake()->image('rinjani-desktop-v2.webp', 1920, 1080);
 
-        $this->putJson("/api/v1/admin/hero-sliders/{$id}", [
-            'title' => 'Stories Updated',
-            'image_desktop' => $newDesktop,
-        ])->assertOk()
+        $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->putJson("/api/v1/admin/hero-sliders/{$id}", [
+                'title' => 'Stories Updated',
+                'image_desktop' => $newDesktop,
+            ])->assertOk()
             ->assertJsonPath('success', true)
             ->assertJsonPath('data.title', 'Stories Updated');
 
         Storage::disk('public')->assertMissing($oldPath);
 
         // delete removes files + row
-        $this->deleteJson("/api/v1/admin/hero-sliders/{$id}")
+        $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->deleteJson("/api/v1/admin/hero-sliders/{$id}")
             ->assertOk()
             ->assertJsonPath('success', true);
         $this->assertDatabaseMissing('hero_sliders', ['id' => $id]);
@@ -148,30 +224,67 @@ class HeroSliderTest extends TestCase
 
     public function test_admin_store_validation_fails_without_required_fields(): void
     {
-        $this->postJson('/api/v1/admin/hero-sliders', [])
+        $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/hero-sliders', [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['title', 'image_desktop', 'primary_btn_url']);
     }
 
-    public function test_admin_store_accepts_image_over_2mb_and_converts_to_webp(): void
+    public function test_admin_store_rejects_image_over_2mb(): void
     {
         Storage::fake('public');
 
         $source = $this->noisyPng(1200, 1200);
         $this->assertGreaterThan(2 * 1024 * 1024, filesize($source));
 
-        $create = $this->postJson('/api/v1/admin/hero-sliders', [
-            'title' => 'Big upload',
-            'image_desktop' => new UploadedFile($source, 'big.png', 'image/png', null, true),
-            'primary_btn_url' => '/katalog',
-        ]);
+        $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/hero-sliders', [
+                'title' => 'Big upload',
+                'image_desktop' => new UploadedFile($source, 'big.png', 'image/png', null, true),
+                'primary_btn_url' => '/katalog',
+            ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['image_desktop']);
+    }
 
-        $create->assertCreated();
+    public function test_admin_store_rejects_image_with_excessive_dimensions(): void
+    {
+        Storage::fake('public');
 
-        $slider = HeroSlider::find($create->json('data.id'));
-        $this->assertStringEndsWith('.webp', $slider->image_desktop);
-        Storage::disk('public')->assertExists($slider->image_desktop);
-        $this->assertLessThan(2 * 1024 * 1024, Storage::disk('public')->size($slider->image_desktop));
+        $source = UploadedFile::fake()->image('wide.png', 3000, 1000);
+
+        $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/hero-sliders', [
+                'title' => 'Wide upload',
+                'image_desktop' => $source,
+                'primary_btn_url' => '/katalog',
+            ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['image_desktop']);
+    }
+
+    public function test_admin_store_rejects_unsafe_button_url(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/hero-sliders', [
+                'title' => 'Unsafe link',
+                'image_desktop' => UploadedFile::fake()->image('desktop.webp', 1200, 800),
+                'primary_btn_url' => 'javascript:alert(1)',
+            ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['primary_btn_url']);
+    }
+
+    public function test_admin_store_accepts_relative_and_https_button_urls(): void
+    {
+        Storage::fake('public');
+
+        $this->actingAs($this->authorizedAdmin, 'sanctum')
+            ->postJson('/api/v1/admin/hero-sliders', [
+                'title' => 'Safe relative',
+                'image_desktop' => UploadedFile::fake()->image('desktop.webp', 1200, 800),
+                'primary_btn_url' => '/katalog',
+                'secondary_btn_url' => 'https://palorinjani.com/cerita',
+            ])->assertCreated();
     }
 
     private function noisyPng(int $width, int $height): string

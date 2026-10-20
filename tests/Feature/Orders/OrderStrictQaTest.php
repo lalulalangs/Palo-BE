@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Orders;
 
+use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Models\AdminUser;
@@ -144,7 +145,7 @@ class OrderStrictQaTest extends TestCase
             // Verifikasi stok item 2 tetap utuh
             $this->assertEquals(3, $this->skuSecondary->fresh()->stock);
             // Status order harus tetap pending
-            $this->assertEquals(Order::STATUS_PENDING, $order->fresh()->status);
+            $this->assertEquals(OrderStatus::Pending, $order->fresh()->status);
             // Tidak boleh ada pergerakan stok penjualan tersimpan (hanya ada initial_stock dari setup)
             $this->assertEquals(0, StockMovement::where('type', StockMovement::TYPE_SALE)->count());
             // Tidak boleh ada histori transisi
@@ -172,7 +173,7 @@ class OrderStrictQaTest extends TestCase
 
         $paidOrder = $this->service->markAsPaid($order, actorId: null, note: 'Midtrans Webhook HTTP Notification');
 
-        $this->assertEquals(Order::STATUS_PAID, $paidOrder->status);
+        $this->assertEquals(OrderStatus::Paid, $paidOrder->status);
         $this->assertEquals(9, $this->skuPrimary->fresh()->stock);
 
         $history = OrderStatusHistory::where('order_id', $order->id)->first();
@@ -201,11 +202,11 @@ class OrderStrictQaTest extends TestCase
         ]);
 
         $paidOrder = $this->service->markAsPaid($order, $this->admin->id);
-        $this->assertEquals(Order::STATUS_PAID, $paidOrder->status);
+        $this->assertEquals(OrderStatus::Paid, $paidOrder->status);
 
         // Pembatalan juga harus aman dan tidak melempar error null pointer
         $cancelledOrder = $this->service->cancelOrder($paidOrder, 'Katalog lama batal diproduksi', $this->admin->id);
-        $this->assertEquals(Order::STATUS_CANCELLED, $cancelledOrder->status);
+        $this->assertEquals(OrderStatus::Cancelled, $cancelledOrder->status);
     }
 
     /**
@@ -232,12 +233,12 @@ class OrderStrictQaTest extends TestCase
 
         // 2. Paid -> Processing (gudang mulai kemas)
         $this->service->markAsProcessing($order, $this->admin->id);
-        $this->assertEquals(Order::STATUS_PROCESSING, $order->fresh()->status);
+        $this->assertEquals(OrderStatus::Processing, $order->fresh()->status);
 
         // 3. Batalkan saat status processing
         $this->service->cancelOrder($order, 'Barang cacat saat sortir akhir di gudang', $this->admin->id);
 
-        $this->assertEquals(Order::STATUS_CANCELLED, $order->fresh()->status);
+        $this->assertEquals(OrderStatus::Cancelled, $order->fresh()->status);
         // Stok harus kembali ke 10
         $this->assertEquals(10, $this->skuPrimary->fresh()->stock);
 

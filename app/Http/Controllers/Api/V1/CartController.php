@@ -7,11 +7,14 @@ use App\Http\Requests\Api\V1\AddToCartRequest;
 use App\Http\Requests\Api\V1\UpdateCartItemRequest;
 use App\Models\User;
 use App\Services\Cart\CartService;
+use App\Traits\ResolvesGuestToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
+    use ResolvesGuestToken;
+
     public function __construct(
         protected CartService $cartService
     ) {}
@@ -25,16 +28,7 @@ class CartController extends Controller
         $guestToken = $this->cartService->resolveGuestToken($request);
         $cart = $this->cartService->getCart($user, $guestToken);
 
-        $response = response()->json([
-            'success' => true,
-            'data' => $cart,
-        ]);
-
-        if (! $user && filled($cart['guest_token'])) {
-            $response->withCookie(cookie('guest_cart_id', $cart['guest_token'], 60 * 24 * 30));
-        }
-
-        return $response;
+        return $this->withGuestCartCookie($this->respond($cart), $cart);
     }
 
     /**
@@ -46,17 +40,10 @@ class CartController extends Controller
         $guestToken = $this->cartService->resolveGuestToken($request);
         $cart = $this->cartService->addItem($user, $guestToken, (int) $request->sku_id, (int) $request->quantity);
 
-        $response = response()->json([
-            'success' => true,
-            'message' => 'Produk berhasil ditambahkan ke keranjang.',
-            'data' => $cart,
-        ]);
-
-        if (! $user && filled($cart['guest_token'])) {
-            $response->withCookie(cookie('guest_cart_id', $cart['guest_token'], 60 * 24 * 30));
-        }
-
-        return $response;
+        return $this->withGuestCartCookie(
+            $this->respond($cart, 'Produk berhasil ditambahkan ke keranjang.'),
+            $cart,
+        );
     }
 
     /**
@@ -68,11 +55,10 @@ class CartController extends Controller
         $guestToken = $this->cartService->resolveGuestToken($request);
         $cart = $this->cartService->updateItem($user, $guestToken, $skuId, (int) $request->quantity);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Jumlah barang keranjang berhasil diperbarui.',
-            'data' => $cart,
-        ]);
+        return $this->withGuestCartCookie(
+            $this->respond($cart, 'Jumlah barang keranjang berhasil diperbarui.'),
+            $cart,
+        );
     }
 
     /**
@@ -84,11 +70,10 @@ class CartController extends Controller
         $guestToken = $this->cartService->resolveGuestToken($request);
         $cart = $this->cartService->removeItem($user, $guestToken, $skuId);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Produk berhasil dihapus dari keranjang.',
-            'data' => $cart,
-        ]);
+        return $this->withGuestCartCookie(
+            $this->respond($cart, 'Produk berhasil dihapus dari keranjang.'),
+            $cart,
+        );
     }
 
     /**
@@ -99,24 +84,29 @@ class CartController extends Controller
         /** @var User $user */
         $user = $request->user('sanctum');
 
-        $guestToken = $request->input('guest_token')
-            ?? $request->header('X-Guest-Token')
-            ?? $request->cookie('guest_cart_id')
-            ?? $request->cookie('guest_token');
+        $guestToken = $this->getGuestToken($request);
 
-        if (! $guestToken) {
-            return response()->json([
-                'success' => true,
-                'data' => $this->cartService->getCart($user),
-            ]);
+        if ($guestToken === null) {
+            return $this->respond($this->cartService->getCart($user));
         }
 
-        $cart = $this->cartService->mergeGuestCart($user, (string) $guestToken);
+        $cart = $this->cartService->mergeGuestCart($user, $guestToken);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Keranjang tamu berhasil digabungkan ke akun Anda.',
-            'data' => $cart,
-        ]);
+        return $this->withGuestCartCookie(
+            $this->respond($cart, 'Keranjang tamu berhasil digabungkan ke akun Anda.'),
+            $cart,
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $cart
+     */
+    private function withGuestCartCookie(JsonResponse $response, array $cart): JsonResponse
+    {
+        if (filled($cart['guest_token'] ?? null)) {
+            $response->withCookie($this->guestCartCookie((string) $cart['guest_token']));
+        }
+
+        return $response;
     }
 }
