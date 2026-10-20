@@ -33,8 +33,6 @@ class CheckoutController extends Controller
             itemsInput: $request->input('items'),
             shippingCourier: (string) $request->input('shipping_courier'),
             shippingService: (string) $request->input('shipping_service'),
-            shippingCost: (float) $request->input('shipping_cost'),
-            shippingEtd: $request->input('shipping_etd'),
             paymentMethod: (string) $request->input('payment_method'),
             voucherCode: $request->input('voucher_code'),
             acknowledgePriceChange: (bool) $request->input('acknowledge_price_change', false)

@@ -336,9 +336,9 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/v1/checkout/orders', $payload);
 
-        // Subtotal = 125.000, Discount = 25.000, Shipping = 10.000 -> Grand Total = 110.000
+        // Subtotal = 125.000, Discount = 25.000, shipping server = 14.000 -> Grand Total = 114.000
         $response->assertCreated()
             ->assertJsonPath('data.discount_total', 25000)
-            ->assertJsonPath('data.grand_total', 110000);
+            ->assertJsonPath('data.grand_total', 114000);
     }
 }

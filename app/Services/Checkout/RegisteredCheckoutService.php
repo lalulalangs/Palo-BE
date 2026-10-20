@@ -14,6 +14,7 @@ use App\Models\Sku;
 use App\Models\User;
 use App\Models\Voucher;
 use App\Services\Cart\CartService;
+use App\Services\Shipping\ShippingRateService;
 use App\Services\Vouchers\VoucherService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -25,11 +26,16 @@ class RegisteredCheckoutService
 {
     public function __construct(
         protected CartService $cartService,
-        protected VoucherService $voucherService
+        protected VoucherService $voucherService,
+        protected ShippingRateService $shippingRateService
     ) {}
 
     /**
      * Process checkout for registered user, locking stock temporarily and creating immutable snapshots.
+     *
+     * Ongkir tidak dipercaya dari client (remediasi audit S-02): tarif resmi
+     * selalu dihitung ulang server-side oleh ShippingRateService berdasarkan
+     * kota tujuan, kurir/layanan yang diminta, dan berat SKU di database.
      *
      * @param  array<string, mixed>  $shippingAddress
      * @param  array<int, array{sku_id: int, quantity: int, price_seen?: float|null}>|null  $itemsInput
@@ -40,8 +46,6 @@ class RegisteredCheckoutService
         ?array $itemsInput,
         string $shippingCourier,
         string $shippingService,
-        float $shippingCost,
-        ?string $shippingEtd,
         string $paymentMethod,
         ?string $voucherCode = null,
         bool $acknowledgePriceChange = false
@@ -53,7 +57,6 @@ class RegisteredCheckoutService
                 $itemsInput,
                 $shippingCourier,
                 $shippingService,
-                $shippingCost,
                 $paymentMethod,
                 $voucherCode,
                 $acknowledgePriceChange
@@ -178,6 +181,27 @@ class RegisteredCheckoutService
                 }
 
                 $subtotal = round($subtotal, 2);
+
+                // Hitung ulang tarif ongkir resmi server-side (S-02). Nilai
+                // ongkir apa pun dari client diabaikan sepenuhnya. Kombinasi
+                // kurir/layanan yang tidak dikenal menolak checkout (fail-closed).
+                $shippingQuote = $this->shippingRateService->quoteFor(
+                    courier: $shippingCourier,
+                    service: $shippingService,
+                    destinationCity: (string) ($shippingAddress['city'] ?? ''),
+                    items: array_map(fn (array $prep): array => [
+                        'sku_id' => $prep['sku']->id,
+                        'quantity' => $prep['quantity'],
+                    ], $preparedLines)
+                );
+
+                if ($shippingQuote === null) {
+                    throw ValidationException::withMessages([
+                        'shipping_courier' => ['Kombinasi kurir dan layanan pengiriman tidak tersedia. Silakan pilih dari daftar tarif resmi.'],
+                    ]);
+                }
+
+                $shippingCost = (float) $shippingQuote['cost'];
 
                 // Calculate voucher discount before throwing price changed if any
                 $discountAmount = 0.0;
