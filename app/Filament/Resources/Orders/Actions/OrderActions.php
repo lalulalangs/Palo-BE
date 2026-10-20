@@ -19,6 +19,66 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class OrderActions
 {
     /**
+     * Aksi mengonfirmasi pembayaran pesanan non-COD dari status Menunggu Pembayaran.
+     *
+     * Runtime trigger OrderTransitionService::markAsPaid() yang sudah teruji
+     * (remediasi audit A-02): status paid, payment settlement, stok fisik
+     * dipotong via StockMovement TYPE_SALE, dan riwayat status tercatat.
+     * Pesanan COD (awaiting_confirmation) alurnya terpisah via aksi konfirmasi
+     * COD, bukan lewat method ini.
+     */
+    public static function makeMarkAsPaidAction(): Action
+    {
+        return Action::make('mark_as_paid')
+            ->label('Konfirmasi Pembayaran')
+            ->icon(Heroicon::OutlinedCheckCircle)
+            ->color('success')
+            ->visible(fn (Order $record): bool => $record->status === OrderStatus::Pending)
+            ->modalHeading('Konfirmasi Pembayaran Pesanan')
+            ->modalDescription('Tandai pesanan ini telah Lunas. Stok fisik gudang akan otomatis dipotong dan tombol "Proses Pesanan" akan aktif setelah konfirmasi disimpan.')
+            ->modalSubmitActionLabel('Ya, Konfirmasi Lunas')
+            ->form([
+                TextInput::make('payment_reference')
+                    ->label('Nomor Referensi Pembayaran (Opsional)')
+                    ->placeholder('Contoh: No. ref transfer bank / mutasi: BCVA1234567890'),
+                Textarea::make('note')
+                    ->label('Catatan Verifikasi Admin (Opsional)')
+                    ->placeholder('Contoh: Dana diverifikasi melalui cek mutasi rekening'),
+            ])
+            ->action(function (Order $record, array $data, OrderTransitionService $service): void {
+                try {
+                    $noteParts = ['Pembayaran dikonfirmasi manual oleh admin.'];
+
+                    if (filled($data['payment_reference'] ?? null)) {
+                        $noteParts[] = "Referensi: {$data['payment_reference']}.";
+                    }
+
+                    if (filled($data['note'] ?? null)) {
+                        $noteParts[] = $data['note'];
+                    }
+
+                    $service->markAsPaid(
+                        $record,
+                        Auth::id() ? (int) Auth::id() : null,
+                        implode(' ', $noteParts)
+                    );
+
+                    Notification::make()
+                        ->title("Pembayaran {$record->order_number} dikonfirmasi")
+                        ->body('Status pesanan menjadi Dibayar dan stok fisik telah dipotong dari inventori.')
+                        ->success()
+                        ->send();
+                } catch (\Throwable $e) {
+                    Notification::make()
+                        ->title('Gagal mengonfirmasi pembayaran')
+                        ->body($e->getMessage())
+                        ->danger()
+                        ->send();
+                }
+            });
+    }
+
+    /**
      * Aksi menandai pesanan lunas sedang disiapkan / dikemas oleh tim gudang.
      */
     public static function makeProcessingAction(): Action

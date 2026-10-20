@@ -120,6 +120,7 @@ class OrdersTable
             ])
             ->recordActions([
                 ViewAction::make(),
+                OrderActions::makeMarkAsPaidAction(),
                 OrderActions::makeProcessingAction(),
                 OrderActions::makeShipAction(),
                 OrderActions::makeCompleteAction(),

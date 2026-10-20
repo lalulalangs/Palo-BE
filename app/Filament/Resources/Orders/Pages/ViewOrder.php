@@ -13,6 +13,7 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            OrderActions::makeMarkAsPaidAction(),
             OrderActions::makeProcessingAction(),
             OrderActions::makeShipAction(),
             OrderActions::makeUpdateTrackingAction(),
