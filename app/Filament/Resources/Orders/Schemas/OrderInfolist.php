@@ -26,7 +26,7 @@ class OrderInfolist
                 Section::make('Ringkasan Transaksi')
                     ->columnSpanFull()
                     ->schema([
-                        Grid::make(4)
+                        Grid::make(5)
                             ->schema([
                                 TextEntry::make('order_number')
                                     ->label('Nomor Pesanan')
@@ -39,6 +39,19 @@ class OrderInfolist
                                     ->badge()
                                     ->formatStateUsing(fn (OrderStatus|string $state): string => OrderStatus::labelFor($state))
                                     ->color(fn (OrderStatus|string $state): string => OrderStatus::colorFor($state)),
+
+                                TextEntry::make('payment_method')
+                                    ->label('Metode Bayar')
+                                    ->badge()
+                                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                                        Order::PAYMENT_METHOD_COD => 'COD',
+                                        Order::PAYMENT_METHOD_ONLINE => 'Online',
+                                        default => strtoupper($state ?? 'ONLINE'),
+                                    })
+                                    ->color(fn (?string $state): string => match ($state) {
+                                        Order::PAYMENT_METHOD_COD => 'warning',
+                                        default => 'info',
+                                    }),
 
                                 TextEntry::make('created_at')
                                     ->label('Waktu Checkout')
@@ -187,6 +200,73 @@ class OrderInfolist
 
                                                 TextEntry::make('payment.paid_at')
                                                     ->label('Waktu Pelunasan')
+                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->placeholder('-'),
+                                            ]),
+
+                                        Section::make('Informasi COD & Konfirmasi CS')
+                                            ->visible(fn (Order $record): bool => $record->isCod())
+                                            ->schema([
+                                                TextEntry::make('cod_reference_code')
+                                                    ->label('Kode Referensi COD')
+                                                    ->fontFamily(FontFamily::Mono)
+                                                    ->weight('bold')
+                                                    ->copyable()
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('confirmed_at')
+                                                    ->label('Waktu Dikonfirmasi CS')
+                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->placeholder('Menunggu konfirmasi CS'),
+
+                                                TextEntry::make('confirmedBy.name')
+                                                    ->label('Dikonfirmasi Oleh')
+                                                    ->placeholder('-'),
+                                            ]),
+
+                                        Section::make('Informasi Pengembalian Dana (Refund)')
+                                            ->visible(fn (Order $record): bool => $record->hasRefund())
+                                            ->schema([
+                                                TextEntry::make('refund_status')
+                                                    ->label('Status Refund')
+                                                    ->badge()
+                                                    ->formatStateUsing(fn (?string $state): string => $state ? (Order::getRefundStatusLabels()[$state] ?? $state) : '-')
+                                                    ->color(fn (?string $state): string => Order::getRefundStatusColor($state)),
+
+                                                TextEntry::make('refund_amount')
+                                                    ->label('Nominal Refund')
+                                                    ->money('IDR', locale: 'id')
+                                                    ->weight('bold'),
+
+                                                TextEntry::make('refund_reason')
+                                                    ->label('Alasan Refund')
+                                                    ->columnSpanFull(),
+
+                                                TextEntry::make('refund_requested_at')
+                                                    ->label('Waktu Pengajuan')
+                                                    ->dateTime('d/m/Y H:i:s'),
+
+                                                TextEntry::make('refund_approved_at')
+                                                    ->label('Waktu Disetujui')
+                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('refundApprovedBy.name')
+                                                    ->label('Disetujui Oleh')
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('refund_method')
+                                                    ->label('Metode Transfer Refund')
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('refund_reference')
+                                                    ->label('Bukti Transfer / No. Referensi')
+                                                    ->fontFamily(FontFamily::Mono)
+                                                    ->copyable()
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('refunded_at')
+                                                    ->label('Waktu Selesai Refund')
                                                     ->dateTime('d/m/Y H:i:s')
                                                     ->placeholder('-'),
                                             ]),

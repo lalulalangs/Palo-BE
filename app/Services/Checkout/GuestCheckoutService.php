@@ -2,10 +2,16 @@
 
 namespace App\Services\Checkout;
 
+use App\Exceptions\InsufficientStockException;
 use App\Models\AppSetting;
 use App\Models\GuestCheckoutLog;
+use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\OrderStatusHistory;
+use App\Models\Payment;
 use App\Models\Sku;
 use App\Services\Cart\CartService;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -13,7 +19,8 @@ use Illuminate\Validation\ValidationException;
 class GuestCheckoutService
 {
     public function __construct(
-        protected CartService $cartService
+        protected CartService $cartService,
+        protected CodWhatsAppService $codWhatsAppService
     ) {}
 
     /**
@@ -194,6 +201,272 @@ class GuestCheckoutService
             'estimated_total_display' => '[Harga dari Admin]',
             'notice' => 'Tim kami akan segera menghubungi Anda melalui WhatsApp.',
         ];
+    }
+
+    /**
+     * Process formal COD checkout for Guest user, creating order (user_id=null), snapshots, and WA link.
+     *
+     * @param  array<string, mixed>  $shippingAddress
+     * @param  array<int, array{sku_id: int, quantity: int, price_seen?: float|null}>|null  $itemsInput
+     * @return array<string, mixed>
+     */
+    public function codCheckout(
+        array $shippingAddress,
+        ?array $itemsInput,
+        ?string $shippingCourier,
+        ?string $shippingService,
+        float $shippingCost,
+        ?string $note,
+        string $sessionId
+    ): array {
+        if (! $this->codWhatsAppService->isCodEnabled()) {
+            throw ValidationException::withMessages([
+                'payment_method' => ['Metode pembayaran COD sedang dinonaktifkan.'],
+            ]);
+        }
+
+        $rawItems = $itemsInput;
+
+        if (empty($rawItems)) {
+            $rawItems = $this->cartService->getRawGuestItems($sessionId);
+        }
+
+        if (empty($rawItems)) {
+            throw ValidationException::withMessages([
+                'items' => ['Keranjang belanja kosong. Tambahkan produk sebelum checkout.'],
+            ]);
+        }
+
+        // Consolidate duplicate SKU entries in guest payload
+        $consolidated = [];
+        foreach ($rawItems as $item) {
+            $skuId = (int) $item['sku_id'];
+            $qty = (int) $item['quantity'];
+            $priceSeen = isset($item['price_seen']) ? (float) $item['price_seen'] : null;
+
+            if (! isset($consolidated[$skuId])) {
+                $consolidated[$skuId] = [
+                    'sku_id' => $skuId,
+                    'quantity' => $qty,
+                    'price_seen' => $priceSeen,
+                ];
+            } else {
+                $consolidated[$skuId]['quantity'] += $qty;
+                if ($priceSeen !== null) {
+                    $consolidated[$skuId]['price_seen'] = $priceSeen;
+                }
+            }
+        }
+        $rawItems = array_values($consolidated);
+
+        return DB::transaction(function () use (
+            $shippingAddress,
+            $rawItems,
+            $shippingCourier,
+            $shippingService,
+            $shippingCost,
+            $note,
+            $sessionId
+        ) {
+            $snapshot = [];
+            $preparedLines = [];
+            $subtotal = 0.0;
+
+            foreach ($rawItems as $line) {
+                $skuId = (int) $line['sku_id'];
+                $quantity = (int) $line['quantity'];
+
+                /** @var Sku|null $sku */
+                $sku = Sku::query()
+                    ->whereKey($skuId)
+                    ->lockForUpdate()
+                    ->with(['product', 'variant'])
+                    ->first();
+
+                if (! $sku) {
+                    throw ValidationException::withMessages([
+                        'items' => ["SKU #{$skuId} tidak ditemukan di sistem."],
+                    ]);
+                }
+
+                if (! $sku->is_active || ! $sku->product || ! $sku->product->is_active) {
+                    $productName = $sku->product?->name ?? $sku->sku_code;
+                    throw new InsufficientStockException(
+                        message: "Produk atau varian {$productName} saat ini tidak aktif atau tidak lagi tersedia.",
+                        skuCode: $sku->sku_code,
+                        available: 0,
+                        requested: $quantity
+                    );
+                }
+
+                $reservedStock = (int) OrderItem::query()
+                    ->where('sku_id', $sku->id)
+                    ->whereHas('order', function ($query): void {
+                        $query->where('status', Order::STATUS_PENDING)
+                            ->where('stock_locked_until', '>', now());
+                    })
+                    ->sum('quantity');
+
+                $availableStock = max(0, $sku->stock - $reservedStock);
+
+                if ($availableStock < $quantity) {
+                    throw new InsufficientStockException(
+                        message: "Stok SKU {$sku->sku_code} ({$sku->product?->name}) tidak mencukupi (tersedia: {$availableStock}, diminta: {$quantity}).",
+                        skuCode: $sku->sku_code,
+                        available: $availableStock,
+                        requested: $quantity
+                    );
+                }
+
+                $effectivePrice = $sku->effective_price;
+                $lineSubtotal = $effectivePrice * $quantity;
+                $subtotal += $lineSubtotal;
+
+                $snapshot[] = [
+                    'sku_id' => $sku->id,
+                    'sku_code' => $sku->sku_code,
+                    'product_name' => $sku->product?->name ?? 'Produk',
+                    'variant_name' => $sku->variant?->name,
+                    'unit_price' => $effectivePrice,
+                    'quantity' => $quantity,
+                    'subtotal' => $lineSubtotal,
+                ];
+
+                $preparedLines[] = [
+                    'sku' => $sku,
+                    'quantity' => $quantity,
+                    'unit_price' => $effectivePrice,
+                    'subtotal' => $lineSubtotal,
+                ];
+            }
+
+            $grandTotal = max(0.0, $subtotal + $shippingCost);
+
+            // Generate order number
+            $today = date('Ymd');
+            $countToday = Order::query()->whereDate('created_at', now()->toDateString())->count() + 1;
+            $orderNumber = sprintf('UJN-%s-%05d', $today, $countToday);
+
+            while (Order::query()->where('order_number', $orderNumber)->exists()) {
+                $orderNumber = sprintf('UJN-%s-%05d-%s', $today, $countToday, strtoupper(Str::random(3)));
+            }
+
+            $codReferenceCode = $this->codWhatsAppService->generateReferenceCode();
+
+            $recipientName = $shippingAddress['recipient_name'] ?? 'Tamu';
+            $recipientPhone = $shippingAddress['phone'] ?? '';
+            $fullAddress = trim(sprintf(
+                '%s, %s, %s, %s %s',
+                $shippingAddress['street'] ?? '',
+                $shippingAddress['district'] ?? '',
+                $shippingAddress['city'] ?? '',
+                $shippingAddress['province'] ?? '',
+                $shippingAddress['postal_code'] ?? ''
+            ), ', ');
+
+            /** @var Order $order */
+            $order = Order::create([
+                'order_number' => $orderNumber,
+                'user_id' => null,
+                'voucher_id' => null,
+                'status' => Order::STATUS_AWAITING_CONFIRMATION,
+                'payment_method' => Order::PAYMENT_METHOD_COD,
+                'cod_reference_code' => $codReferenceCode,
+                'subtotal' => $subtotal,
+                'discount_amount' => 0.0,
+                'shipping_cost' => $shippingCost,
+                'total' => $grandTotal,
+                'shipping_recipient_name' => $recipientName,
+                'shipping_phone' => $recipientPhone,
+                'shipping_full_address' => $fullAddress,
+                'shipping_courier' => $shippingCourier ?: 'COD Kurir',
+                'shipping_service' => $shippingService ?: 'Standar',
+                'stock_locked_until' => null,
+            ]);
+
+            // Create immutable order item snapshots
+            foreach ($preparedLines as $prep) {
+                /** @var Sku $sku */
+                $sku = $prep['sku'];
+
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'sku_id' => $sku->id,
+                    'product_name_snapshot' => $sku->product?->name ?? 'Produk',
+                    'variant_name_snapshot' => $sku->variant?->name ?? 'Default',
+                    'sku_code_snapshot' => $sku->sku_code,
+                    'price_snapshot' => $prep['unit_price'],
+                    'quantity' => $prep['quantity'],
+                    'subtotal' => $prep['subtotal'],
+                ]);
+            }
+
+            $noteText = $note ?? $shippingAddress['notes'] ?? null;
+            $waMessage = $this->codWhatsAppService->buildMessage($order, $noteText);
+            $waUrl = $this->codWhatsAppService->generateWhatsAppUrl($waMessage);
+
+            Payment::create([
+                'order_id' => $order->id,
+                'gateway' => 'cod',
+                'payment_method' => Order::PAYMENT_METHOD_COD,
+                'amount' => $grandTotal,
+                'status' => Payment::STATUS_PENDING,
+                'expired_at' => null,
+                'raw_response' => [
+                    'method' => 'cod',
+                    'cod_reference_code' => $order->cod_reference_code,
+                    'whatsapp_url' => $waUrl,
+                    'whatsapp_message' => $waMessage,
+                    'instructions_text' => 'Silakan konfirmasi pesanan Anda melalui WhatsApp ke Customer Service kami.',
+                ],
+            ]);
+
+            OrderStatusHistory::create([
+                'order_id' => $order->id,
+                'changed_by_admin_id' => null,
+                'from_status' => null,
+                'to_status' => Order::STATUS_AWAITING_CONFIRMATION,
+                'note' => 'Pesanan COD Guest dibuat oleh pembeli, menunggu konfirmasi CS.',
+                'created_at' => now(),
+            ]);
+
+            GuestCheckoutLog::create([
+                'order_id' => $order->id,
+                'session_id' => $sessionId,
+                'cart_snapshot' => $snapshot,
+                'estimated_total' => $grandTotal,
+                'wa_message_text' => $waMessage,
+                'wa_cs_number_used' => $this->codWhatsAppService->getCleanCsWhatsAppNumber(),
+                'created_at' => now(),
+            ]);
+
+            // Clear guest cart
+            $this->cartService->clearCart(null, $sessionId);
+
+            return [
+                'order_number' => $order->order_number,
+                'cod_reference_code' => $order->cod_reference_code,
+                'status' => $order->getFrontendStatus(),
+                'subtotal' => (float) $order->subtotal,
+                'discount_total' => 0.0,
+                'shipping_cost' => (float) $order->shipping_cost,
+                'grand_total' => (float) $order->total,
+                'grand_total_display' => Number::currency($order->total, 'IDR', 'id'),
+                'payment' => [
+                    'method' => 'cod',
+                    'instructions' => [
+                        'method' => 'cod',
+                        'cod_reference_code' => $order->cod_reference_code,
+                        'whatsapp_url' => $waUrl,
+                        'whatsapp_message' => $waMessage,
+                    ],
+                    'whatsapp_url' => $waUrl,
+                ],
+                'whatsapp_url' => $waUrl,
+                'whatsapp_message' => $waMessage,
+                'notice' => 'Pesanan COD berhasil dicatat. Silakan konfirmasi pesanan via WhatsApp ke CS.',
+            ];
+        });
     }
 
     /**

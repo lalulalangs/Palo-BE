@@ -35,11 +35,15 @@ class CheckoutController extends Controller
             shippingService: (string) $request->input('shipping_service'),
             paymentMethod: (string) $request->input('payment_method'),
             voucherCode: $request->input('voucher_code'),
-            acknowledgePriceChange: (bool) $request->input('acknowledge_price_change', false)
+            acknowledgePriceChange: (bool) $request->input('acknowledge_price_change', false),
+            note: $request->input('note')
         );
+
+        $whatsappUrl = $order->isCod() ? ($order->payment?->raw_response['whatsapp_url'] ?? null) : null;
 
         return $this->respond([
             'order_number' => $order->order_number,
+            'cod_reference_code' => $order->cod_reference_code,
             'status' => $order->getFrontendStatus(),
             'subtotal' => (float) $order->subtotal,
             'discount_total' => (float) $order->discount_amount,
@@ -50,7 +54,9 @@ class CheckoutController extends Controller
             'payment' => [
                 'method' => $order->payment?->payment_method,
                 'instructions' => $order->payment?->raw_response,
+                'whatsapp_url' => $whatsappUrl,
             ],
+            'whatsapp_url' => $whatsappUrl,
         ], 'Pesanan berhasil dibuat.', status: 201);
     }
 

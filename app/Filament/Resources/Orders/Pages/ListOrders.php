@@ -18,6 +18,11 @@ class ListOrders extends ListRecords
             'all' => Tab::make('Semua')
                 ->badge(fn (): int => Order::query()->count()),
 
+            'awaiting_confirmation' => Tab::make('Menunggu Konfirmasi CS')
+                ->badge(fn (): int => Order::query()->where('status', Order::STATUS_AWAITING_CONFIRMATION)->count())
+                ->badgeColor('warning')
+                ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('status', Order::STATUS_AWAITING_CONFIRMATION)),
+
             'pending' => Tab::make('Menunggu Pembayaran')
                 ->badge(fn (): int => Order::query()->where('status', Order::STATUS_PENDING)->count())
                 ->badgeColor('warning')

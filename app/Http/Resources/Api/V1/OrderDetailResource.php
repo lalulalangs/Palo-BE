@@ -104,7 +104,11 @@ class OrderDetailResource extends JsonResource
             'shipping_courier' => $this->shipping_courier,
             'shipping_service' => $this->shipping_service,
             'tracking_number' => $this->tracking_number,
-            'payment_method' => $this->payment?->payment_method,
+            'payment_method' => $this->payment_method ?? $this->payment?->payment_method,
+            'is_cod' => $this->isCod(),
+            'cod_reference_code' => $this->cod_reference_code,
+            'confirmed_at' => $this->confirmed_at?->toIso8601String(),
+            'refund_status' => $this->refund_status,
             'payment' => $paymentData,
         ];
     }

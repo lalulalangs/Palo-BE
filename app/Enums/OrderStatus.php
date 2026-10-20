@@ -17,7 +17,7 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::Pending => 'Menunggu Pembayaran',
-            self::AwaitingConfirmation => 'Menunggu Konfirmasi',
+            self::AwaitingConfirmation => 'Menunggu Konfirmasi CS',
             self::Paid => 'Dibayar',
             self::Processing => 'Diproses',
             self::Shipped => 'Dikirim',
@@ -45,7 +45,7 @@ enum OrderStatus: string
     {
         return match ($this) {
             self::Pending => 'menunggu_pembayaran',
-            self::AwaitingConfirmation => 'menunggu_konfirmasi',
+            self::AwaitingConfirmation => 'menunggu_konfirmasi_cs',
             self::Paid => 'dibayar',
             self::Processing => 'diproses',
             self::Shipped => 'dikirim',

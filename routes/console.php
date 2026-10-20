@@ -20,3 +20,9 @@ Schedule::command('pii:anonymize')->daily();
 // Tanpa ini, order "menunggu_pembayaran" tidak pernah kedaluwarsa dan stok
 // tertahan terus (lihat temuan audit A-01).
 Schedule::command('orders:expire-unpaid')->everyMinute();
+
+// Otomasi pembatalan pesanan COD yang tidak dikonfirmasi CS dalam batas waktu.
+Schedule::command('orders:expire-unconfirmed-cod')
+    ->hourly()
+    ->withoutOverlapping()
+    ->runInBackground();
