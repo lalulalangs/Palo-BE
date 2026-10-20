@@ -80,12 +80,14 @@ Route::prefix('v1')->group(function (): void {
         Route::get('hero-sliders/{heroSlider}', [PublicHeroSliderController::class, 'show']);
     });
 
-    // Admin Hero Sliders (TODO: protect with sanctum)
-    Route::prefix('admin')->group(function (): void {
-        Route::get('hero-sliders', [AdminHeroSliderController::class, 'index']);
-        Route::post('hero-sliders', [AdminHeroSliderController::class, 'store']);
-        Route::get('hero-sliders/{heroSlider}', [AdminHeroSliderController::class, 'show']);
-        Route::match(['put', 'patch'], 'hero-sliders/{heroSlider}', [AdminHeroSliderController::class, 'update']);
-        Route::delete('hero-sliders/{heroSlider}', [AdminHeroSliderController::class, 'destroy']);
-    });
+    // Admin Hero Sliders — dilindungi Sanctum + gate AdminFeature::HeroSliders (remediasi audit S-01).
+    Route::prefix('admin')
+        ->middleware(['auth:sanctum', 'can:hero-sliders'])
+        ->group(function (): void {
+            Route::get('hero-sliders', [AdminHeroSliderController::class, 'index']);
+            Route::post('hero-sliders', [AdminHeroSliderController::class, 'store']);
+            Route::get('hero-sliders/{heroSlider}', [AdminHeroSliderController::class, 'show']);
+            Route::match(['put', 'patch'], 'hero-sliders/{heroSlider}', [AdminHeroSliderController::class, 'update']);
+            Route::delete('hero-sliders/{heroSlider}', [AdminHeroSliderController::class, 'destroy']);
+        });
 });

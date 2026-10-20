@@ -11,7 +11,6 @@ use App\Services\ImageOptimizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Storage;
 
-// TODO: protect with sanctum — endpoint admin hero-slider saat ini terbuka tanpa auth (akses sementara untuk development). Pasang middleware auth:sanctum + gate/ability admin sebelum deploy ke publik.
 class AdminHeroSliderController extends Controller
 {
     public function index(): JsonResponse
