@@ -25,18 +25,32 @@ class ProductsTable
                     ->square()
                     ->placeholder('-'),
                 TextColumn::make('category.name')
+                    ->label('Kategori')
                     ->searchable(),
                 TextColumn::make('name')
+                    ->label('Nama Produk')
                     ->searchable(),
                 TextColumn::make('slug')
+                    ->label('Slug')
                     ->searchable(),
                 TextColumn::make('base_price')
+                    ->label('Harga Dasar')
                     ->money('IDR', locale: 'id')
                     ->sortable(),
                 IconColumn::make('is_featured')
-                    ->boolean(),
+                    ->label('Unggulan')
+                    ->boolean()
+                    ->trueIcon('heroicon-m-star')
+                    ->falseIcon('heroicon-m-minus')
+                    ->trueColor('warning')
+                    ->falseColor('gray'),
                 IconColumn::make('is_active')
-                    ->boolean(),
+                    ->label('Status Toko')
+                    ->boolean()
+                    ->trueIcon('heroicon-m-eye')
+                    ->falseIcon('heroicon-m-eye-slash')
+                    ->trueColor('success')
+                    ->falseColor('danger'),
                 TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()

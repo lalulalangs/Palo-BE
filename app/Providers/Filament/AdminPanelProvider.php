@@ -6,10 +6,12 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -28,6 +30,22 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->authGuard('admin')
+            ->sidebarCollapsibleOnDesktop()
+            ->navigationGroups([
+                NavigationGroup::make('Katalog Produk')
+                    ->icon(Heroicon::OutlinedSquare2Stack),
+                NavigationGroup::make('Inventaris')
+                    ->icon(Heroicon::OutlinedArchiveBox),
+                NavigationGroup::make('Penjualan')
+                    ->icon(Heroicon::OutlinedShoppingBag),
+                NavigationGroup::make('Konten & Promosi')
+                    ->icon(Heroicon::OutlinedPhoto),
+                NavigationGroup::make('Pengaturan')
+                    ->icon(Heroicon::OutlinedCog6Tooth),
+                NavigationGroup::make('Role & Pengguna')
+                    ->icon(Heroicon::OutlinedShieldCheck),
+            ])
             ->colors([
                 'primary' => [
                     50 => '#edf7f1',

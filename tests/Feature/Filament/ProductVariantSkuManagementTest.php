@@ -4,11 +4,11 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\RelationManagers\VariantsRelationManager;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sku;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -17,7 +17,7 @@ class ProductVariantSkuManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Product $product;
 
@@ -25,7 +25,7 @@ class ProductVariantSkuManagementTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
 
@@ -47,7 +47,7 @@ class ProductVariantSkuManagementTest extends TestCase
 
     public function test_can_render_variants_relation_manager_on_product_edit_page(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(VariantsRelationManager::class, [
                 'ownerRecord' => $this->product,
                 'pageClass' => EditProduct::class,
@@ -57,7 +57,7 @@ class ProductVariantSkuManagementTest extends TestCase
 
     public function test_can_create_variant_with_sku_stock_and_price_override(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(VariantsRelationManager::class, [
                 'ownerRecord' => $this->product,
                 'pageClass' => EditProduct::class,
@@ -117,7 +117,7 @@ class ProductVariantSkuManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(VariantsRelationManager::class, [
                 'ownerRecord' => $this->product,
                 'pageClass' => EditProduct::class,
@@ -165,7 +165,7 @@ class ProductVariantSkuManagementTest extends TestCase
             'is_active' => true,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(VariantsRelationManager::class, [
                 'ownerRecord' => $this->product,
                 'pageClass' => EditProduct::class,

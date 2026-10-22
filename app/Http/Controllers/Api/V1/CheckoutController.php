@@ -1,0 +1,110 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\CheckoutOrderRequest;
+use App\Http\Resources\Api\V1\OrderDetailResource;
+use App\Http\Resources\Api\V1\OrderSummaryResource;
+use App\Models\Order;
+use App\Models\User;
+use App\Services\Checkout\RegisteredCheckoutService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Number;
+
+class CheckoutController extends Controller
+{
+    public function __construct(
+        protected RegisteredCheckoutService $registeredCheckoutService
+    ) {}
+
+    /**
+     * Create formal order for registered customer with atomic stock locking (PRD §3.6).
+     */
+    public function createOrder(CheckoutOrderRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user('sanctum');
+
+        $order = $this->registeredCheckoutService->process(
+            user: $user,
+            shippingAddress: (array) $request->input('shipping_address'),
+            itemsInput: $request->input('items'),
+            shippingCourier: (string) $request->input('shipping_courier'),
+            shippingService: (string) $request->input('shipping_service'),
+            paymentMethod: (string) $request->input('payment_method'),
+            voucherCode: $request->input('voucher_code'),
+            acknowledgePriceChange: (bool) $request->input('acknowledge_price_change', false),
+            note: $request->input('note')
+        );
+
+        $whatsappUrl = $order->isCod() ? ($order->payment?->raw_response['whatsapp_url'] ?? null) : null;
+
+        return $this->respond([
+            'order_number' => $order->order_number,
+            'cod_reference_code' => $order->cod_reference_code,
+            'status' => $order->getFrontendStatus(),
+            'subtotal' => (float) $order->subtotal,
+            'discount_total' => (float) $order->discount_amount,
+            'shipping_cost' => (float) $order->shipping_cost,
+            'grand_total' => (float) $order->total,
+            'grand_total_display' => Number::currency($order->total, 'IDR', 'id'),
+            'payment_expires_at' => $order->stock_locked_until?->toIso8601String(),
+            'payment' => [
+                'method' => $order->payment?->payment_method,
+                'instructions' => $order->payment?->raw_response,
+                'whatsapp_url' => $whatsappUrl,
+            ],
+            'whatsapp_url' => $whatsappUrl,
+        ], 'Pesanan berhasil dibuat.', status: 201);
+    }
+
+    /**
+     * List registered user's order history.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user('sanctum');
+
+        $perPage = min(max((int) $request->input('per_page', 15), 1), 100);
+
+        $orders = Order::query()
+            ->where('user_id', $user->id)
+            ->with(['items', 'voucher', 'payment'])
+            ->latest()
+            ->paginate($perPage);
+
+        $paginationData = [
+            'current_page' => $orders->currentPage(),
+            'last_page' => $orders->lastPage(),
+            'per_page' => $orders->perPage(),
+            'total' => $orders->total(),
+            'has_more' => $orders->hasMorePages(),
+        ];
+
+        return $this->respond(
+            OrderSummaryResource::collection($orders->items()),
+            'Daftar pesanan berhasil diambil',
+            $paginationData,
+        );
+    }
+
+    /**
+     * Get snapshot details of a specific order belonging to the user.
+     */
+    public function show(Request $request, string $orderNumber): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user('sanctum');
+
+        $order = Order::query()
+            ->where('user_id', $user->id)
+            ->where('order_number', $orderNumber)
+            ->with(['items.sku.product.thumbnail', 'payment', 'voucher', 'statusHistories'])
+            ->firstOrFail();
+
+        return $this->respond(new OrderDetailResource($order));
+    }
+}

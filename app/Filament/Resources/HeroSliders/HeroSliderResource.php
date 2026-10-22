@@ -1,0 +1,70 @@
+<?php
+
+namespace App\Filament\Resources\HeroSliders;
+
+use App\Enums\AdminFeature;
+use App\Filament\Concerns\HasAdminFeatureAccess;
+use App\Filament\Resources\HeroSliders\Pages\CreateHeroSlider;
+use App\Filament\Resources\HeroSliders\Pages\EditHeroSlider;
+use App\Filament\Resources\HeroSliders\Pages\ListHeroSliders;
+use App\Filament\Resources\HeroSliders\Schemas\HeroSliderForm;
+use App\Filament\Resources\HeroSliders\Tables\HeroSlidersTable;
+use App\Models\HeroSlider;
+use BackedEnum;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Table;
+use UnitEnum;
+
+class HeroSliderResource extends Resource
+{
+    use HasAdminFeatureAccess;
+
+    protected static ?string $model = HeroSlider::class;
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPresentationChartBar;
+
+    protected static string|UnitEnum|null $navigationGroup = 'Konten & Promosi';
+
+    protected static ?string $navigationLabel = 'Hero Slider';
+
+    protected static ?string $modelLabel = 'Hero Slider';
+
+    protected static ?string $pluralModelLabel = 'Daftar Hero Slider';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $recordTitleAttribute = 'title';
+
+    public static function getAdminFeature(): AdminFeature
+    {
+        return AdminFeature::HeroSliders;
+    }
+
+    public static function form(Schema $schema): Schema
+    {
+        return HeroSliderForm::configure($schema);
+    }
+
+    public static function table(Table $table): Table
+    {
+        return HeroSlidersTable::configure($table);
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            //
+        ];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => ListHeroSliders::route('/'),
+            'create' => CreateHeroSlider::route('/create'),
+            'edit' => EditHeroSlider::route('/{record}/edit'),
+        ];
+    }
+}

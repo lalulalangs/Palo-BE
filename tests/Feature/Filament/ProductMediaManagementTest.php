@@ -4,10 +4,10 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\Products\Pages\CreateProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
+use App\Models\AdminUser;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductMedia;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -18,7 +18,7 @@ class ProductMediaManagementTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected User $admin;
+    protected AdminUser $admin;
 
     protected Category $category;
 
@@ -26,7 +26,7 @@ class ProductMediaManagementTest extends TestCase
     {
         parent::setUp();
 
-        $this->admin = User::factory()->create([
+        $this->admin = AdminUser::factory()->create([
             'email' => 'admin@palorinjani.com',
         ]);
 
@@ -54,7 +54,7 @@ class ProductMediaManagementTest extends TestCase
             'sort_order' => 0,
         ]);
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(ListProducts::class)
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$product]);
@@ -62,7 +62,7 @@ class ProductMediaManagementTest extends TestCase
 
     public function test_can_render_create_product_page_with_media_gallery(): void
     {
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateProduct::class)
             ->assertSuccessful()
             ->assertFormFieldExists('media');
@@ -99,14 +99,13 @@ class ProductMediaManagementTest extends TestCase
         $this->assertEquals($mediaPrimary->id, $product->fresh()->media->first()->id);
     }
 
-    public function test_can_upload_and_save_product_with_media(): void
+    public function test_can_upload_and_save_product_with_single_media(): void
     {
         Storage::fake('public');
 
         $file1 = UploadedFile::fake()->image('photo1.jpg');
-        $file2 = UploadedFile::fake()->image('photo2.png');
 
-        Livewire::actingAs($this->admin)
+        Livewire::actingAs($this->admin, 'admin')
             ->test(CreateProduct::class)
             ->fillForm([
                 'category_id' => $this->category->id,
@@ -118,10 +117,6 @@ class ProductMediaManagementTest extends TestCase
                 'media' => [
                     [
                         'url' => [$file1],
-                        'type' => 'image',
-                    ],
-                    [
-                        'url' => [$file2],
                         'type' => 'image',
                     ],
                 ],
@@ -137,8 +132,38 @@ class ProductMediaManagementTest extends TestCase
             'name' => 'Matras Angin Ultralight',
         ]);
 
-        $this->assertCount(2, $product->media);
+        $this->assertCount(1, $product->media);
         $this->assertNotNull($product->thumbnail);
+        $this->assertStringEndsWith('.webp', $product->media->first()->url);
+    }
+
+    public function test_cannot_upload_more_than_one_media_item(): void
+    {
+        Storage::fake('public');
+
+        $file1 = UploadedFile::fake()->image('photo1.jpg');
+        $file2 = UploadedFile::fake()->image('photo2.png');
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(CreateProduct::class)
+            ->fillForm([
+                'category_id' => $this->category->id,
+                'name' => 'Tenda Dome 2P',
+                'slug' => 'tenda-dome-2p',
+                'base_price' => 500000.00,
+                'media' => [
+                    [
+                        'url' => [$file1],
+                        'type' => 'image',
+                    ],
+                    [
+                        'url' => [$file2],
+                        'type' => 'image',
+                    ],
+                ],
+            ])
+            ->call('create')
+            ->assertHasFormErrors(['media']);
     }
 
     public function test_deleting_product_cascades_to_media(): void
