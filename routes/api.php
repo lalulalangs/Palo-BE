@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\CollectionController;
 use App\Http\Controllers\Api\V1\GuestCheckoutController;
+use App\Http\Controllers\Api\V1\PaymentWebhookController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\PublicHeroSliderController;
 use App\Http\Controllers\Api\V1\ShippingController;
@@ -46,6 +47,13 @@ Route::prefix('v1')->group(function (): void {
         Route::post('whatsapp-checkout', [GuestCheckoutController::class, 'whatsappCheckout']);
         Route::post('custom-inquiry', [GuestCheckoutController::class, 'customInquiry']);
     });
+
+    // Notifikasi pembayaran DOKU (S-04).
+    // Tanpa auth: keaslian request diverifikasi lewat signature HMAC-SHA256.
+    // URL ini didaftarkan di DOKU Back Office dan harus sama dengan
+    // DOKU_NOTIFICATION_PATH (dipakai sebagai komponen Request-Target).
+    Route::post('payments/webhook/doku', [PaymentWebhookController::class, 'doku'])
+        ->middleware('throttle:120,1');
 
     // Shipping Quotes (PRD §3.8 & KONTRAK-API §3)
     Route::post('shipping/quote', [ShippingController::class, 'quote'])->middleware('auth:sanctum');

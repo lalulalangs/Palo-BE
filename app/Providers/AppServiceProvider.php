@@ -2,12 +2,14 @@
 
 namespace App\Providers;
 
+use App\Contracts\PaymentGatewayContract;
 use App\Enums\AdminFeature;
 use App\Models\AdminUser;
 use App\Models\Order;
 use App\Models\Sku;
 use App\Observers\OrderAuditObserver;
 use App\Observers\SkuAuditObserver;
+use App\Services\Payments\Doku\DokuCheckoutClient;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Illuminate\Support\Facades\Gate;
@@ -21,7 +23,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Payment gateway aktif: DOKU Checkout (hosted page).
+        $this->app->bind(PaymentGatewayContract::class, DokuCheckoutClient::class);
     }
 
     /**

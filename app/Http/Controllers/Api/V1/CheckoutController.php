@@ -40,6 +40,7 @@ class CheckoutController extends Controller
         );
 
         $whatsappUrl = $order->isCod() ? ($order->payment?->raw_response['whatsapp_url'] ?? null) : null;
+        $paymentUrl = $order->payment?->raw_response['payment_url'] ?? null;
 
         return $this->respond([
             'order_number' => $order->order_number,
@@ -52,7 +53,10 @@ class CheckoutController extends Controller
             'grand_total_display' => Number::currency($order->total, 'IDR', 'id'),
             'payment_expires_at' => $order->stock_locked_until?->toIso8601String(),
             'payment' => [
+                'gateway' => $order->payment?->gateway,
                 'method' => $order->payment?->payment_method,
+                'reference' => $order->payment?->gateway_transaction_id,
+                'payment_url' => $paymentUrl,
                 'instructions' => $order->payment?->raw_response,
                 'whatsapp_url' => $whatsappUrl,
             ],

@@ -107,7 +107,7 @@ class OrderManualVerificationSeeder extends Seeder
 
         Payment::create([
             'order_id' => $order1->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'gateway_transaction_id' => 'MID-TEST-001-PAY',
             'payment_method' => 'bank_transfer_bca',
             'amount' => 295000.00,
@@ -129,7 +129,7 @@ class OrderManualVerificationSeeder extends Seeder
             'changed_by_admin_id' => null,
             'from_status' => Order::STATUS_PENDING,
             'to_status' => Order::STATUS_PAID,
-            'note' => 'Pembayaran Rp 295.000 lunas via Midtrans SNAP.',
+            'note' => 'Pembayaran Rp 295.000 lunas via DOKU Checkout.',
             'created_at' => now()->subHours(2),
         ]);
 
@@ -167,7 +167,7 @@ class OrderManualVerificationSeeder extends Seeder
 
         Payment::create([
             'order_id' => $order2->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'gateway_transaction_id' => 'MID-TEST-002-PAY',
             'payment_method' => 'gopay',
             'amount' => 380000.00,
@@ -236,7 +236,7 @@ class OrderManualVerificationSeeder extends Seeder
 
         Payment::create([
             'order_id' => $order3->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'gateway_transaction_id' => 'MID-TEST-003-PAY',
             'payment_method' => 'qris',
             'amount' => 390000.00,
@@ -314,7 +314,7 @@ class OrderManualVerificationSeeder extends Seeder
 
         Payment::create([
             'order_id' => $order4->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'gateway_transaction_id' => 'MID-TEST-004-PAY',
             'payment_method' => 'bank_transfer_mandiri',
             'amount' => 565000.00,
@@ -383,7 +383,7 @@ class OrderManualVerificationSeeder extends Seeder
 
         Payment::create([
             'order_id' => $order5->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'gateway_transaction_id' => 'MID-TEST-005-PAY',
             'payment_method' => 'bank_transfer_bni',
             'amount' => 305000.00,
@@ -440,7 +440,7 @@ class OrderManualVerificationSeeder extends Seeder
 
         Payment::create([
             'order_id' => $order6->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'gateway_transaction_id' => 'MID-TEST-006-PAY',
             'payment_method' => 'qris',
             'amount' => 370000.00,

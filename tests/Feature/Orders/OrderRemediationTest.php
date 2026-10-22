@@ -16,10 +16,12 @@ use App\Services\Orders\OrderTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Tests\Support\FakesDokuCheckout;
 use Tests\TestCase;
 
 class OrderRemediationTest extends TestCase
 {
+    use FakesDokuCheckout;
     use RefreshDatabase;
 
     private User $user;
@@ -31,6 +33,9 @@ class OrderRemediationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->configureDokuForTests();
+        $this->fakeDokuCheckout();
 
         $this->service = app(OrderTransitionService::class);
 

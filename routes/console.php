@@ -11,7 +11,7 @@ Artisan::command('inspire', function () {
 // Retensi data pribadi (UU PDP): bersihkan pesan WA checkout tamu yang lama.
 Schedule::command('pii:anonymize')->daily();
 
-// Lepaskan pesanan pending yang melewati batas tahan stok 15 menit.
+// Lepaskan pesanan pending yang melewati batas tahan stok (jendela bayar DOKU).
 //
 // TODO(deploy): di server produksi, jadwalar ini HANYA berjalan jika cron
 // Laravel terpasang — tambahkan entri crontab berikut (interval 1 menit):
@@ -20,6 +20,12 @@ Schedule::command('pii:anonymize')->daily();
 // Tanpa ini, order "menunggu_pembayaran" tidak pernah kedaluwarsa dan stok
 // tertahan terus (lihat temuan audit A-01).
 Schedule::command('orders:expire-unpaid')->everyMinute();
+
+// Rekonsiliasi pembayaran DOKU yang tidak menerima notifikasi (S-04):
+// membandingkan payment pending dengan Check Status API DOKU.
+Schedule::command('payments:reconcile-doku')
+    ->dailyAt('02:00')
+    ->withoutOverlapping();
 
 // Otomasi pembatalan pesanan COD yang tidak dikonfirmasi CS dalam batas waktu.
 Schedule::command('orders:expire-unconfirmed-cod')
