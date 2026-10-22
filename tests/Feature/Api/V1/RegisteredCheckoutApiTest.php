@@ -16,10 +16,12 @@ use App\Models\Voucher;
 use App\Services\Orders\OrderTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Tests\Support\FakesDokuCheckout;
 use Tests\TestCase;
 
 class RegisteredCheckoutApiTest extends TestCase
 {
+    use FakesDokuCheckout;
     use RefreshDatabase;
 
     protected User $user;
@@ -35,6 +37,9 @@ class RegisteredCheckoutApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->configureDokuForTests();
+        $this->fakeDokuCheckout();
 
         $this->user = User::create([
             'name' => 'Rinjani Hiker',
@@ -662,7 +667,7 @@ class RegisteredCheckoutApiTest extends TestCase
 
         Payment::create([
             'order_id' => $order->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'payment_method' => 'qris',
             'amount' => 370000,
             'status' => Payment::STATUS_PENDING,

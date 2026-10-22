@@ -58,7 +58,7 @@ class ExpireUnpaidOrdersCommandTest extends TestCase
         $this->assertSame(Payment::STATUS_EXPIRE, $payment->fresh()->status);
         $this->assertSame(1, $voucher->fresh()->used_count);
         $this->assertSame(
-            'Pesanan kedaluwarsa otomatis (melewati batas waktu pembayaran 15 menit).',
+            'Pesanan kedaluwarsa otomatis (melewati batas waktu pembayaran).',
             $fresh->cancelled_reason
         );
         $this->assertDatabaseHas('order_status_histories', [

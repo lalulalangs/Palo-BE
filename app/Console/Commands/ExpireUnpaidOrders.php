@@ -32,13 +32,13 @@ class ExpireUnpaidOrders extends Command
 
         foreach ($orders as $order) {
             try {
-                // TODO: Konfirmasi aturan bisnis dengan klien — apakah ketika pesanan expired (melewati batas waktu
-                // pembayaran 15 menit), kuota voucher promo yang digunakan dikembalikan ke pembeli atau dianggap
+                // TODO: Konfirmasi aturan bisnis dengan klien — apakah ketika pesanan expired (melewati jendela
+                // pembayaran DOKU), kuota voucher promo yang digunakan dikembalikan ke pembeli atau dianggap
                 // hangus (one-time use burn on expiry). Saat ini cancelOrder() otomatis memanggil restoreVoucherQuota().
                 // Jika klien menetapkan bahwa voucher hangus saat expired, pisahkan alur expire atau buat flag per-voucher.
                 $transitionService->cancelOrder(
                     $order,
-                    'Pesanan kedaluwarsa otomatis (melewati batas waktu pembayaran 15 menit).'
+                    'Pesanan kedaluwarsa otomatis (melewati batas waktu pembayaran).'
                 );
 
                 $cancelled++;

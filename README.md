@@ -35,7 +35,7 @@ PaloRinjani mengadopsi prinsip **Modular Monolith** (SAM §1):
   * `CART` & `ORDER`: Siklus transaksi pemesanan, reservasi stok, dan snapshot produk.
   * `VOUCHER`: Aturan kupon diskon dan batas kuota.
   * `ADMINSVC`: Panel admin Filament dengan integrasi role-based access control (RBAC).
-  * `INTEGRATIONS`: Gerbang pembayaran (Midtrans/Xendit) dan kurir logistik (RajaOngkir).
+  * `INTEGRATIONS`: Gerbang pembayaran (DOKU Checkout) dan kurir logistik (RajaOngkir).
 
 ---
 

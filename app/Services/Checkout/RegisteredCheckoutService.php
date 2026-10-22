@@ -2,6 +2,7 @@
 
 namespace App\Services\Checkout;
 
+use App\Contracts\PaymentGatewayContract;
 use App\Enums\OrderStatus;
 use App\Exceptions\InsufficientStockException;
 use App\Exceptions\PriceChangedException;
@@ -28,7 +29,8 @@ class RegisteredCheckoutService
         protected CartService $cartService,
         protected VoucherService $voucherService,
         protected ShippingRateService $shippingRateService,
-        protected CodWhatsAppService $codWhatsAppService
+        protected CodWhatsAppService $codWhatsAppService,
+        protected PaymentGatewayContract $paymentGateway
     ) {}
 
     /**
@@ -271,7 +273,12 @@ class RegisteredCheckoutService
                 $orderStatus = $isCod ? OrderStatus::AwaitingConfirmation : OrderStatus::Pending;
                 $orderPaymentMethod = $isCod ? Order::PAYMENT_METHOD_COD : Order::PAYMENT_METHOD_ONLINE;
                 $codReferenceCode = $isCod ? $this->codWhatsAppService->generateReferenceCode() : null;
-                $stockLockedUntil = $isCod ? null : now()->addMinutes(15);
+
+                // Jendela bayar mengikuti `payment_due_date` DOKU (default 60
+                // menit) agar order tidak dibatalkan otomatis saat halaman
+                // pembayaran DOKU masih aktif.
+                $paymentWindowMinutes = max(1, (int) config('doku.payment_window_minutes', 60));
+                $stockLockedUntil = $isCod ? null : now()->addMinutes($paymentWindowMinutes);
 
                 /** @var Order $order */
                 $order = Order::create([
@@ -344,16 +351,20 @@ class RegisteredCheckoutService
                         'created_at' => now(),
                     ]);
                 } else {
-                    $paymentInstructions = $this->generatePaymentInstructions($paymentMethod, $order);
+                    // Buat transaksi di DOKU (hosted page). Bila gateway gagal,
+                    // exception membatalkan seluruh transaksi database sehingga
+                    // tidak ada order menggantung tanpa pembayaran.
+                    $paymentResult = $this->paymentGateway->createPayment($order, $paymentMethod);
 
                     Payment::create([
                         'order_id' => $order->id,
-                        'gateway' => 'manual',
+                        'gateway' => $paymentResult['gateway'],
+                        'gateway_transaction_id' => $paymentResult['reference'],
                         'payment_method' => $paymentMethod,
                         'amount' => $grandTotal,
                         'status' => Payment::STATUS_PENDING,
                         'expired_at' => $order->stock_locked_until,
-                        'raw_response' => $paymentInstructions,
+                        'raw_response' => $paymentResult['instructions'],
                     ]);
 
                     OrderStatusHistory::create([
@@ -398,32 +409,5 @@ class RegisteredCheckoutService
         }
 
         throw new RuntimeException('Gagal membuat nomor pesanan unik. Silakan coba lagi.');
-    }
-
-    /**
-     * Instruksi pembayaran netral. Integrasi gateway resmi belum ada, sehingga
-     * tidak ada QR/VA yang dikarang: customer diarahkan ke Customer Service
-     * sampai vendor pembayaran ditetapkan.
-     *
-     * @return array<string, mixed>
-     */
-    public function generatePaymentInstructions(string $method, Order $order): array
-    {
-        $expiresAt = $order->stock_locked_until?->toIso8601String() ?? now()->addMinutes(15)->toIso8601String();
-
-        $instructionsText = match ($method) {
-            'qris' => 'Pembayaran QRIS belum tersedia. Silakan hubungi Customer Service untuk instruksi pembayaran pesanan ini.',
-            'virtual_account', 'bank_transfer' => 'Nomor Virtual Account belum tersedia. Silakan hubungi Customer Service untuk instruksi transfer pesanan ini.',
-            default => 'Silakan hubungi Customer Service untuk menyelesaikan pembayaran pesanan ini.',
-        };
-
-        return [
-            'method' => in_array($method, ['virtual_account', 'bank_transfer'], true) ? 'virtual_account' : $method,
-            'qr_string' => null,
-            'va_number' => null,
-            'bank_name' => null,
-            'instructions_text' => $instructionsText,
-            'expires_at' => $expiresAt,
-        ];
     }
 }

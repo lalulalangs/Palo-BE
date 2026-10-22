@@ -198,6 +198,26 @@ class OrderInfolist
                                                     ->badge()
                                                     ->placeholder('Belum ada transaksi'),
 
+                                                TextEntry::make('payment.gateway_transaction_id')
+                                                    ->label('Referensi Gateway (Invoice DOKU)')
+                                                    ->fontFamily(FontFamily::Mono)
+                                                    ->copyable()
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('payment_url')
+                                                    ->label('Halaman Pembayaran DOKU')
+                                                    ->state(fn (Order $record): ?string => $record->payment?->raw_response['payment_url'] ?? null)
+                                                    ->url(fn (?string $state): ?string => $state, shouldOpenInNewTab: true)
+                                                    ->copyable()
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('needs_reconciliation')
+                                                    ->label('Rekonsiliasi')
+                                                    ->badge()
+                                                    ->state(fn (Order $record): ?string => $record->needsReconciliation() ? 'Perlu rekonsiliasi' : null)
+                                                    ->color('danger')
+                                                    ->placeholder('-'),
+
                                                 TextEntry::make('payment.paid_at')
                                                     ->label('Waktu Pelunasan')
                                                     ->dateTime('d/m/Y H:i:s')

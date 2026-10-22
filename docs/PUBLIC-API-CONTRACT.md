@@ -858,7 +858,7 @@ Jalur cepat untuk pengunjung tanpa login. **TIDAK** membuat order di tabel `orde
 
 ## 12. Jalur B: Registered Online Checkout & Order Tracking (PRD §3.6)
 
-Jalur formal transaksi online dengan penguncian stok sementara (*soft reservation* 15 menit), validasi harga server-side, penerapan voucher, pembuatan record pesanan immutable, dan instruksi pembayaran.
+Jalur formal transaksi online dengan penguncian stok sementara (*soft reservation* mengikuti jendela pembayaran DOKU, default 60 menit), validasi harga server-side, penerapan voucher, pembuatan record pesanan immutable, dan instruksi pembayaran dari DOKU Checkout.
 
 ### 12.1 Buat Pesanan Online (Submit Order)
 * **Endpoint:** `POST /checkout/orders`
@@ -907,21 +907,29 @@ Jalur formal transaksi online dengan penguncian stok sementara (*soft reservatio
     "shipping_cost": 28000,
     "grand_total": 296200,
     "grand_total_display": "Rp 296.200",
-    "payment_expires_at": "2026-10-11T16:15:00.000000Z",
+    "payment_expires_at": "2026-10-11T17:00:00.000000Z",
     "payment": {
+      "gateway": "doku",
       "method": "qris",
+      "reference": "UJN-20261011-00001",
+      "payment_url": "https://sandbox.doku.com/checkout/link/2ebffd22d23e436895ce5c38f7ddcf86",
       "instructions": {
         "method": "qris",
-        "qr_string": "00020101021226590014ID.LINKAJA.WWW01189360001100000000005204549953033605802ID5919Palo Mountain Goods6006Senaru62190115UJN-20261011-000016304ABCD",
+        "gateway": "doku",
+        "payment_url": "https://sandbox.doku.com/checkout/link/2ebffd22d23e436895ce5c38f7ddcf86",
+        "reference": "UJN-20261011-00001",
+        "qr_string": null,
         "va_number": null,
         "bank_name": null,
-        "instructions_text": "Pindai kode QRIS di aplikasi mobile banking atau dompet digital Anda.",
-        "expires_at": "2026-10-11T16:15:00+08:00"
+        "instructions_text": "Selesaikan pembayaran melalui halaman pembayaran DOKU.",
+        "expires_at": "2026-10-11T17:00:00+08:00"
       }
     }
   }
 }
 ```
+
+> **Perubahan perilaku (DOKU Checkout):** `data.payment.payment_url` adalah halaman pembayaran resmi DOKU. Frontend **wajib** mengarahkan pengguna ke URL tersebut (redirect/tombol "Bayar Sekarang") dan tidak boleh membuat QR/VA sendiri. `qr_string`/`va_number` dipertahankan bernilai `null` agar kontrak lama tidak pecah. Status pembayaran final diterima backend lewat notifikasi DOKU (`POST /api/v1/payments/webhook/doku`, tanpa auth, diverifikasi signature) dengan fallback rekonsiliasi harian.
 
 #### Respon Error Khusus Checkout
 

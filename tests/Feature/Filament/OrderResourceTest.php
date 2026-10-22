@@ -162,7 +162,7 @@ class OrderResourceTest extends TestCase
 
         Payment::create([
             'order_id' => $order->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'gateway_transaction_id' => 'MID-TRANS-12345',
             'payment_method' => 'bank_transfer_bca',
             'amount' => 375000,
@@ -186,7 +186,7 @@ class OrderResourceTest extends TestCase
             ->assertSee('Desa Sembalun Lawang')
             ->assertSee('Palo Rinjani Hoodie')
             ->assertSee('PR-HD-BLK-L')
-            ->assertSee('midtrans')
+            ->assertSee('doku')
             ->assertSee('Pembayaran BCA VA lunas via webhook.');
     }
 
