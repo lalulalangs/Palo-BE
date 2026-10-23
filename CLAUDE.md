@@ -54,6 +54,6 @@
 - Kolom password bernama `password_hash` (bukan `password`) di `users` dan `admin_users`.
 - Upload gambar: batas default `config/image.php` (kualitas 82, max width 2048, max 5120 KB); `ImageOptimizer` fallback menyimpan file asli bila konversi WebP gagal. Pastikan `upload_max_filesize`/`post_max_size` php.ini sesuai.
 - Route `api/v1/admin/hero-sliders/*` (`AdminHeroSliderController`) BELUM dilindungi auth — ditandai TODO di `routes/api.php`.
-- Branch aktif = `devel` (branch feature banyak; alur mengikuti README: feature → `devel` → `main`). Belum ada CI (`.github` tidak ada); remote GitHub `lalulalangs/Palo-BE`.
+- Branch aktif = `devel` (branch feature banyak; alur mengikuti README: feature → `devel` → `main`). CI GitHub Actions ada di `.github/workflows/ci.yml` (Pint `--test` + `php artisan test`, PHP 8.4), jalan tiap push/PR; remote GitHub `lalulalangs/Palo-BE`.
 - Cache/session/queue dev = driver `database`: jalankan migrasi sebelum `php artisan serve`/`composer dev`.
 - Jangan edit artefak generated: `vendor/`, `node_modules/`, `composer.lock` (gunakan composer), `.phpunit.result.cache`.
