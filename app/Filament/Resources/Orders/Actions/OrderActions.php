@@ -15,11 +15,11 @@ use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Number;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderActions
 {
-    /**
     /**
      * Aksi mengonfirmasi pembayaran pesanan non-COD dari status Menunggu Pembayaran.
      *
@@ -28,6 +28,9 @@ class OrderActions
      * dipotong via StockMovement TYPE_SALE, dan riwayat status tercatat.
      * Pesanan COD (awaiting_confirmation) alurnya terpisah via aksi konfirmasi
      * COD, bukan lewat method ini.
+     *
+     * Tanpa field input: catatan riwayat dibentuk otomatis dari data payment
+     * (gateway, status, invoice) supaya jejak audit tidak bergantung ketikan admin.
      */
     public static function makeMarkAsPaidAction(): Action
     {
@@ -37,32 +40,28 @@ class OrderActions
             ->color('success')
             ->visible(fn (Order $record): bool => $record->status === OrderStatus::Pending)
             ->modalHeading('Konfirmasi Pembayaran Pesanan')
-            ->modalDescription('Tandai pesanan ini telah Lunas. Stok fisik gudang akan otomatis dipotong dan tombol "Proses Pesanan" akan aktif setelah konfirmasi disimpan.')
+            ->modalDescription(fn (Order $record): string => sprintf(
+                '%s • %s • Status %s: %s • Invoice: %s. Stok fisik gudang akan otomatis dipotong dan tombol "Proses Pesanan" aktif setelah konfirmasi.',
+                $record->order_number,
+                Number::currency($record->total, 'IDR', 'id'),
+                strtoupper((string) ($record->payment?->gateway ?? 'gateway')),
+                $record->payment?->status ?? '-',
+                $record->payment?->gateway_transaction_id ?? '-',
+            ))
             ->modalSubmitActionLabel('Ya, Konfirmasi Lunas')
-            ->form([
-                TextInput::make('payment_reference')
-                    ->label('Nomor Referensi Pembayaran (Opsional)')
-                    ->placeholder('Contoh: No. ref transfer bank / mutasi: BCVA1234567890'),
-                Textarea::make('note')
-                    ->label('Catatan Verifikasi Admin (Opsional)')
-                    ->placeholder('Contoh: Dana diverifikasi melalui cek mutasi rekening'),
-            ])
-            ->action(function (Order $record, array $data, OrderTransitionService $service): void {
+            ->action(function (Order $record, OrderTransitionService $service): void {
+                $payment = $record->payment;
+
                 try {
-                    $noteParts = ['Pembayaran dikonfirmasi manual oleh admin.'];
-
-                    if (filled($data['payment_reference'] ?? null)) {
-                        $noteParts[] = "Referensi: {$data['payment_reference']}.";
-                    }
-
-                    if (filled($data['note'] ?? null)) {
-                        $noteParts[] = $data['note'];
-                    }
-
                     $service->markAsPaid(
                         $record,
                         Auth::id() ? (int) Auth::id() : null,
-                        implode(' ', $noteParts)
+                        sprintf(
+                            'Pembayaran dikonfirmasi manual oleh admin. Gateway: %s, status: %s, invoice: %s.',
+                            $payment?->gateway ?? '-',
+                            $payment?->status ?? '-',
+                            $payment?->gateway_transaction_id ?? '-',
+                        )
                     );
 
                     Notification::make()
