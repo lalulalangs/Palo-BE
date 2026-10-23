@@ -119,15 +119,13 @@ class OrderPaymentConfirmationTest extends TestCase
     public function test_admin_can_confirm_payment_of_pending_order(): void
     {
         $order = $this->createPendingOrderWithPayment();
+        $order->payment->update(['gateway_transaction_id' => 'BCVA-99228811']);
         $initialStock = $this->sku->fresh()->stock;
 
         Livewire::actingAs($this->admin, 'admin')
             ->test(ViewOrder::class, ['record' => $order->getKey()])
             ->assertActionVisible('mark_as_paid')
-            ->callAction('mark_as_paid', [
-                'payment_reference' => 'BCVA-99228811',
-                'note' => 'Dana diverifikasi melalui cek mutasi rekening',
-            ])
+            ->callAction('mark_as_paid')
             ->assertHasNoActionErrors()
             ->assertNotified();
 
@@ -150,7 +148,7 @@ class OrderPaymentConfirmationTest extends TestCase
             'reference_id' => $order->id,
         ]);
 
-        // 4. Riwayat status tercatat dengan referensi pembayaran
+        // 4. Riwayat status tercatat dengan jejak audit dari data payment
         $this->assertDatabaseHas('order_status_histories', [
             'order_id' => $order->id,
             'from_status' => OrderStatus::Pending->value,
@@ -163,8 +161,9 @@ class OrderPaymentConfirmationTest extends TestCase
             ->where('to_status', OrderStatus::Paid->value)
             ->firstOrFail();
         $this->assertStringContainsString('Pembayaran dikonfirmasi manual oleh admin.', $history->note);
-        $this->assertStringContainsString('Referensi: BCVA-99228811', $history->note);
-        $this->assertStringContainsString('Dana diverifikasi melalui cek mutasi rekening', $history->note);
+        $this->assertStringContainsString('Gateway: manual', $history->note);
+        $this->assertStringContainsString('status: pending', $history->note);
+        $this->assertStringContainsString('invoice: BCVA-99228811', $history->note);
 
         // 5. Tombol langkah berikutnya ("Proses Pesanan") aktif pada status Paid
         Livewire::actingAs($this->admin, 'admin')
@@ -183,36 +182,6 @@ class OrderPaymentConfirmationTest extends TestCase
                 ->test(ViewOrder::class, ['record' => $order->getKey()])
                 ->assertActionHidden('mark_as_paid');
         }
-    }
-
-    public function test_mark_as_paid_action_works_without_optional_modal_input(): void
-    {
-        $order = $this->createPendingOrderWithPayment();
-
-        $livewireTest = Livewire::actingAs($this->admin, 'admin')
-            ->test(ViewOrder::class, ['record' => $order->getKey()])
-            ->assertActionVisible('mark_as_paid')
-            ->callAction('mark_as_paid', data: [
-                'payment_reference' => null,
-                'note' => null,
-            ])
-            ->assertHasNoActionErrors();
-
-        $livewireTest->assertNotified();
-
-        $this->assertEquals(OrderStatus::Paid, $order->fresh()->status);
-        $this->assertDatabaseHas('order_status_histories', [
-            'order_id' => $order->id,
-            'to_status' => OrderStatus::Paid->value,
-            'changed_by_admin_id' => $this->admin->id,
-        ]);
-
-        // Tanpa input opsional, note komposisi default aksi dipakai.
-        $history = OrderStatusHistory::query()
-            ->where('order_id', $order->id)
-            ->where('to_status', OrderStatus::Paid->value)
-            ->firstOrFail();
-        $this->assertSame('Pembayaran dikonfirmasi manual oleh admin.', $history->note);
     }
 
     public function test_service_rejects_mark_as_paid_when_order_is_not_pending(): void
