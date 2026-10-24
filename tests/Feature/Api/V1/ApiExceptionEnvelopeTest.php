@@ -6,10 +6,12 @@ use App\Exceptions\InsufficientStockException;
 use App\Exceptions\PriceChangedException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Tests\Concerns\FakesRajaOngkir;
 use Tests\TestCase;
 
 class ApiExceptionEnvelopeTest extends TestCase
 {
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     public function test_validation_error_422_includes_success_false_and_no_and_more_errors_suffix(): void

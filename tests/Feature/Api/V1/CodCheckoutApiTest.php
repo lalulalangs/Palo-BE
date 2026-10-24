@@ -15,10 +15,12 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\FakesRajaOngkir;
 use Tests\TestCase;
 
 class CodCheckoutApiTest extends TestCase
 {
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     protected User $user;
@@ -178,6 +180,8 @@ class CodCheckoutApiTest extends TestCase
                     'price_seen' => 750000,
                 ],
             ],
+            // Dikirim dengan sengaja: guest COD tidak boleh mempercayai nilai
+            // ongkir/kurir dari client, semuanya harus diabaikan server.
             'shipping_courier' => 'SiCepat',
             'shipping_service' => 'BEST',
             'shipping_cost' => 30000,
@@ -192,8 +196,8 @@ class CodCheckoutApiTest extends TestCase
             ->assertJsonPath('message', 'Pesanan COD berhasil dibuat.')
             ->assertJsonPath('data.status', 'menunggu_konfirmasi_cs')
             ->assertJsonPath('data.subtotal', 750000)
-            ->assertJsonPath('data.shipping_cost', 30000)
-            ->assertJsonPath('data.grand_total', 780000);
+            ->assertJsonPath('data.shipping_cost', 0)
+            ->assertJsonPath('data.grand_total', 750000);
 
         $codRef = $response->json('data.cod_reference_code');
         $this->assertNotNull($codRef);
@@ -210,6 +214,8 @@ class CodCheckoutApiTest extends TestCase
         $this->assertEquals(OrderStatus::AwaitingConfirmation, $order->status);
         $this->assertSame($codRef, $order->cod_reference_code);
         $this->assertNull($order->stock_locked_until);
+        $this->assertNull($order->shipping_courier);
+        $this->assertSame(0.0, (float) $order->shipping_cost);
 
         // Verify item snapshot
         $this->assertCount(1, $order->items);
@@ -223,8 +229,11 @@ class CodCheckoutApiTest extends TestCase
         // Verify GuestCheckoutLog created with order_id
         $log = GuestCheckoutLog::where('order_id', $order->id)->firstOrFail();
         $this->assertSame($guestToken, $log->session_id);
-        $this->assertSame(780000.0, (float) $log->estimated_total);
+        $this->assertSame(750000.0, (float) $log->estimated_total);
         $this->assertStringContainsString($codRef, $log->wa_message_text);
+        // Ongkir belum final: CS mengonfirmasinya lewat WhatsApp.
+        $this->assertStringContainsString('Ongkir: akan dikonfirmasi CS', $log->wa_message_text);
+        $this->assertStringNotContainsString('Rp 30.000', $log->wa_message_text);
 
         // Verify WhatsApp URL
         $waUrl = $response->json('data.whatsapp_url');
@@ -260,7 +269,9 @@ class CodCheckoutApiTest extends TestCase
 
         $response->assertCreated();
         $this->assertEquals(1500000.0, (float) $response->json('data.subtotal'));
-        $this->assertEquals(1515000.0, (float) $response->json('data.grand_total'));
+        // Ongkir dari client diabaikan; CS mengonfirmasi via WhatsApp.
+        $this->assertEquals(1500000.0, (float) $response->json('data.grand_total'));
+        $this->assertEquals(0.0, (float) $response->json('data.shipping_cost'));
 
         // Guest cart must be cleared after checkout
         $cartCheck = $this->withHeader('X-Guest-Token', $guestToken)
@@ -298,9 +309,10 @@ class CodCheckoutApiTest extends TestCase
         $response = $this->postJson('/api/v1/checkout/orders', $payload);
 
         $response->assertCreated();
-        // Server calculates using effective_price: 750,000 * 2 = 1,500,000 + 28,000 (S-02 Jakarta JNE REG) = 1,528,000
+        // Server menghitung ulang dari harga efektif SKU, bukan price_seen client:
+        // 750.000 x 2 = 1.500.000 + ongkir server (14.000) = 1.514.000.
         $this->assertEquals(1500000.0, (float) $response->json('data.subtotal'));
-        $this->assertEquals(1528000.0, (float) $response->json('data.grand_total'));
+        $this->assertEquals(1514000.0, (float) $response->json('data.grand_total'));
     }
 
     public function test_checkout_rejects_cod_when_cod_is_disabled_in_settings(): void

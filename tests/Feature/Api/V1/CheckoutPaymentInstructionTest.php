@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
+use Tests\Concerns\FakesRajaOngkir;
 use Tests\Support\FakesDokuCheckout;
 use Tests\TestCase;
 
@@ -25,6 +26,7 @@ use Tests\TestCase;
 class CheckoutPaymentInstructionTest extends TestCase
 {
     use FakesDokuCheckout;
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     private User $user;

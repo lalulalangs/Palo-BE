@@ -47,9 +47,8 @@ class GuestCodCheckoutRequest extends FormRequest
             'items.*.quantity' => ['required_with:items', 'integer', 'min:1', 'max:100'],
             'items.*.price_seen' => ['nullable', 'numeric', 'min:0'],
 
-            'shipping_courier' => ['nullable', 'string', 'max:50'],
-            'shipping_service' => ['nullable', 'string', 'max:50'],
-            'shipping_cost' => ['nullable', 'numeric', 'min:0'],
+            // Ongkir sengaja tidak divalidasi: guest COD adalah serah-terima
+            // lead ke CS via WhatsApp, dan nilai dari client tidak dipakai.
             'note' => ['nullable', 'string', 'max:500'],
         ];
     }

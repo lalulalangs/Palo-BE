@@ -16,12 +16,14 @@ use App\Services\Orders\OrderTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\FakesRajaOngkir;
 use Tests\Support\FakesDokuCheckout;
 use Tests\TestCase;
 
 class OrderRemediationTest extends TestCase
 {
     use FakesDokuCheckout;
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     private User $user;
