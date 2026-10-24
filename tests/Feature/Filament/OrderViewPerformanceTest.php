@@ -79,6 +79,15 @@ class OrderViewPerformanceTest extends TestCase
         $this->assertTrue($resolved->items->first()->sku->relationLoaded('product'));
         $this->assertTrue($resolved->items->first()->sku->product->relationLoaded('thumbnail'));
         $this->assertTrue($resolved->statusHistories->first()->relationLoaded('changedBy'));
+        // Kolom "dikonfirmasi oleh" dan "refund disetujui oleh" di infolist.
+        $this->assertTrue($resolved->relationLoaded('confirmedBy'));
+        $this->assertTrue($resolved->relationLoaded('refundApprovedBy'));
+    }
+
+    public function test_admin_user_eager_loads_role_for_feature_gating(): void
+    {
+        // Dipakai setiap request oleh HasAdminFeatureAccess::canAccess().
+        $this->assertTrue(AdminUser::query()->firstOrFail()->relationLoaded('role'));
     }
 
     public function test_order_view_query_count_does_not_grow_with_item_count(): void

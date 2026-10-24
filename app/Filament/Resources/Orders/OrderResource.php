@@ -88,6 +88,15 @@ class OrderResource extends Resource
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
         return parent::getRecordRouteBindingEloquentQuery()
-            ->with(['user', 'payment', 'statusHistories.changedBy', 'items.sku.product.thumbnail']);
+            ->with([
+                'user',
+                'payment',
+                'statusHistories.changedBy',
+                'items.sku.product.thumbnail',
+                // Infolist menampilkan siapa yang mengonfirmasi COD dan
+                // menyetujui refund; tanpa ini jadi 2 query lazy per order.
+                'confirmedBy',
+                'refundApprovedBy',
+            ]);
     }
 }
