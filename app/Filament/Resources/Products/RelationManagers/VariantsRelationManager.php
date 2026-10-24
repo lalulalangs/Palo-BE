@@ -21,6 +21,7 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Number;
 
 class VariantsRelationManager extends RelationManager
@@ -113,6 +114,10 @@ class VariantsRelationManager extends RelationManager
             ->modelLabel('Varian')
             ->pluralModelLabel('Daftar Varian')
             ->recordTitleAttribute('name')
+            // Kolom harga varian memakai placeholder $record->product->base_price;
+            // `product` bukan nama kolom tabel sehingga tidak ikut eager load
+            // otomatis Filament — tanpa ini terjadi N+1 (1 query per baris).
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('product'))
             ->columns([
                 TextColumn::make('name')
                     ->label('Nama Varian')
