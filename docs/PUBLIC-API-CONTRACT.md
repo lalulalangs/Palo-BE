@@ -1146,7 +1146,7 @@ Nilai `payment_method` pada `POST /checkout/orders`:
 
 `data.payment_expires_at` adalah batas waktu pembayaran **dan** masa penguncian stok (default **60 menit**). Setelah lewat, penguncian stok dilepas dan kuota voucher dikembalikan.
 
-> **Perhatikan status akhirnya:** order online yang tidak dibayar diakhiri sebagai `dibatalkan` (`cancelled`), **bukan** `expired` — yang memakai `expired` hanya COD yang tidak dikonfirmasi CS. Tangani keduanya sebagai "pesanan tidak jadi" agar frontend tidak salah menampilkan.
+> **Status akhirnya `expired`.** Order online yang tidak dibayar sampai batas waktu dan COD yang tidak dikonfirmasi CS sama-sama berakhir `expired` (`kedaluwarsa`). `dibatalkan` (`cancelled`) hanya dipakai bila admin atau CS membatalkan pesanan secara sengaja.
 
 Tampilkan hitung mundur dari `payment_expires_at`; jangan menghitung sendiri dari waktu request.
 
@@ -1189,7 +1189,7 @@ Sifat pemrosesan:
 | Proses | Jadwal | Fungsi |
 |---|---|---|
 | `payments:reconcile-doku` | Harian, 02:00 | Membandingkan payment `pending` dengan Check Status API DOKU untuk menangkap notifikasi yang hilang |
-| `orders:expire-unpaid` | Tiap menit | Membatalkan order `pending` yang melewati batas waktu (status akhir `cancelled`) dan melepas stok |
+| `orders:expire-unpaid` | Tiap menit | Menandai order `pending` yang melewati batas waktu sebagai `expired` dan melepas stok |
 | `orders:expire-unconfirmed-cod` | Tiap jam | Menandai order COD yang tidak dikonfirmasi CS sebagai `expired` |
 
 ---

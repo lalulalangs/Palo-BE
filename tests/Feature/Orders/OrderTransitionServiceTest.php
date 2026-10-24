@@ -281,6 +281,25 @@ class OrderTransitionServiceTest extends TestCase
         ]);
     }
 
+    public function test_cancelling_with_expiry_wording_still_marks_payment_cancelled(): void
+    {
+        $order = $this->createSampleOrder(Order::STATUS_PENDING, 1);
+
+        Payment::create([
+            'order_id' => $order->id,
+            'gateway' => 'manual',
+            'payment_method' => 'bank_transfer',
+            'amount' => 100000,
+            'status' => Payment::STATUS_PENDING,
+        ]);
+
+        // Status payment tidak lagi ditebak dari teks alasan: pembatalan manual
+        // selalu `cancel`, sedangkan kedaluwarsa punya jalur expireOrder().
+        $this->service->cancelOrder($order, 'Dibatalkan karena voucher kedaluwarsa', $this->admin->id);
+
+        $this->assertSame(Payment::STATUS_CANCEL, $order->payment->fresh()->status);
+    }
+
     public function test_cannot_cancel_shipped_order(): void
     {
         $order = $this->createSampleOrder(Order::STATUS_SHIPPED, 1);

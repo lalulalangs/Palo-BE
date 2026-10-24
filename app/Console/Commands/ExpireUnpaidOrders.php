@@ -13,7 +13,7 @@ class ExpireUnpaidOrders extends Command
 {
     protected $signature = 'orders:expire-unpaid {--limit=100 : Jumlah maksimum pesanan per eksekusi}';
 
-    protected $description = 'Batalkan pesanan pending yang melewati batas waktu pembayaran dan kembalikan kuota voucher';
+    protected $description = 'Tandai pesanan pending yang melewati batas waktu pembayaran sebagai kedaluwarsa dan kembalikan kuota voucher';
 
     public function handle(OrderTransitionService $transitionService): int
     {
@@ -27,21 +27,26 @@ class ExpireUnpaidOrders extends Command
             ->limit($limit)
             ->get();
 
-        $cancelled = 0;
+        $expired = 0;
         $failed = 0;
 
         foreach ($orders as $order) {
             try {
-                // TODO: Konfirmasi aturan bisnis dengan klien — apakah ketika pesanan expired (melewati jendela
-                // pembayaran DOKU), kuota voucher promo yang digunakan dikembalikan ke pembeli atau dianggap
-                // hangus (one-time use burn on expiry). Saat ini cancelOrder() otomatis memanggil restoreVoucherQuota().
-                // Jika klien menetapkan bahwa voucher hangus saat expired, pisahkan alur expire atau buat flag per-voucher.
-                $transitionService->cancelOrder(
+                // expireOrder(), bukan cancelOrder(): order berakhir sebagai
+                // `expired`, payment ikut menjadi `expire`, kuota voucher
+                // dikembalikan. Ini jalur yang sama dengan COD yang tidak
+                // dikonfirmasi CS.
+                //
+                // TODO: Konfirmasi aturan bisnis dengan klien — apakah kuota voucher
+                // pada pesanan kedaluwarsa dikembalikan ke pembeli atau dianggap
+                // hangus (one-time use burn on expiry). Saat ini expireOrder()
+                // otomatis memanggil restoreVoucherQuota().
+                $transitionService->expireOrder(
                     $order,
-                    'Pesanan kedaluwarsa otomatis (melewati batas waktu pembayaran).'
+                    'Batas waktu pembayaran telah habis (kedaluwarsa otomatis).'
                 );
 
-                $cancelled++;
+                $expired++;
             } catch (Throwable $e) {
                 $failed++;
 
@@ -52,7 +57,7 @@ class ExpireUnpaidOrders extends Command
             }
         }
 
-        $this->info("Pesanan kedaluwarsa diproses: {$cancelled} dibatalkan, {$failed} gagal.");
+        $this->info("Pesanan kedaluwarsa diproses: {$expired} dikedaluwarsakan, {$failed} gagal.");
 
         return self::SUCCESS;
     }
