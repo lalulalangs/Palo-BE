@@ -72,6 +72,44 @@ class ShippingRateWeightTest extends TestCase
         Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 350);
     }
 
+    public function test_volumetric_weight_wins_when_larger_than_actual(): void
+    {
+        $sku = $this->createShippingSku(1000);
+        // 60 x 40 x 40 cm / 6000 = 16 kg, jauh di atas berat aktual 1 kg.
+        $sku->update(['length_cm' => 60, 'width_cm' => 40, 'height_cm' => 40]);
+
+        $this->fakeCostResponse();
+
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 16000);
+    }
+
+    public function test_actual_weight_wins_when_larger_than_volumetric(): void
+    {
+        $sku = $this->createShippingSku(20000);
+        $sku->update(['length_cm' => 10, 'width_cm' => 10, 'height_cm' => 10]);
+
+        $this->fakeCostResponse();
+
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 20000);
+    }
+
+    public function test_incomplete_dimensions_are_ignored(): void
+    {
+        $sku = $this->createShippingSku(1000);
+        // Tinggi kosong: volumetrik tidak boleh dipakai sama sekali.
+        $sku->update(['length_cm' => 60, 'width_cm' => 40]);
+
+        $this->fakeCostResponse();
+
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 1000);
+    }
+
     public function test_cargo_services_are_filtered_out_and_services_are_sorted_by_cost(): void
     {
         $sku = $this->createShippingSku(1000);

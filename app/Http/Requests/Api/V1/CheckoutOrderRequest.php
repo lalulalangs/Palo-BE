@@ -45,6 +45,9 @@ class CheckoutOrderRequest extends FormRequest
             'shipping_address.street' => ['required', 'string', 'max:255'],
             'shipping_address.city' => ['required', 'string', 'max:100'],
             'shipping_address.city_code' => ['nullable', 'string', 'max:50'],
+            // Subdistrict ID RajaOngkir: cara yang benar menghitung ongkir.
+            // Bila kosong, server mencari dari `city` (satu rilis transisi).
+            'shipping_address.destination_id' => ['nullable', 'integer', 'min:1'],
             'shipping_address.province' => ['required', 'string', 'max:100'],
             'shipping_address.province_code' => ['nullable', 'string', 'max:50'],
             'shipping_address.district' => ['nullable', 'string', 'max:100'],

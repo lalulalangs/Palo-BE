@@ -54,6 +54,7 @@ class AdminFeatureAccessTest extends TestCase
             'stock_opnames' => ['/admin/stock-opnames', AdminFeature::StockOpnames],
             'stock_movements' => ['/admin/stock-movements', AdminFeature::StockMovements],
             'social_media' => ['/admin/pengaturan-media-sosial', AdminFeature::SocialMediaSettings],
+            'shipping_settings' => ['/admin/pengaturan-ekspedisi', AdminFeature::ShippingSettings],
             'roles' => ['/admin/roles', AdminFeature::Roles],
             'admin_users' => ['/admin/admin-users', AdminFeature::AdminUsers],
         ];

@@ -63,7 +63,7 @@ class ShippingRateService
      * dan pemanggil wajib menolak checkout (fail-closed).
      *
      * @param  array<int, array{sku_id: int, quantity: int}>  $items
-     * @return array{courier: string, courier_code: string, service: string, description: string, cost: int, etd: string}|null
+     * @return array{courier: string, courier_code: string, service: string, description: string, cost: int, etd: string, source: string, origin_id: int, destination_id: int, destination_label: string|null, weight_grams: int, quoted_at: string}|null
      */
     public function quoteFor(
         string $courier,
@@ -75,9 +75,31 @@ class ShippingRateService
         $requestedCourier = $this->normalizeCourierKey($courier);
         $requestedService = $this->normalizeCourierKey($service);
 
-        return collect($this->getQuotes($destinationCity, $items, $destinationId))
-            ->first(fn (array $quote): bool => $this->normalizeCourierKey($quote['courier']) === $requestedCourier
-                && $this->normalizeCourierKey($quote['service']) === $requestedService);
+        $destinationId ??= $this->resolveDestinationId($destinationCity);
+
+        $quote = $this->quote(
+            destinationId: $destinationId,
+            items: $items,
+            destinationLabel: trim($destinationCity) !== '' ? $destinationCity : null,
+        );
+
+        $matched = collect($quote['services'])
+            ->first(fn (array $row): bool => $this->normalizeCourierKey($row['courier']) === $requestedCourier
+                && $this->normalizeCourierKey($row['service']) === $requestedService);
+
+        if ($matched === null) {
+            return null;
+        }
+
+        // Sertakan metadata supaya pemanggil bisa menyimpan snapshot order.
+        return $matched + [
+            'source' => $quote['source'],
+            'origin_id' => $quote['origin']['id'],
+            'destination_id' => $quote['destination']['id'],
+            'destination_label' => $quote['destination']['label'],
+            'weight_grams' => $quote['weight_grams'],
+            'quoted_at' => $quote['quoted_at'],
+        ];
     }
 
     /**
@@ -152,6 +174,67 @@ class ShippingRateService
     }
 
     /**
+     * Label destinasi yang ramah dibaca manusia.
+     *
+     * API mengirim nama wilayah dalam huruf kapital penuh dan provinsi
+     * panjang ("NUSA TENGGARA BARAT (NTB)"), yang jelek untuk ditampilkan.
+     * Hasilnya: "Bayan, Lombok Utara, NTB, 83354".
+     *
+     * @param  array<string, mixed>  $destination
+     */
+    public static function readableDestinationLabel(array $destination): string
+    {
+        $parts = array_filter([
+            self::titleCaseName((string) ($destination['subdistrict_name'] ?? '')),
+            self::titleCaseName((string) ($destination['city_name'] ?? '')),
+            self::shortProvinceName((string) ($destination['province_name'] ?? '')),
+            trim((string) ($destination['zip_code'] ?? '')),
+        ]);
+
+        $label = implode(', ', $parts);
+
+        // Jaga-jaga bila bentuk respons API berubah.
+        return $label !== '' ? $label : trim((string) ($destination['label'] ?? ''));
+    }
+
+    /**
+     * Kapitalisasi nama wilayah tanpa merusak akronim pendek (DKI, DIY, NTB).
+     */
+    private static function titleCaseName(string $name): string
+    {
+        $name = trim($name);
+
+        if ($name === '') {
+            return '';
+        }
+
+        $words = preg_split('/\s+/', $name) ?: [];
+
+        return implode(' ', array_map(function (string $word): string {
+            if (mb_strlen($word) <= 4 && $word === mb_strtoupper($word)) {
+                return $word;
+            }
+
+            return mb_convert_case(mb_strtolower($word), MB_CASE_TITLE);
+        }, $words));
+    }
+
+    /**
+     * Ambil singkatan provinsi dari tanda kurung bila ada.
+     * "NUSA TENGGARA BARAT (NTB)" → "NTB", "DKI JAKARTA" → "DKI Jakarta".
+     */
+    private static function shortProvinceName(string $province): string
+    {
+        $province = trim($province);
+
+        if (preg_match('/\(([^)]+)\)\s*$/', $province, $matches) === 1 && mb_strlen($matches[1]) <= 6) {
+            return mb_strtoupper($matches[1]);
+        }
+
+        return self::titleCaseName($province);
+    }
+
+    /**
      * Jembatan kompatibilitas: frontend lama masih mengirim nama kota bebas.
      * Hasil pencarian di-cache, jadi biayanya hanya sekali per kata kunci.
      */
@@ -185,11 +268,12 @@ class ShippingRateService
         $total = 0;
 
         foreach ($items as $item) {
-            $skuId = (int) ($item['sku_id'] ?? 0);
+            $sku = $skus->get((int) ($item['sku_id'] ?? 0));
             $quantity = (int) ($item['quantity'] ?? 1);
-            $weight = (int) ($skus->get($skuId)?->weight_grams ?? self::FALLBACK_WEIGHT_GRAMS);
+            $actualWeight = (int) ($sku?->weight_grams ?? self::FALLBACK_WEIGHT_GRAMS);
 
-            $total += $weight * $quantity;
+            // Kurir menagih berat terbesar antara aktual dan volumetrik.
+            $total += max($actualWeight, $this->volumetricWeightGrams($sku)) * $quantity;
         }
 
         $maxWeight = (int) config('shipping.max_weight_grams', 50000);
@@ -203,8 +287,25 @@ class ShippingRateService
     }
 
     /**
-     * @param  array<int, mixed>  $items
+     * Berat volumetrik dalam gram, dihitung app-side karena endpoint
+     * `calculate/domestic-cost` tidak menerima dimensi.
+     *
+     * Rumus kurir domestik: P x L x T (cm) / 6000 = kilogram.
+     * Dikembalikan 0 bila dimensi belum diisi, sehingga diabaikan.
      */
+    private function volumetricWeightGrams(?Sku $sku): int
+    {
+        $length = (int) ($sku?->length_cm ?? 0);
+        $width = (int) ($sku?->width_cm ?? 0);
+        $height = (int) ($sku?->height_cm ?? 0);
+
+        if ($length <= 0 || $width <= 0 || $height <= 0) {
+            return 0;
+        }
+
+        return (int) ceil($length * $width * $height / 6000 * 1000);
+    }
+
     private function originSubdistrictId(): int
     {
         $originId = (int) AppSetting::getValue('shipping_origin_subdistrict_id', '0');
