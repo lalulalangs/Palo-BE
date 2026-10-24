@@ -32,6 +32,7 @@ class ShippingRateCacheTest extends TestCase
             'shipping.api_key' => 'test-api-key',
             'shipping.cache_ttl' => 86400,
             'shipping.stale_ttl' => 604800,
+            'shipping.daily_hit_quota' => 100,
         ]);
 
         AppSetting::setValue('shipping_origin_subdistrict_id', '746');
@@ -151,7 +152,37 @@ class ShippingRateCacheTest extends TestCase
         $this->service->quote(17596, $this->items(1));
         $this->service->quote(17596, $this->items(2));
 
-        $this->assertSame(2, (int) cache()->get('shipping:hits:'.now()->toDateString()));
+        $usage = $this->service->quotaUsage();
+
+        $this->assertSame(2, $usage['count']);
+        $this->assertSame(100, $usage['quota']);
+        $this->assertSame(98, $usage['remaining']);
+        $this->assertSame(2, $usage['percent']);
+    }
+
+    public function test_hit_counter_survives_cache_clear(): void
+    {
+        Http::fake($this->successfulResponse());
+
+        $this->service->quote(17596, $this->items(1));
+
+        // Deploy biasanya menjalankan cache:clear. Penghitung kuota tidak
+        // boleh ikut hilang, kalau tidak admin melihat angka yang salah.
+        cache()->flush();
+
+        $this->assertSame(1, $this->service->quotaUsage()['count']);
+    }
+
+    public function test_hit_counter_resets_on_a_new_day(): void
+    {
+        Http::fake($this->successfulResponse());
+
+        $this->service->quote(17596, $this->items(1));
+        $this->assertSame(1, $this->service->quotaUsage()['count']);
+
+        $this->travel(1)->days();
+
+        $this->assertSame(0, $this->service->quotaUsage()['count']);
     }
 
     /**

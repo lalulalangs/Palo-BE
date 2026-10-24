@@ -45,6 +45,11 @@ class ShippingRateService
     private const DESTINATION_CACHE_TTL = 604800;
 
     /**
+     * Kunci `app_settings` untuk pencatat HIT harian.
+     */
+    private const HITS_KEY = 'shipping_hits_today';
+
+    /**
      * Nama tampilan kurir. API mengirim `name` yang panjang
      * ("Jalur Nugraha Ekakurir (JNE)"), sedangkan kontrak API kita memakai
      * nama pendek. Hanya berisi label, bukan tarif.
@@ -433,19 +438,56 @@ class ShippingRateService
     }
 
     /**
-     * Hitung pemakaian kuota harian; API ini tidak punya sandbox sehingga
-     * satu request nyata = satu HIT.
+     * Pemakaian kuota hari ini.
+     *
+     * Angka ini menentukan apakah checkout masih hidup: API RajaOngkir tidak
+     * punya sandbox dan paket Starter hanya 100 HIT/hari. Disimpan di
+     * `app_settings`, BUKAN di cache, karena `cache:clear` saat deploy akan
+     * menghapusnya — justru saat angka itu paling dibutuhkan.
+     *
+     * @return array{date: string, count: int, quota: int, remaining: int, percent: int}
+     */
+    public function quotaUsage(): array
+    {
+        $quota = max(1, (int) config('shipping.daily_hit_quota', 100));
+        $today = now()->toDateString();
+        $decoded = json_decode((string) AppSetting::getValue(self::HITS_KEY, ''), true);
+
+        $count = 0;
+
+        if (is_array($decoded) && ($decoded['date'] ?? null) === $today) {
+            $count = max(0, (int) ($decoded['count'] ?? 0));
+        }
+
+        return [
+            'date' => $today,
+            'count' => $count,
+            'quota' => $quota,
+            'remaining' => max(0, $quota - $count),
+            'percent' => min(100, (int) round($count / $quota * 100)),
+        ];
+    }
+
+    /**
+     * Satu request nyata ke RajaOngkir = satu HIT.
      */
     private function recordApiHit(): void
     {
-        $cacheKey = 'shipping:hits:'.now()->toDateString();
+        $usage = $this->quotaUsage();
+        $count = $usage['count'] + 1;
 
-        Cache::add($cacheKey, 0, 172800);
-        $hits = (int) Cache::increment($cacheKey);
-        $quota = (int) config('shipping.daily_hit_quota', 100);
+        AppSetting::setValue(self::HITS_KEY, json_encode([
+            'date' => $usage['date'],
+            'count' => $count,
+        ]));
 
-        if ($hits === (int) round($quota * 0.8)) {
-            Log::warning('Kuota RajaOngkir sudah mencapai 80%.', ['hits' => $hits, 'quota' => $quota]);
+        $warnAt = (int) round($usage['quota'] * 0.8);
+
+        if ($count === $warnAt) {
+            Log::warning('Kuota RajaOngkir sudah mencapai 80%.', [
+                'hits' => $count,
+                'quota' => $usage['quota'],
+            ]);
         }
     }
 
