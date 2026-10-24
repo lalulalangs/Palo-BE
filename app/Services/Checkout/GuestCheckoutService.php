@@ -347,10 +347,16 @@ class GuestCheckoutService
             // Generate order number
             $today = date('Ymd');
             $countToday = Order::query()->whereDate('created_at', now()->toDateString())->count() + 1;
-            $orderNumber = sprintf('UJN-%s-%05d', $today, $countToday);
+            $orderNumber = sprintf('%s-%s-%05d', Order::NUMBER_PREFIX, $today, $countToday);
 
             while (Order::query()->where('order_number', $orderNumber)->exists()) {
-                $orderNumber = sprintf('UJN-%s-%05d-%s', $today, $countToday, strtoupper(Str::random(3)));
+                $orderNumber = sprintf(
+                    '%s-%s-%05d-%s',
+                    Order::NUMBER_PREFIX,
+                    $today,
+                    $countToday,
+                    strtoupper(Str::random(3))
+                );
             }
 
             $codReferenceCode = $this->codWhatsAppService->generateReferenceCode();

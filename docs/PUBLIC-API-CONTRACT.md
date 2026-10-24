@@ -832,7 +832,7 @@ Membuat order berstatus `awaiting_confirmation`, lalu memberi tautan WhatsApp CS
   "success": true,
   "message": "Pesanan COD berhasil dibuat.",
   "data": {
-    "order_number": "UJN-20261024-00001",
+    "order_number": "PLR-20261024-00001",
     "cod_reference_code": "COD-20261024-A1B2C",
     "status": "menunggu_konfirmasi_cs",
     "subtotal": 750000,
@@ -1038,7 +1038,7 @@ Bila kombinasi `shipping_courier` + `shipping_service` tidak tersedia (mis. kuri
   "success": true,
   "message": "Pesanan berhasil dibuat.",
   "data": {
-    "order_number": "UJN-20261011-00001",
+    "order_number": "PLR-20261011-00001",
     "status": "menunggu_pembayaran",
     "subtotal": 298000,
     "discount_total": 29800,
@@ -1049,13 +1049,13 @@ Bila kombinasi `shipping_courier` + `shipping_service` tidak tersedia (mis. kuri
     "payment": {
       "gateway": "doku",
       "method": "qris",
-      "reference": "UJN-20261011-00001",
+      "reference": "PLR-20261011-00001",
       "payment_url": "https://sandbox.doku.com/checkout/link/2ebffd22d23e436895ce5c38f7ddcf86",
       "instructions": {
         "method": "qris",
         "gateway": "doku",
         "payment_url": "https://sandbox.doku.com/checkout/link/2ebffd22d23e436895ce5c38f7ddcf86",
-        "reference": "UJN-20261011-00001",
+        "reference": "PLR-20261011-00001",
         "qr_string": null,
         "va_number": null,
         "bank_name": null,

@@ -182,7 +182,7 @@ class RegisteredCheckoutApiTest extends TestCase
             ->assertJsonPath('data.payment.method', 'qris');
 
         $orderNumber = $response->json('data.order_number');
-        $this->assertStringStartsWith('UJN-', $orderNumber);
+        $this->assertStringStartsWith('PLR-', $orderNumber);
 
         // Verify order in database
         $order = Order::where('order_number', $orderNumber)->firstOrFail();

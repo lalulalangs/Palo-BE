@@ -423,7 +423,7 @@ class RegisteredCheckoutService
         $date = now()->format('Ymd');
 
         for ($attempt = 0; $attempt < 3; $attempt++) {
-            $candidate = sprintf('UJN-%s-%s', $date, strtoupper(bin2hex(random_bytes(3))));
+            $candidate = sprintf('%s-%s-%s', Order::NUMBER_PREFIX, $date, strtoupper(bin2hex(random_bytes(3))));
 
             if (! Order::query()->where('order_number', $candidate)->exists()) {
                 return $candidate;

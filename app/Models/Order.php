@@ -13,6 +13,12 @@ class Order extends Model
 {
     use HasFactory;
 
+    /**
+     * Prefix nomor pesanan. Diubah dari `UJN` ke `PLR`; order lama tetap
+     * memakai prefix lamanya.
+     */
+    public const NUMBER_PREFIX = 'PLR';
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_AWAITING_CONFIRMATION = 'awaiting_confirmation';
