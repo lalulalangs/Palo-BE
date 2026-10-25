@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Models\AdminUser;
@@ -107,6 +108,43 @@ class OrderResourceTest extends TestCase
             ->assertSee('UJN-20261009-10001')
             ->assertSee('Rinjani Walker')
             ->assertSee('Menunggu Pembayaran');
+    }
+
+    public function test_can_search_orders_by_guest_reference_code_and_order_number(): void
+    {
+        $guestOrder = $this->createOrder([
+            'order_number' => 'PLR-20261025-99001',
+            'guest_reference_code' => 'GC-20261025-GUNA',
+            'status' => Order::STATUS_AWAITING_CONFIRMATION,
+            'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
+            'shipping_recipient_name' => 'Gunadi Tamu',
+        ]);
+
+        $otherOrder = $this->createOrder([
+            'order_number' => 'PLR-20261025-99002',
+            'status' => Order::STATUS_PENDING,
+            'shipping_recipient_name' => 'Budi Reguler',
+        ]);
+
+        // Table search by exact guest reference code
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(ListOrders::class)
+            ->searchTable('GC-20261025-GUNA')
+            ->assertSee('PLR-20261025-99001')
+            ->assertSee('GC-20261025-GUNA')
+            ->assertDontSee('PLR-20261025-99002');
+
+        // Table search by lowercase partial guest reference code
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(ListOrders::class)
+            ->searchTable('gc-20261025')
+            ->assertSee('PLR-20261025-99001')
+            ->assertDontSee('PLR-20261025-99002');
+
+        // Global search attributes support guest reference code
+        $this->assertContains('guest_reference_code', OrderResource::getGloballySearchableAttributes());
+        $globalResults = OrderResource::getGlobalSearchResults('GC-20261025-GUNA');
+        $this->assertTrue($globalResults->contains(fn ($res) => $res->title === 'PLR-20261025-99001'));
     }
 
     public function test_orders_table_tabs_filtering(): void
