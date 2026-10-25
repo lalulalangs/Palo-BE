@@ -29,7 +29,7 @@ class ExpireUnpaidOrdersCommandTest extends TestCase
         ]);
     }
 
-    public function test_expired_pending_order_is_cancelled_and_voucher_quota_restored(): void
+    public function test_expired_pending_order_becomes_expired_and_voucher_quota_restored(): void
     {
         $voucher = Voucher::create([
             'code' => 'EXPIRY10',
@@ -54,16 +54,17 @@ class ExpireUnpaidOrdersCommandTest extends TestCase
 
         $fresh = $order->fresh();
 
-        $this->assertSame(OrderStatus::Cancelled, $fresh->status);
+        // Batas waktu habis = kedaluwarsa, bukan pembatalan manual.
+        $this->assertSame(OrderStatus::Expired, $fresh->status);
         $this->assertSame(Payment::STATUS_EXPIRE, $payment->fresh()->status);
         $this->assertSame(1, $voucher->fresh()->used_count);
         $this->assertSame(
-            'Pesanan kedaluwarsa otomatis (melewati batas waktu pembayaran).',
+            'Batas waktu pembayaran telah habis (kedaluwarsa otomatis).',
             $fresh->cancelled_reason
         );
         $this->assertDatabaseHas('order_status_histories', [
             'order_id' => $order->id,
-            'to_status' => OrderStatus::Cancelled->value,
+            'to_status' => OrderStatus::Expired->value,
         ]);
     }
 
@@ -87,7 +88,7 @@ class ExpireUnpaidOrdersCommandTest extends TestCase
 
         $this->artisan('orders:expire-unpaid', ['--limit' => 1])->assertSuccessful();
 
-        $this->assertSame(OrderStatus::Cancelled, $first->fresh()->status);
+        $this->assertSame(OrderStatus::Expired, $first->fresh()->status);
         $this->assertSame(OrderStatus::Pending, $second->fresh()->status);
     }
 

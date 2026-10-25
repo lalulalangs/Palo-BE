@@ -2,19 +2,22 @@
 
 namespace Tests\Feature\Shipping;
 
-use App\Models\Category;
-use App\Models\Product;
-use App\Models\ProductVariant;
-use App\Models\Sku;
+use App\Models\AppSetting;
 use App\Services\Shipping\ShippingRateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request as ClientRequest;
+use Illuminate\Support\Facades\Http;
+use Tests\Concerns\CreatesCatalogFixtures;
 use Tests\TestCase;
 
+/**
+ * Berat & pemetaan layanan. Semua HTTP di-fake: API RajaOngkir tidak punya
+ * sandbox sehingga panggilan nyata memotong kuota harian.
+ */
 class ShippingRateWeightTest extends TestCase
 {
+    use CreatesCatalogFixtures;
     use RefreshDatabase;
-
-    private ProductVariant $variant;
 
     private ShippingRateService $service;
 
@@ -22,68 +25,163 @@ class ShippingRateWeightTest extends TestCase
     {
         parent::setUp();
 
+        config([
+            'shipping.base_url' => 'https://rajaongkir.komerce.id/api/v1',
+            'shipping.api_key' => 'test-api-key',
+        ]);
+
+        AppSetting::setValue('shipping_origin_subdistrict_id', '746');
+        AppSetting::setValue('shipping_origin_label', 'Bayan, Lombok Utara, NTB, 83354');
+        AppSetting::setValue('shipping_enabled_couriers', 'jne:jnt');
+        AppSetting::setValue('shipping_excluded_services', 'JTR,JTR<130,JTR>130,JTR>200');
+
         $this->service = app(ShippingRateService::class);
-
-        $category = Category::create(['name' => 'Tenda', 'slug' => 'tenda']);
-        $product = Product::create([
-            'category_id' => $category->id,
-            'name' => 'Flysheet',
-            'slug' => 'flysheet',
-            'base_price' => 500000,
-            'is_active' => true,
-        ]);
-
-        $this->variant = ProductVariant::create([
-            'product_id' => $product->id,
-            'name' => 'Default',
-            'attributes' => [],
-        ]);
     }
 
-    public function test_shipping_cost_uses_sku_weight_instead_of_flat_quantity(): void
+    public function test_weight_is_sent_in_grams_without_rounding_to_kilograms(): void
     {
-        $light = $this->createSku('LIGHT-1KG', 1000);
-        $heavy = $this->createSku('HEAVY-2KG', 2000);
+        $sku = $this->createShippingSku(1200);
 
-        $lightQuote = $this->jneRegQuote($light);
-        $heavyQuote = $this->jneRegQuote($heavy);
+        $this->fakeCostResponse();
 
-        // Mataram multiplier 0.5 -> 28.000 * 0.5 * kg
-        $this->assertSame(14000, $lightQuote);
-        $this->assertSame(28000, $heavyQuote);
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        // 1.200 gram dikirim apa adanya; dulu dibulatkan menjadi 2.000 gram.
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 1200);
+    }
+
+    public function test_quantity_multiplies_weight(): void
+    {
+        $sku = $this->createShippingSku(1000);
+
+        $this->fakeCostResponse();
+
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 3]], 17596);
+
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 3000);
     }
 
     public function test_null_weight_falls_back_to_350_grams(): void
     {
-        $sku = $this->createSku('NULL-WEIGHT', null);
+        $sku = $this->createShippingSku(null);
 
-        $this->assertSame(14000, $this->jneRegQuote($sku));
+        $this->fakeCostResponse();
+
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 350);
     }
 
-    private function createSku(string $code, ?int $weightGrams): Sku
+    public function test_volumetric_weight_wins_when_larger_than_actual(): void
     {
-        return Sku::create([
-            'variant_id' => $this->variant->id,
-            'sku_code' => $code,
-            'price_override' => 500000,
-            'stock' => 10,
-            'weight_grams' => $weightGrams,
-            'is_active' => true,
-        ]);
+        $sku = $this->createShippingSku(1000);
+        // 60 x 40 x 40 cm / 6000 = 16 kg, jauh di atas berat aktual 1 kg.
+        $sku->update(['length_cm' => 60, 'width_cm' => 40, 'height_cm' => 40]);
+
+        $this->fakeCostResponse();
+
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 16000);
     }
 
-    private function jneRegQuote(Sku $sku): int
+    public function test_actual_weight_wins_when_larger_than_volumetric(): void
     {
-        $quotes = $this->service->getQuotes('KOTA MATARAM', [
-            ['sku_id' => $sku->id, 'quantity' => 1],
+        $sku = $this->createShippingSku(20000);
+        $sku->update(['length_cm' => 10, 'width_cm' => 10, 'height_cm' => 10]);
+
+        $this->fakeCostResponse();
+
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 20000);
+    }
+
+    public function test_incomplete_dimensions_are_ignored(): void
+    {
+        $sku = $this->createShippingSku(1000);
+        // Tinggi kosong: volumetrik tidak boleh dipakai sama sekali.
+        $sku->update(['length_cm' => 60, 'width_cm' => 40]);
+
+        $this->fakeCostResponse();
+
+        $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        Http::assertSent(fn (ClientRequest $request): bool => $request['weight'] == 1000);
+    }
+
+    public function test_cargo_services_are_filtered_out_and_services_are_sorted_by_cost(): void
+    {
+        $sku = $this->createShippingSku(1000);
+
+        $this->fakeCostResponse();
+
+        $services = $this->service->getQuotes('', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        $this->assertSame(['J&T', 'JNE'], array_values(array_unique(array_map(
+            fn (array $service): string => $service['courier'],
+            $services,
+        ))));
+        $this->assertNotContains('JTR', array_column($services, 'service'));
+        $this->assertSame(13500, $services[0]['cost']);
+    }
+
+    public function test_courier_alias_matches_api_payload(): void
+    {
+        $sku = $this->createShippingSku(1000);
+
+        $this->fakeCostResponse();
+
+        $quote = $this->service->quoteFor('J&T', 'EZ', '', [['sku_id' => $sku->id, 'quantity' => 1]], 17596);
+
+        $this->assertNotNull($quote);
+        $this->assertSame('J&T', $quote['courier']);
+        $this->assertSame(13500, $quote['cost']);
+    }
+
+    public function test_unknown_courier_returns_null_so_checkout_can_fail_closed(): void
+    {
+        $sku = $this->createShippingSku(1000);
+
+        $this->fakeCostResponse();
+
+        $this->assertNull(
+            $this->service->quoteFor('GHOST', 'EXPRESS', '', [['sku_id' => $sku->id, 'quantity' => 1]], 17596)
+        );
+    }
+
+    private function fakeCostResponse(): void
+    {
+        Http::fake([
+            'rajaongkir.komerce.id/api/v1/calculate/domestic-cost' => Http::response([
+                'meta' => ['message' => 'Success', 'code' => 200, 'status' => 'success'],
+                'data' => [
+                    [
+                        'name' => 'Jalur Nugraha Ekakurir (JNE)',
+                        'code' => 'jne',
+                        'service' => 'REG',
+                        'description' => 'Layanan Reguler',
+                        'cost' => 31000,
+                        'etd' => '2 day',
+                    ],
+                    [
+                        'name' => 'J&T Express',
+                        'code' => 'jnt',
+                        'service' => 'EZ',
+                        'description' => 'Reguler',
+                        'cost' => 13500,
+                        'etd' => '',
+                    ],
+                    [
+                        'name' => 'Jalur Nugraha Ekakurir (JNE)',
+                        'code' => 'jne',
+                        'service' => 'JTR',
+                        'description' => 'Cargo',
+                        'cost' => 115000,
+                        'etd' => '8 day',
+                    ],
+                ],
+            ]),
         ]);
-
-        foreach ($quotes as $quote) {
-            if ($quote['courier'] === 'JNE' && $quote['service'] === 'REG') {
-                return $quote['cost'];
-            }
-        }
-
-        $this->fail('Quote JNE REG tidak ditemukan.');
     }
 }

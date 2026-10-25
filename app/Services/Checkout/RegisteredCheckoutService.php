@@ -200,6 +200,9 @@ class RegisteredCheckoutService
                     courier: $shippingCourier,
                     service: $shippingService,
                     destinationCity: (string) ($shippingAddress['city'] ?? ''),
+                    destinationId: filled($shippingAddress['destination_id'] ?? null)
+                        ? (int) $shippingAddress['destination_id']
+                        : null,
                     items: array_map(fn (array $prep): array => [
                         'sku_id' => $prep['sku']->id,
                         'quantity' => $prep['quantity'],
@@ -255,6 +258,7 @@ class RegisteredCheckoutService
                     'subdistrict' => $shippingAddress['subdistrict'] ?? null,
                     'city' => $shippingAddress['city'] ?? null,
                     'city_code' => $shippingAddress['city_code'] ?? null,
+                    'destination_id' => $shippingAddress['destination_id'] ?? null,
                     'province' => $shippingAddress['province'] ?? null,
                     'province_code' => $shippingAddress['province_code'] ?? null,
                     'postal_code' => $shippingAddress['postal_code'] ?? null,
@@ -297,7 +301,25 @@ class RegisteredCheckoutService
                     'shipping_full_address' => $fullAddress,
                     'shipping_address_snapshot' => $addressSnapshot,
                     'shipping_courier' => $shippingCourier,
+                    'shipping_courier_code' => $shippingQuote['courier_code'],
                     'shipping_service' => $shippingService,
+                    // Tarif kurir berubah kapan saja; snapshot membuat order
+                    // tetap menampilkan angka yang dipakai saat transaksi.
+                    'shipping_quote_snapshot' => [
+                        'provider' => 'rajaongkir',
+                        'origin_id' => $shippingQuote['origin_id'],
+                        'destination_id' => $shippingQuote['destination_id'],
+                        'destination_label' => $shippingQuote['destination_label'],
+                        'weight_grams' => $shippingQuote['weight_grams'],
+                        'courier_code' => $shippingQuote['courier_code'],
+                        'service' => $shippingQuote['service'],
+                        'cost' => $shippingQuote['cost'],
+                        'etd' => $shippingQuote['etd'],
+                        'source' => $shippingQuote['source'],
+                        'quoted_at' => $shippingQuote['quoted_at'],
+                    ],
+                    'shipping_weight_grams' => $shippingQuote['weight_grams'],
+                    'shipping_destination_id' => $shippingQuote['destination_id'],
                     'stock_locked_until' => $stockLockedUntil,
                 ]);
 
@@ -401,7 +423,7 @@ class RegisteredCheckoutService
         $date = now()->format('Ymd');
 
         for ($attempt = 0; $attempt < 3; $attempt++) {
-            $candidate = sprintf('UJN-%s-%s', $date, strtoupper(bin2hex(random_bytes(3))));
+            $candidate = sprintf('%s-%s-%s', Order::NUMBER_PREFIX, $date, strtoupper(bin2hex(random_bytes(3))));
 
             if (! Order::query()->where('order_number', $candidate)->exists()) {
                 return $candidate;

@@ -206,6 +206,12 @@ class GuestCheckoutService
     /**
      * Process formal COD checkout for Guest user, creating order (user_id=null), snapshots, and WA link.
      *
+     * Ongkir TIDAK dihitung di sini. Guest COD adalah serah-terima lead ke CS
+     * lewat WhatsApp (order berstatus `awaiting_confirmation`), sehingga
+     * `shipping_cost` disimpan 0 dan CS mengonfirmasi ongkir saat chat —
+     * lihat `CodWhatsAppService::buildMessage()`. Nilai ongkir dari client
+     * tidak pernah dipercaya.
+     *
      * @param  array<string, mixed>  $shippingAddress
      * @param  array<int, array{sku_id: int, quantity: int, price_seen?: float|null}>|null  $itemsInput
      * @return array<string, mixed>
@@ -213,9 +219,6 @@ class GuestCheckoutService
     public function codCheckout(
         array $shippingAddress,
         ?array $itemsInput,
-        ?string $shippingCourier,
-        ?string $shippingService,
-        float $shippingCost,
         ?string $note,
         string $sessionId
     ): array {
@@ -262,9 +265,6 @@ class GuestCheckoutService
         return DB::transaction(function () use (
             $shippingAddress,
             $rawItems,
-            $shippingCourier,
-            $shippingService,
-            $shippingCost,
             $note,
             $sessionId
         ) {
@@ -340,15 +340,23 @@ class GuestCheckoutService
                 ];
             }
 
-            $grandTotal = max(0.0, $subtotal + $shippingCost);
+            // Ongkir belum diketahui saat guest checkout: CS mengonfirmasinya
+            // via WhatsApp, jadi total order = subtotal saja.
+            $grandTotal = max(0.0, $subtotal);
 
             // Generate order number
             $today = date('Ymd');
             $countToday = Order::query()->whereDate('created_at', now()->toDateString())->count() + 1;
-            $orderNumber = sprintf('UJN-%s-%05d', $today, $countToday);
+            $orderNumber = sprintf('%s-%s-%05d', Order::NUMBER_PREFIX, $today, $countToday);
 
             while (Order::query()->where('order_number', $orderNumber)->exists()) {
-                $orderNumber = sprintf('UJN-%s-%05d-%s', $today, $countToday, strtoupper(Str::random(3)));
+                $orderNumber = sprintf(
+                    '%s-%s-%05d-%s',
+                    Order::NUMBER_PREFIX,
+                    $today,
+                    $countToday,
+                    strtoupper(Str::random(3))
+                );
             }
 
             $codReferenceCode = $this->codWhatsAppService->generateReferenceCode();
@@ -374,13 +382,14 @@ class GuestCheckoutService
                 'cod_reference_code' => $codReferenceCode,
                 'subtotal' => $subtotal,
                 'discount_amount' => 0.0,
-                'shipping_cost' => $shippingCost,
+                'shipping_cost' => 0.0,
                 'total' => $grandTotal,
                 'shipping_recipient_name' => $recipientName,
                 'shipping_phone' => $recipientPhone,
                 'shipping_full_address' => $fullAddress,
-                'shipping_courier' => $shippingCourier ?: 'COD Kurir',
-                'shipping_service' => $shippingService ?: 'Standar',
+                // Null agar CodWhatsAppService menulis "Ongkir: akan dikonfirmasi CS".
+                'shipping_courier' => null,
+                'shipping_service' => null,
                 'stock_locked_until' => null,
             ]);
 

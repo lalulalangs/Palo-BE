@@ -73,6 +73,9 @@ class ProductVariantSkuManagementTest extends TestCase
                         'sku_code' => 'PR-JKT-NVY-XL',
                         'stock' => 15,
                         'price_override' => 475000.00,
+                        'length_cm' => 30,
+                        'width_cm' => 20,
+                        'height_cm' => 10,
                         'is_active' => true,
                     ],
                 ],
@@ -93,6 +96,10 @@ class ProductVariantSkuManagementTest extends TestCase
             'sku_code' => 'PR-JKT-NVY-XL',
             'stock' => 15,
             'price_override' => 475000.00,
+            // Dimensi dipakai untuk berat volumetrik.
+            'length_cm' => 30,
+            'width_cm' => 20,
+            'height_cm' => 10,
             'is_active' => true,
         ]);
 

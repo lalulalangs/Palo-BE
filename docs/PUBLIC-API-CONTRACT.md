@@ -797,62 +797,191 @@ Jalur cepat untuk pengunjung tanpa login. **TIDAK** membuat order di tabel `orde
 }
 ```
 
----
+### 10.3 Checkout COD Tamu (Order Tanpa Login)
+* **Endpoint:** `POST /guest/cod-checkout`
+* **Auth:** Tidak (Publik, rate limit 15 req/menit)
 
-## 11. Estimasi Ongkir (Shipping Quotes)
+Membuat order berstatus `awaiting_confirmation`, lalu memberi tautan WhatsApp CS. Berbeda dari §10.1, endpoint ini **membuat order** dan mengosongkan keranjang guest.
 
-### 11.1 Kalkulasi Tarif Kurir
-* **Endpoint:** `POST /shipping/quote`
-* **Auth:** Wajib (`Bearer <token>`)
+> **Perubahan perilaku:** field `shipping_cost`, `shipping_courier`, dan `shipping_service` **tidak lagi diterima** di body. Bila tetap dikirim, nilainya diabaikan server. Ongkir guest **belum dihitung** di sini karena CS mengonfirmasinya lewat WhatsApp.
 
 #### Request Body
 ```json
 {
-  "destination_city": "KOTA MATARAM",
+  "shipping_address": {
+    "recipient_name": "Pendaki Guest",
+    "phone": "085522334455",
+    "street": "Jl. Pariwisata Senaru No. 5",
+    "city": "Lombok Utara",
+    "province": "Nusa Tenggara Barat",
+    "district": "Bayan",
+    "postal_code": "83354",
+    "notes": "Hubungi via WhatsApp dulu"
+  },
   "items": [
-    { "sku_id": 1, "quantity": 2 }
-  ]
+    { "sku_id": 1, "quantity": 1, "price_seen": 750000 }
+  ],
+  "note": "Hubungi via WhatsApp dulu"
 }
 ```
+*(Catatan: bila `items` kosong, server memakai isi keranjang guest. Keranjang dikosongkan setelah order dibuat.)*
+
+#### Respon Berhasil (`201 Created`)
+```json
+{
+  "success": true,
+  "message": "Pesanan COD berhasil dibuat.",
+  "data": {
+    "order_number": "PLR-20261024-00001",
+    "cod_reference_code": "COD-20261024-A1B2C",
+    "status": "menunggu_konfirmasi_cs",
+    "subtotal": 750000,
+    "discount_total": 0,
+    "shipping_cost": 0,
+    "grand_total": 750000,
+    "grand_total_display": "Rp 750.000",
+    "payment": {
+      "method": "cod",
+      "instructions": {
+        "method": "cod",
+        "cod_reference_code": "COD-20261024-A1B2C",
+        "whatsapp_url": "https://wa.me/6281234567890?text=Halo%20Admin...",
+        "whatsapp_message": "Halo Admin Palorinjani, saya ingin memesan dengan COD.\n...\nOngkir: akan dikonfirmasi CS\nTotal: Rp 750.000",
+        "instructions_text": "Silakan konfirmasi pesanan Anda melalui WhatsApp ke Customer Service kami."
+      },
+      "whatsapp_url": "https://wa.me/6281234567890?text=Halo%20Admin..."
+    },
+    "whatsapp_url": "https://wa.me/6281234567890?text=Halo%20Admin...",
+    "whatsapp_message": "Halo Admin Palorinjani, saya ingin memesan dengan COD.\n...",
+    "notice": "Pesanan COD berhasil dicatat. Silakan konfirmasi pesanan via WhatsApp ke CS."
+  }
+}
+```
+
+> `grand_total` pada guest COD **belum termasuk ongkir** (`shipping_cost` selalu `0`). Tampilkan sebagai nilai sementara dan sertakan catatan bahwa ongkir dikonfirmasi CS — jangan beri label "total akhir".
+
+---
+
+## 11. Estimasi Ongkir & Pencarian Destinasi (Shipping)
+
+Tarif dihitung **server-side** dari RajaOngkir V2. Nominal ongkir dari client tidak pernah dipakai.
+
+### 11.1 Pencarian Destinasi (Autocomplete Alamat)
+* **Endpoint:** `GET /shipping/destinations?search={keyword}&limit=10`
+* **Auth:** Wajib (`Bearer <token>`, rate limit 60 req/menit)
+
+`keyword` minimal 3 karakter; boleh nama kota, kecamatan, desa, atau kode pos. `limit` maksimal 50 (default 10).
 
 #### Respon Berhasil (`200 OK`)
 ```json
 {
   "success": true,
   "data": {
-    "services": [
+    "destinations": [
       {
-        "courier": "JNE",
-        "service": "REG",
-        "description": "Layanan Reguler",
-        "cost": 28000,
-        "etd": "2-3 hari"
-      },
-      {
-        "courier": "JNE",
-        "service": "YES",
-        "description": "Yakin Esok Sampai",
-        "cost": 45000,
-        "etd": "1 hari"
-      },
-      {
-        "courier": "J&T",
-        "service": "EZ",
-        "description": "Layanan Reguler",
-        "cost": 27000,
-        "etd": "2-3 hari"
-      },
-      {
-        "courier": "SiCepat",
-        "service": "REG",
-        "description": "SiCepat Reguler",
-        "cost": 26000,
-        "etd": "2-3 hari"
+        "id": 17596,
+        "label": "CEMPAKA PUTIH BARAT, CEMPAKA PUTIH, JAKARTA PUSAT, DKI JAKARTA, 10520",
+        "province_name": "DKI JAKARTA",
+        "city_name": "JAKARTA PUSAT",
+        "district_name": "CEMPAKA PUTIH",
+        "subdistrict_name": "CEMPAKA PUTIH BARAT",
+        "zip_code": "10520"
       }
     ]
   }
 }
 ```
+
+**Cara pakai yang benar:** simpan `id` dari pilihan user sebagai `destination_id`, lalu kirim ke §11.2 dan §12.1. Jangan mengandalkan `label` mentah — formatnya milik RajaOngkir. Untuk tampilan, susun sendiri dari `subdistrict_name`, `city_name`, `province_name`, `zip_code` (contoh: `Cempaka Putih Barat, Jakarta Pusat, DKI Jakarta, 10520`).
+
+Bila tidak ada hasil, `destinations` bernilai `[]` (tetap `200`, bukan error).
+
+#### Error
+| Kode | Keterangan |
+|---|---|
+| `422` | `search` kurang dari 3 karakter atau lebih dari 100 |
+| `429` | Terlalu banyak pencarian (60/menit) |
+| `503` | Layanan ongkir belum dikonfigurasi admin (`error_code: shipping_not_configured`) |
+
+### 11.2 Kalkulasi Tarif Kurir
+* **Endpoint:** `POST /shipping/quote`
+* **Auth:** Wajib (`Bearer <token>`)
+
+#### Request Body
+```json
+{
+  "destination_id": 17596,
+  "items": [
+    { "sku_id": 1, "quantity": 2 }
+  ]
+}
+```
+
+| Field | Tipe | Wajib | Keterangan |
+|---|---|---|---|
+| `destination_id` | integer | salah satu | Subdistrict ID dari §11.1. **Cara yang dianjurkan.** |
+| `destination_city` | string | salah satu | Nama kota bebas. Hanya untuk frontend lama: server mencarikan ID-nya (memakan kuota API sekali per kata kunci). |
+| `items` | array | tidak | Bila kosong, server memakai isi keranjang user yang sedang login. |
+
+Minimal salah satu dari `destination_id` / `destination_city` harus ada.
+
+#### Respon Berhasil (`200 OK`)
+```json
+{
+  "success": true,
+  "data": {
+    "origin": { "id": 746, "label": "Bayan, Lombok Utara, NTB, 83354" },
+    "destination": { "id": 17596, "label": null },
+    "weight_grams": 1200,
+    "quoted_at": "2026-10-24T10:13:00+07:00",
+    "source": "api",
+    "services": [
+      {
+        "courier": "J&T",
+        "courier_code": "jnt",
+        "service": "EZ",
+        "description": "Reguler",
+        "cost": 13500,
+        "etd": ""
+      },
+      {
+        "courier": "JNE",
+        "courier_code": "jne",
+        "service": "REG",
+        "description": "Layanan Reguler",
+        "cost": 14000,
+        "etd": "2 day"
+      }
+    ]
+  }
+}
+```
+
+| Field | Keterangan |
+|---|---|
+| `weight_grams` | Berat yang dikirim ke kurir, sudah termasuk berat volumetrik bila dimensi SKU terisi. |
+| `quoted_at` | Waktu tarif diambil/dihitung. |
+| `source` | `api` = baru diambil dari kurir · `cache` = dari cache ≤24 jam · `stale_cache` = cache lama dipakai karena kurir sedang bermasalah. |
+| `services[].courier` | Nama tampilan (JNE, J&T, Lion, POS, …). |
+| `services[].courier_code` | Kode internal kurir. Pakai ini bila perlu membandingkan, bukan `courier`. |
+| `services[].cost` | Integer rupiah **apa adanya dari kurir**; bisa tidak bulat (mis. `40642`). Jangan dibulatkan. |
+| `services[].etd` | String bebas dari kurir dan **bisa kosong** (`""`). Frontend wajib menangani kosong — jangan mengarang "2-3 hari". |
+| `services[].description` | Tidak reliabel (sebagian kurir mengisinya dengan angka). Gunakan `service` sebagai label. |
+| `destination.label` | Terisi hanya bila request memakai `destination_city`. Bila memakai `destination_id`, nilainya `null` — frontend sudah punya labelnya dari §11.1. |
+
+`services` sudah diurutkan dari termurah. Layanan kargo (tarif ratusan ribu sampai jutaan rupiah) sudah difilter server. Bila tidak ada kurir yang melayani rute, `services` bernilai `[]`.
+
+> **Ketersediaan kurir bergantung rute.** Kurir yang sama bisa muncul untuk satu kota dan tidak muncul untuk kota lain. Jangan meng-hardcode daftar kurir di frontend.
+
+#### Respon Error
+| Kode | `error_code` | Penyebab & tindakan frontend |
+|---|---|---|
+| `422` | `shipping_destination_not_found` | `destination_city` tidak dikenali. Arahkan user memilih dari §11.1. |
+| `422` | `shipping_weight_too_heavy` | Berat pesanan melebihi batas kirim. Arahkan ke CS. |
+| `503` | `shipping_not_configured` | Gudang asal belum diatur admin. Bukan kesalahan frontend. |
+| `503` | `shipping_provider_unreachable` | Kurir tidak bisa dihubungi. Tampilkan pesan, izinkan coba lagi. |
+| `503` | `shipping_provider_invalid_response` | Kurir membalas tidak valid atau error 5xx. Sama seperti di atas. |
+| `502` | `shipping_provider_rejected` | Kurir menolak parameter yang dikirim (indikasi bug, bukan outage). Laporkan ke backend. |
 
 ---
 
@@ -886,13 +1015,22 @@ Jalur formal transaksi online dengan penguncian stok sementara (*soft reservatio
   ],
   "shipping_courier": "JNE",
   "shipping_service": "REG",
-  "shipping_cost": 28000,
-  "shipping_etd": "2-3 hari",
   "payment_method": "qris",
   "voucher_code": "RINJANI10",
   "acknowledge_price_change": false
 }
 ```
+
+**Field pengiriman yang wajib diperhatikan:**
+
+| Field | Wajib | Keterangan |
+|---|---|---|
+| `shipping_address.destination_id` | dianjurkan | Subdistrict ID dari §11.1. Bila kosong, server mencarikan dari `shipping_address.city`. |
+| `shipping_courier` | ya | Nama kurir dari `services[].courier` (§11.2), mis. `JNE` / `J&T`. |
+| `shipping_service` | ya | Kode layanan dari `services[].service`, mis. `REG` / `EZ`. |
+| `shipping_cost` | **tidak diterima** | Ongkir selalu dihitung ulang server-side dari tarif kurir terkini. Nilai yang dikirim akan diabaikan — jangan dikirim. |
+
+Bila kombinasi `shipping_courier` + `shipping_service` tidak tersedia (mis. kurir berubah tarif atau rute tidak lagi dilayani), server menolak dengan `422` pada field `shipping_courier`. Frontend harus meminta user memilih ulang dari §11.2.
 
 #### Respon Berhasil (`201 Created`)
 ```json
@@ -900,7 +1038,7 @@ Jalur formal transaksi online dengan penguncian stok sementara (*soft reservatio
   "success": true,
   "message": "Pesanan berhasil dibuat.",
   "data": {
-    "order_number": "UJN-20261011-00001",
+    "order_number": "PLR-20261011-00001",
     "status": "menunggu_pembayaran",
     "subtotal": 298000,
     "discount_total": 29800,
@@ -911,13 +1049,13 @@ Jalur formal transaksi online dengan penguncian stok sementara (*soft reservatio
     "payment": {
       "gateway": "doku",
       "method": "qris",
-      "reference": "UJN-20261011-00001",
+      "reference": "PLR-20261011-00001",
       "payment_url": "https://sandbox.doku.com/checkout/link/2ebffd22d23e436895ce5c38f7ddcf86",
       "instructions": {
         "method": "qris",
         "gateway": "doku",
         "payment_url": "https://sandbox.doku.com/checkout/link/2ebffd22d23e436895ce5c38f7ddcf86",
-        "reference": "UJN-20261011-00001",
+        "reference": "PLR-20261011-00001",
         "qr_string": null,
         "va_number": null,
         "bank_name": null,
@@ -928,6 +1066,8 @@ Jalur formal transaksi online dengan penguncian stok sementara (*soft reservatio
   }
 }
 ```
+
+> **Snapshot ongkir:** order menyimpan tarif yang dipakai saat transaksi (`shipping_quote_snapshot`) beserta berat dan ID tujuan. Perubahan tarif kurir setelahnya **tidak** mengubah nilai order lama, jadi `data.shipping_cost` pada detail order adalah angka historis — bukan tarif terkini.
 
 > **Perubahan perilaku (DOKU Checkout):** `data.payment.payment_url` adalah halaman pembayaran resmi DOKU. Frontend **wajib** mengarahkan pengguna ke URL tersebut (redirect/tombol "Bayar Sekarang") dan tidak boleh membuat QR/VA sendiri. `qr_string`/`va_number` dipertahankan bernilai `null` agar kontrak lama tidak pecah. Status pembayaran final diterima backend lewat notifikasi DOKU (`POST /api/v1/payments/webhook/doku`, tanpa auth, diverifikasi signature) dengan fallback rekonsiliasi harian.
 
@@ -977,11 +1117,88 @@ Jika harga produk telah diubah oleh Admin sejak pengguna membuka keranjang dan p
 
 ---
 
-## 13. Voucher & Promosi (PRD §3.6, §3.8, §3.12)
+## 13. Pembayaran (DOKU Checkout)
+
+Pembayaran non-COD memakai **DOKU Checkout** (hosted payment page). Backend tidak membuat QR atau nomor VA sendiri: semua metode diselesaikan di halaman DOKU, dan status final dikirim DOKU ke backend.
+
+### 13.1 Alur Wajib di Frontend
+
+1. `POST /checkout/orders` dengan `payment_method` pilihan user (§12.1).
+2. Ambil `data.payment.payment_url`.
+3. Arahkan user ke URL itu (redirect penuh atau tombol "Bayar Sekarang"). **Jangan** dibuka di dalam iframe.
+4. Setelah user menyelesaikan pembayaran, DOKU mengembalikan ke halaman toko. Status order **belum tentu** berubah saat itu — backend menunggu notifikasi DOKU (biasanya beberapa detik).
+5. Poll `GET /orders/{orderNumber}` (mis. tiap 3–5 detik, hentikan setelah 2 menit) sampai `data.status` berubah dari `menunggu_pembayaran`.
+
+### 13.2 Metode Pembayaran yang Diterima
+
+Nilai `payment_method` pada `POST /checkout/orders`:
+
+| Nilai | Metode di DOKU |
+|---|---|
+| `qris` | QRIS |
+| `virtual_account` | Virtual Account (BCA, BRI, BNI, Mandiri, Permata, CIMB, DOKU) |
+| `ewallet` | OVO, DANA, ShopeePay, Doku Wallet, LinkAja |
+| `bank_transfer` | Virtual Account bank |
+| `credit_card` | Kartu kredit |
+| `cod` | Bayar di tempat — **bukan** DOKU (§10.3 & §12.1) |
+
+### 13.3 Batas Waktu Pembayaran
+
+`data.payment_expires_at` adalah batas waktu pembayaran **dan** masa penguncian stok (default **60 menit**). Setelah lewat, penguncian stok dilepas dan kuota voucher dikembalikan.
+
+> **Status akhirnya `expired`.** Order online yang tidak dibayar sampai batas waktu dan COD yang tidak dikonfirmasi CS sama-sama berakhir `expired` (`kedaluwarsa`). `dibatalkan` (`cancelled`) hanya dipakai bila admin atau CS membatalkan pesanan secara sengaja.
+
+Tampilkan hitung mundur dari `payment_expires_at`; jangan menghitung sendiri dari waktu request.
+
+### 13.4 Status Pembayaran
+
+`data.payment.status` pada `GET /orders/{orderNumber}`:
+
+| Status | Arti | Tindakan frontend |
+|---|---|---|
+| `pending` | Belum dibayar | Tampilkan tombol bayar + hitung mundur |
+| `settlement` | Lunas terverifikasi | Hentikan polling, tampilkan halaman sukses |
+| `capture` | Dana ter-capture (kartu kredit) | Perlakukan sama seperti `settlement` |
+| `deny` / `cancel` | Ditolak / dibatalkan | Tampilkan gagal, tawarkan buat pesanan baru |
+| `expire` | Kedaluwarsa | Tampilkan kedaluwarsa |
+| `refund` | Dana dikembalikan | Tampilkan info refund |
+
+Bila `data.needs_reconciliation` bernilai `true`, status pembayaran dan status order saling bertentangan (mis. sudah dibayar tetapi stok lepas). Tampilkan pesan "sedang diverifikasi CS" dan jangan menganggapnya gagal.
+
+### 13.5 Notifikasi Pembayaran (Webhook — internal, bukan untuk frontend)
+
+* **Endpoint:** `POST /api/v1/payments/webhook/doku`
+* **Auth:** Tidak ada. Keaslian diverifikasi lewat signature HMAC-SHA256 (`Client-Id`, `Request-Id`, `Request-Timestamp`, `Signature`) memakai `Request-Target` yang sama dengan `DOKU_NOTIFICATION_PATH`.
+
+Endpoint ini **hanya dipanggil DOKU**. Frontend tidak boleh memanggilnya.
+
+| Respon | Arti |
+|---|---|
+| `200` | Diterima, atau duplikat yang sudah pernah diproses (aman, idempoten) |
+| `400` | Payload tidak dikenali |
+| `401` | Signature tidak valid |
+| `404` | Order untuk notifikasi tersebut tidak ditemukan (dicatat di log) |
+| `500` | Gagal diproses; DOKU akan mengirim ulang |
+
+Sifat pemrosesan:
+* **Idempoten** — notifikasi berulang bertanda `external_event_id` sama hanya diproses sekali, sehingga pembayaran tidak tergandakan.
+* **Nominal diverifikasi** — bila nominal notifikasi tidak sama dengan tagihan, payment ditandai untuk rekonsiliasi manual dan order diberi `needs_reconciliation: true`.
+
+### 13.6 Rekonsiliasi Otomatis
+
+| Proses | Jadwal | Fungsi |
+|---|---|---|
+| `payments:reconcile-doku` | Harian, 02:00 | Membandingkan payment `pending` dengan Check Status API DOKU untuk menangkap notifikasi yang hilang |
+| `orders:expire-unpaid` | Tiap menit | Menandai order `pending` yang melewati batas waktu sebagai `expired` dan melepas stok |
+| `orders:expire-unconfirmed-cod` | Tiap jam | Menandai order COD yang tidak dikonfirmasi CS sebagai `expired` |
+
+---
+
+## 14. Voucher & Promosi (PRD §3.6, §3.8, §3.12)
 
 Fitur voucher dan diskon promosi untuk mendapatkan potongan harga pada pesanan belanja. Voucher dapat berupa nominal tetap (*fixed*) atau persentase (*percentage*) dengan batas kuota dan periode berlaku.
 
-### 13.1 Daftar Voucher Aktif & Publik
+### 14.1 Daftar Voucher Aktif & Publik
 Mengambil daftar voucher aktif yang saat ini berlaku, memiliki sisa kuota, dan dapat digunakan oleh pelanggan di storefront/halaman promo.
 
 * **Endpoint:** `GET /vouchers`
@@ -1024,7 +1241,7 @@ Mengambil daftar voucher aktif yang saat ini berlaku, memiliki sisa kuota, dan d
 
 ---
 
-### 13.2 Validasi & Simulasi Voucher (Apply Voucher)
+### 14.2 Validasi & Simulasi Voucher (Apply Voucher)
 Memvalidasi kode voucher terhadap subtotal belanja atau daftar item keranjang sebelum checkout. Endpoint ini menghitung potensi potongan diskon tanpa mengunci kuota atau mengubah status keranjang.
 
 * **Endpoint:** `POST /vouchers/apply`
@@ -1093,7 +1310,7 @@ Mengembalikan envelope error standar `success: false` dengan pesan spesifik kega
 
 ---
 
-## 14. Ringkasan Kode Status HTTP (HTTP Status Codes)
+## 15. Ringkasan Kode Status HTTP (HTTP Status Codes)
 
 | Kode | Status | Keterangan untuk Frontend |
 |---|---|---|
@@ -1105,7 +1322,8 @@ Mengembalikan envelope error standar `success: false` dengan pesan spesifik kega
 | `409` | **Conflict** | Terjadi konflik transaksi stok habis (`stock_unavailable`) atau perubahan harga (`price_changed`). |
 | `422` | **Unprocessable Content** | Validasi payload gagal (misal email duplikat, voucher kadaluarsa). Periksa objek `errors`. |
 | `429` | **Too Many Requests** | Terkena limitasi frekuensi request (auth/checkout > 10x/menit, guest > 15x/menit). Periksa header `Retry-After`. |
-| `503` | **Service Unavailable** | Layanan eksternal (misal API ekspedisi kurir) sedang offline atau bermasalah. |
+| `502` | **Bad Gateway** | Penyedia eksternal (kurir) menolak permintaan karena parameter tidak valid (`error_code: shipping_provider_rejected`). Indikasi bug backend, bukan kesalahan frontend. |
+| `503` | **Service Unavailable** | Layanan eksternal sedang bermasalah atau belum dikonfigurasi: kurir tidak bisa dihubungi (`shipping_provider_unreachable`, `shipping_provider_invalid_response`) atau gudang asal belum diatur admin (`shipping_not_configured`). |
 | `500` | **Internal Server Error** | Terjadi kesalahan server backend. |
 
 

@@ -13,6 +13,12 @@ class Order extends Model
 {
     use HasFactory;
 
+    /**
+     * Prefix nomor pesanan. Diubah dari `UJN` ke `PLR`; order lama tetap
+     * memakai prefix lamanya.
+     */
+    public const NUMBER_PREFIX = 'PLR';
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_AWAITING_CONFIRMATION = 'awaiting_confirmation';
@@ -155,7 +161,11 @@ class Order extends Model
         'shipping_full_address',
         'shipping_address_snapshot',
         'shipping_courier',
+        'shipping_courier_code',
         'shipping_service',
+        'shipping_quote_snapshot',
+        'shipping_weight_grams',
+        'shipping_destination_id',
         'tracking_number',
         'stock_locked_until',
         'confirmed_at',
@@ -181,6 +191,9 @@ class Order extends Model
             'shipping_cost' => 'decimal:2',
             'total' => 'decimal:2',
             'shipping_address_snapshot' => 'array',
+            'shipping_quote_snapshot' => 'array',
+            'shipping_weight_grams' => 'integer',
+            'shipping_destination_id' => 'integer',
             'stock_locked_until' => 'datetime',
             'confirmed_at' => 'datetime',
             'refund_amount' => 'decimal:2',

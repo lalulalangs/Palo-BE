@@ -16,12 +16,14 @@ use App\Models\Voucher;
 use App\Services\Orders\OrderTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\FakesRajaOngkir;
 use Tests\Support\FakesDokuCheckout;
 use Tests\TestCase;
 
 class RegisteredCheckoutApiTest extends TestCase
 {
     use FakesDokuCheckout;
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     protected User $user;
@@ -119,15 +121,20 @@ class RegisteredCheckoutApiTest extends TestCase
 
     public function test_shipping_quote_returns_503_when_courier_service_down(): void
     {
+        // Penyedia gagal dan belum ada cache: checkout harus fail-closed,
+        // bukan memakai angka perkiraan.
+        $this->rajaOngkirOutage = true;
+
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/v1/shipping/quote', [
-                'destination_city' => 'SIMULATE_DOWN',
+                'destination_id' => 17596,
                 'items' => [
                     ['sku_id' => $this->sku->id, 'quantity' => 1],
                 ],
             ]);
 
-        $response->assertStatus(503);
+        $response->assertStatus(503)
+            ->assertJsonPath('error_code', 'shipping_provider_invalid_response');
     }
 
     public function test_registered_user_can_create_order_successfully(): void
@@ -175,7 +182,7 @@ class RegisteredCheckoutApiTest extends TestCase
             ->assertJsonPath('data.payment.method', 'qris');
 
         $orderNumber = $response->json('data.order_number');
-        $this->assertStringStartsWith('UJN-', $orderNumber);
+        $this->assertStringStartsWith('PLR-', $orderNumber);
 
         // Verify order in database
         $order = Order::where('order_number', $orderNumber)->firstOrFail();

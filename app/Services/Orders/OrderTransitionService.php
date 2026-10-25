@@ -339,10 +339,13 @@ class OrderTransitionService
                     'cancelled_reason' => $cleanReason,
                 ]);
 
+                // Pembatalan manual selalu berarti `cancel`. Kedaluwarsa punya
+                // jalurnya sendiri (expireOrder) yang sekaligus mengubah status
+                // order; sebelumnya status payment ditebak dari teks alasan,
+                // sehingga mengubah kalimat alasan diam-diam mengubah status.
                 if ($lockedOrder->payment && $lockedOrder->payment->status === Payment::STATUS_PENDING) {
-                    $isExpired = str_contains(strtolower($cleanReason), 'kedaluwarsa') || str_contains(strtolower($cleanReason), 'expired');
                     $lockedOrder->payment->update([
-                        'status' => $isExpired ? Payment::STATUS_EXPIRE : Payment::STATUS_CANCEL,
+                        'status' => Payment::STATUS_CANCEL,
                     ]);
                 }
 

@@ -19,6 +19,14 @@ class AdminUser extends Authenticatable implements FilamentUser
 
     use HasFactory;
 
+    /**
+     * Gating fitur (`hasFeatureAccess`) membaca role untuk setiap resource saat
+     * navigasi dibangun. Eager load menghindari 1 query lazy per request.
+     *
+     * @var array<int, string>
+     */
+    protected $with = ['role'];
+
     protected $fillable = [
         'role_id',
         'permissions',

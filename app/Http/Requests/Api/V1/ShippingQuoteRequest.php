@@ -24,10 +24,14 @@ class ShippingQuoteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'destination_city' => ['required', 'string', 'max:100'],
-            'items' => ['nullable', 'array'],
+            // `destination_id` (subdistrict RajaOngkir) adalah cara yang benar.
+            // `destination_city` dipertahankan satu rilis untuk frontend lama:
+            // server akan mencarikan ID-nya (hasil pencarian di-cache).
+            'destination_id' => ['nullable', 'integer', 'min:1'],
+            'destination_city' => ['required_without:destination_id', 'nullable', 'string', 'max:100'],
+            'items' => ['nullable', 'array', 'max:50'],
             'items.*.sku_id' => ['required_with:items', 'integer', 'exists:skus,id'],
-            'items.*.quantity' => ['required_with:items', 'integer', 'min:1'],
+            'items.*.quantity' => ['required_with:items', 'integer', 'min:1', 'max:100'],
         ];
     }
 
@@ -37,10 +41,13 @@ class ShippingQuoteRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'destination_city.required' => 'Kota tujuan pengiriman wajib diisi.',
+            'destination_id.integer' => 'Tujuan pengiriman tidak valid.',
+            'destination_city.required_without' => 'Kota tujuan atau ID destinasi wajib diisi.',
+            'items.max' => 'Maksimal 50 item per permintaan ongkir.',
             'items.*.sku_id.required_with' => 'SKU produk wajib dipilih.',
             'items.*.sku_id.exists' => 'SKU produk tidak ditemukan.',
             'items.*.quantity.min' => 'Jumlah barang minimal 1.',
+            'items.*.quantity.max' => 'Jumlah barang maksimal 100.',
         ];
     }
 }

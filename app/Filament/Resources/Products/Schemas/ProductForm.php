@@ -27,14 +27,14 @@ class ProductForm
                     ->schema([
                         Select::make('category_id')
                             ->relationship('category', 'name')
-                            ->searchable()
-                            ->preload(),
+                            // Tanpa preload(): opsi dicari ke database saat
+                            // diketik, bukan memuat semua kategori ke payload.
+                            ->searchable(),
                         Select::make('collections')
                             ->label('Koleksi / Series (Opsional)')
                             ->relationship('collections', 'name')
                             ->multiple()
                             ->searchable()
-                            ->preload()
                             ->helperText('Pilih satu atau lebih koleksi yang menaungi produk ini.'),
                         TextInput::make('name')
                             ->label('Nama Produk')

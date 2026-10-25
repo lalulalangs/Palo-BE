@@ -13,12 +13,14 @@ use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\FakesRajaOngkir;
 use Tests\Support\FakesDokuCheckout;
 use Tests\TestCase;
 
 class CartAndCheckoutEdgeCasesTest extends TestCase
 {
     use FakesDokuCheckout;
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     protected User $user;

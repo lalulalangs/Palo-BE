@@ -21,10 +21,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 use LogicException;
+use Tests\Concerns\FakesRajaOngkir;
 use Tests\TestCase;
 
 class CodIntegrationQaTest extends TestCase
 {
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     private User $user;

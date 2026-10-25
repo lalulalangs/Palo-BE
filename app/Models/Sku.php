@@ -21,6 +21,9 @@ class Sku extends Model
         'price_override',
         'stock',
         'weight_grams',
+        'length_cm',
+        'width_cm',
+        'height_cm',
         'is_active',
     ];
 
@@ -30,6 +33,9 @@ class Sku extends Model
             'price_override' => 'decimal:2',
             'stock' => 'integer',
             'weight_grams' => 'integer',
+            'length_cm' => 'integer',
+            'width_cm' => 'integer',
+            'height_cm' => 'integer',
             'is_active' => 'boolean',
         ];
     }

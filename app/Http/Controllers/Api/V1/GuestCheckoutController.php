@@ -27,9 +27,6 @@ class GuestCheckoutController extends Controller
         $result = $this->guestCheckoutService->codCheckout(
             shippingAddress: (array) $request->input('shipping_address'),
             itemsInput: $request->input('items'),
-            shippingCourier: $request->input('shipping_courier'),
-            shippingService: $request->input('shipping_service'),
-            shippingCost: (float) $request->input('shipping_cost', 0),
             note: $request->input('note'),
             sessionId: $sessionId
         );

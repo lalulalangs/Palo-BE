@@ -57,6 +57,8 @@ Route::prefix('v1')->group(function (): void {
 
     // Shipping Quotes (PRD §3.8 & KONTRAK-API §3)
     Route::post('shipping/quote', [ShippingController::class, 'quote'])->middleware('auth:sanctum');
+    Route::get('shipping/destinations', [ShippingController::class, 'destinations'])
+        ->middleware(['auth:sanctum', 'throttle:60,1']);
 
     // Authenticated Checkout & Order Tracking (PRD §3.5, §3.6 & KONTRAK-API §3)
     Route::middleware('auth:sanctum')->group(function (): void {

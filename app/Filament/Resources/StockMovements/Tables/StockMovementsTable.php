@@ -74,9 +74,10 @@ class StockMovementsTable
                     ->options(StockMovement::getTypeLabels()),
                 SelectFilter::make('sku_id')
                     ->label('Filter SKU')
+                    // Tanpa preload(): opsi dicari ke database saat diketik,
+                    // bukan memuat seluruh tabel skus ke payload Livewire.
                     ->relationship('sku', 'sku_code')
-                    ->searchable()
-                    ->preload(),
+                    ->searchable(),
             ]);
     }
 }
