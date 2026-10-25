@@ -200,7 +200,7 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
     /**
      * Edge Case 5: Cart merge ignores inactive or soft-deleted products.
      */
-    public function test_cart_merge_ignores_inactive_or_deleted_products(): void
+    public function test_cart_merge_upon_login_ignores_inactive_or_deleted_products(): void
     {
         $guestToken = 'guest-edge-merge';
 
@@ -214,9 +214,12 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
         // Product gets soft-deleted before user logs in
         $this->product->delete();
 
-        // User logs in and attempts merge
-        $this->actingAs($this->user, 'sanctum')
-            ->postJson('/api/v1/cart/merge', [
+        // User logs in; login yang menggabungkan keranjang tamu
+        // (endpoint /cart/merge sudah dihapus).
+        $this->withHeader('X-Guest-Token', $guestToken)
+            ->postJson('/api/v1/auth/login', [
+                'email' => 'edge@example.test',
+                'password' => 'Password123!',
                 'guest_token' => $guestToken,
             ])->assertOk();
 

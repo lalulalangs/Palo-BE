@@ -202,7 +202,7 @@ class CartApiTest extends TestCase
         ]);
     }
 
-    public function test_guest_cart_is_merged_into_user_cart_via_explicit_merge_endpoint(): void
+    public function test_guest_cart_is_merged_into_user_cart_upon_customer_login(): void
     {
         $guestToken = 'guest-merge-token';
 
@@ -227,13 +227,19 @@ class CartApiTest extends TestCase
                 'quantity' => 1,
             ])->assertOk();
 
-        // Merge guest cart
-        $mergeResponse = $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/cart/merge', [
+        // Endpoint khusus merge sudah dihapus: jalurnya adalah login (yang
+        // juga menggabungkan keranjang tamu ke akun).
+        $loginResponse = $this->withHeader('X-Guest-Token', $guestToken)
+            ->postJson('/api/v1/auth/login', [
+                'email' => 'lalu@example.test',
+                'password' => 'password123',
                 'guest_token' => $guestToken,
-            ]);
+            ])
+            ->assertOk();
 
-        $mergeResponse->assertOk()
+        $this->withHeader('Authorization', 'Bearer '.$loginResponse->json('data.token'))
+            ->getJson('/api/v1/cart')
+            ->assertOk()
             ->assertJsonPath('data.summary.item_count', 2)
             ->assertJsonPath('data.summary.total_quantity', 3);
 
@@ -374,7 +380,7 @@ class CartApiTest extends TestCase
         $this->assertTrue(Cache::has('cart:session:'.hash('sha256', $token)));
     }
 
-    public function test_merge_rotates_guest_token_and_clears_old_cache_entry(): void
+    public function test_login_rotates_guest_token_and_clears_old_cache_entry(): void
     {
         $guestToken = 'guest-token-to-rotate';
 
@@ -391,17 +397,21 @@ class CartApiTest extends TestCase
             'password_hash' => Hash::make('password123'),
         ]);
 
-        $response = $this->actingAs($user, 'sanctum')
-            ->postJson('/api/v1/cart/merge', ['guest_token' => $guestToken])
+        // Endpoint merge sudah dihapus; rotasi token tamu terjadi di login.
+        $response = $this->withHeader('X-Guest-Token', $guestToken)
+            ->postJson('/api/v1/auth/login', [
+                'email' => 'rotate@example.test',
+                'password' => 'password123',
+                'guest_token' => $guestToken,
+            ])
             ->assertOk();
 
-        $rotatedToken = $response->json('data.guest_token');
+        $rotatedToken = $response->getCookie('guest_cart_id', false)?->getValue();
 
         $this->assertIsString($rotatedToken);
         $this->assertTrue(Str::isUuid($rotatedToken));
         $this->assertNotSame($guestToken, $rotatedToken);
         $this->assertFalse(Cache::has('cart:session:'.hash('sha256', $guestToken)));
-        $this->assertSame($rotatedToken, $response->getCookie('guest_cart_id', false)?->getValue());
     }
 
     public function test_guest_cart_cookie_is_http_only_and_lax(): void

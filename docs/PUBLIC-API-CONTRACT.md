@@ -728,17 +728,10 @@ Mengembalikan struktur data keranjang yang telah diperbarui. Jika stok tidak men
 * **Endpoint:** `DELETE /cart/items/{skuId}`
 * **Auth:** Opsional
 
-### 9.5 Penggabungan Keranjang Guest ke Akun User (Cart Merge)
-* **Endpoint:** `POST /cart/merge`
-* **Auth:** Wajib (`Bearer <token>`)
+### 9.5 Penggabungan Keranjang Guest ke Akun User (Otomatis, Tanpa Endpoint)
+Tidak ada endpoint merge terpisah. Keranjang tamu digabungkan **otomatis** di dalam `POST /auth/login` dan `POST /auth/register` bila request membawa `guest_token` di body, header `X-Guest-Token`, atau cookie `guest_cart_id`. Server memutar token tamu dan mengirimkan token baru lewat cookie `guest_cart_id`.
 
-#### Request Body (Opsional)
-```json
-{
-  "guest_token": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-}
-```
-*(Jika field `guest_token` tidak dikirim, server otomatis membaca dari cookie `guest_cart_id` atau header `X-Guest-Token`).*
+> `POST /cart/merge` dihapus 25-10-2026: tidak punya konsumen, dan perilakunya sudah tercakup oleh login/register (`AuthController::mergeGuestCartIfPresent()`).
 
 ---
 

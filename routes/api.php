@@ -37,7 +37,6 @@ Route::prefix('v1')->group(function (): void {
             Route::post('items', [CartController::class, 'addItem']);
             Route::patch('items/{skuId}', [CartController::class, 'updateItem']);
             Route::delete('items/{skuId}', [CartController::class, 'removeItem']);
-            Route::post('merge', [CartController::class, 'merge'])->middleware('auth:sanctum');
         });
     });
 

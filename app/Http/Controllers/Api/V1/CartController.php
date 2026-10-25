@@ -5,16 +5,12 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\AddToCartRequest;
 use App\Http\Requests\Api\V1\UpdateCartItemRequest;
-use App\Models\User;
 use App\Services\Cart\CartService;
-use App\Traits\ResolvesGuestToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
-    use ResolvesGuestToken;
-
     public function __construct(
         protected CartService $cartService
     ) {}
@@ -72,28 +68,6 @@ class CartController extends Controller
 
         return $this->withGuestCartCookie(
             $this->respond($cart, 'Produk berhasil dihapus dari keranjang.'),
-            $cart,
-        );
-    }
-
-    /**
-     * Merge guest cart into authenticated user cart.
-     */
-    public function merge(Request $request): JsonResponse
-    {
-        /** @var User $user */
-        $user = $request->user('sanctum');
-
-        $guestToken = $this->getGuestToken($request);
-
-        if ($guestToken === null) {
-            return $this->respond($this->cartService->getCart($user));
-        }
-
-        $cart = $this->cartService->mergeGuestCart($user, $guestToken);
-
-        return $this->withGuestCartCookie(
-            $this->respond($cart, 'Keranjang tamu berhasil digabungkan ke akun Anda.'),
             $cart,
         );
     }
