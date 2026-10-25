@@ -19,6 +19,7 @@ use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -143,7 +144,16 @@ class ManageShippingSettings extends Page
                             ->required()
                             ->placeholder('Ketik nama kecamatan atau desa, mis. Bayan')
                             ->getSearchResultsUsing(fn (string $search): array => $this->searchOriginOptions($search))
-                            ->getOptionLabelUsing(fn (): ?string => AppSetting::getValue('shipping_origin_label'))
+                            ->getOptionLabelUsing(function (mixed $value, Get $get): ?string {
+                                if (blank($value)) {
+                                    return null;
+                                }
+
+                                return $this->originOptions[(int) $value]
+                                    ?? $get('shipping_origin_label')
+                                    ?? AppSetting::getValue('shipping_origin_label')
+                                    ?? (string) $value;
+                            })
                             ->afterStateUpdated(function (mixed $state, Set $set): void {
                                 // Label disimpan sekali saat dipilih supaya
                                 // halaman tidak perlu memanggil API lagi.
@@ -214,9 +224,14 @@ class ManageShippingSettings extends Page
 
         $normalize = fn (mixed $value): ?string => blank($value) ? null : trim((string) $value);
 
+        $originId = $state['shipping_origin_subdistrict_id'] ?? null;
+        $originLabel = $state['shipping_origin_label']
+            ?? ($this->originOptions[(int) $originId] ?? null)
+            ?? AppSetting::getValue('shipping_origin_label');
+
         AppSetting::setMany([
-            'shipping_origin_subdistrict_id' => $normalize($state['shipping_origin_subdistrict_id'] ?? null),
-            'shipping_origin_label' => $normalize($state['shipping_origin_label'] ?? null),
+            'shipping_origin_subdistrict_id' => $normalize($originId),
+            'shipping_origin_label' => $normalize($originLabel),
             'shipping_enabled_couriers' => implode(':', (array) ($state['shipping_enabled_couriers'] ?? [])),
             'shipping_excluded_services' => ($state['hide_cargo_services'] ?? true)
                 ? self::CARGO_SERVICE_CODES

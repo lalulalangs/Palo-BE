@@ -62,6 +62,22 @@ class ShippingSettingsTest extends TestCase
         $this->assertSame('JTR,JTR<130,JTR>130,JTR>200', AppSetting::getValue('shipping_excluded_services'));
     }
 
+    public function test_can_save_origin_when_no_previous_origin_label_exists_in_database(): void
+    {
+        // Simulasi kondisi awal/fresh database di mana belum ada shipping_origin_label sama sekali
+        AppSetting::whereIn('key', ['shipping_origin_subdistrict_id', 'shipping_origin_label'])->delete();
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(ManageShippingSettings::class)
+            ->set('data.shipping_origin_subdistrict_id', 746)
+            ->set('data.shipping_origin_label', 'Bayan, Lombok Utara, NTB, 83354')
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('746', AppSetting::getValue('shipping_origin_subdistrict_id'));
+        $this->assertSame('Bayan, Lombok Utara, NTB, 83354', AppSetting::getValue('shipping_origin_label'));
+    }
+
     public function test_cargo_services_can_be_shown_again(): void
     {
         AppSetting::setValue('shipping_excluded_services', 'JTR,JTR<130,JTR>130,JTR>200');
