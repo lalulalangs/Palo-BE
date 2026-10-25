@@ -197,6 +197,52 @@ class RegisteredCheckoutApiTest extends TestCase
         $cartCheck->assertOk()->assertJsonPath('data.summary.item_count', 0);
     }
 
+    /**
+     * `online` = jalur pembayaran DOKU tanpa mengunci kanal.
+     *
+     * Ini nilai yang dikirim storefront sejak checkout berhenti menanyakan
+     * metode: pembeli memilih QRIS/VA/e-wallet/kartu DI HALAMAN DOKU. Test ini
+     * menjaga dua hal sekaligus — endpoint menerima nilainya, dan payment
+     * tersimpan sebagai `online` (kanal sebenarnya baru diketahui dari webhook).
+     */
+    public function test_checkout_accepts_neutral_online_payment_method(): void
+    {
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Rinjani Hiker',
+                'phone' => '081234567890',
+                'street' => 'Jl. Pariwisata Senaru No. 12',
+                'city' => 'Lombok Utara',
+                'province' => 'Nusa Tenggara Barat',
+                'postal_code' => '83354',
+            ],
+            'items' => [
+                [
+                    'sku_id' => $this->sku->id,
+                    'quantity' => 1,
+                    'price_seen' => 350000,
+                ],
+            ],
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+            'shipping_cost' => 28000,
+            'payment_method' => 'online',
+        ];
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $response->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'menunggu_pembayaran');
+
+        $order = Order::where('order_number', $response->json('data.order_number'))->firstOrFail();
+
+        // Order menyimpan jalur "online"; payment menyimpan kanal yang diminta.
+        $this->assertSame(Order::PAYMENT_METHOD_ONLINE, $order->payment_method);
+        $this->assertSame('online', $order->payment?->payment_method);
+    }
+
     public function test_checkout_ignores_client_shipping_cost_and_records_server_rate(): void
     {
         // Manipulasi audit S-02: client mengirim shipping_cost 0 (atau nilai

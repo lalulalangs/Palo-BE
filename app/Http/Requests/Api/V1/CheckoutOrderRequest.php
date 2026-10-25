@@ -66,7 +66,11 @@ class CheckoutOrderRequest extends FormRequest
             // S-02): tarif resmi dihitung ulang server-side di RegisteredCheckoutService.
             'shipping_etd' => ['nullable', 'string', 'max:50'],
 
-            'payment_method' => ['required', 'string', 'in:qris,virtual_account,ewallet,bank_transfer,credit_card,cod'],
+            // `online` = pembayaran lewat DOKU Checkout TANPA mengunci kanal:
+            // pembeli memilih QRIS/VA/e-wallet/kartu di halaman DOKU. Nilai
+            // kanal spesifik (qris, virtual_account, ...) tetap diterima untuk
+            // klien lama, tetapi mengunci halaman DOKU ke kanal itu saja.
+            'payment_method' => ['required', 'string', 'in:qris,virtual_account,ewallet,bank_transfer,credit_card,online,cod'],
             'voucher_code' => ['nullable', 'string', 'max:50'],
             'acknowledge_price_change' => ['nullable', 'boolean'],
             'shipping_address_id' => ['nullable', 'integer'],

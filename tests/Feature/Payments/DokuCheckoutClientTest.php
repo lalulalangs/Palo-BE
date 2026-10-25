@@ -121,6 +121,33 @@ class DokuCheckoutClientTest extends TestCase
         $this->assertSame('2026-10-20T09:45:00+00:00', $result['expires_at']);
     }
 
+    /**
+     * `online` = kanal dipilih pembeli DI HALAMAN DOKU.
+     *
+     * Kalau `payment.payment_method_types` ikut dikirim, DOKU mengunci halaman
+     * pembayaran ke kanal itu (mis. `qris` → "/payment/page/qris?status=single-payment")
+     * sehingga pembeli tidak pernah melihat pilihan VA/e-wallet/kartu. Untuk
+     * metode `online`, kunci itu harus TIDAK ada sama sekali.
+     */
+    public function test_online_method_leaves_payment_channel_open(): void
+    {
+        $this->fakeCheckoutSuccess();
+
+        $order = $this->makeOrder();
+
+        app(DokuCheckoutClient::class)->createPayment($order, 'online');
+
+        Http::assertSent(function (ClientRequest $request): bool {
+            $payload = json_decode($request->body(), true);
+
+            $this->assertArrayNotHasKey('payment_method_types', $payload['payment']);
+            // Kunci lain tetap ada: jendela bayar tidak ikut hilang.
+            $this->assertSame(60, $payload['payment']['payment_due_date']);
+
+            return true;
+        });
+    }
+
     public function test_sends_integer_amount_matching_line_items(): void
     {
         $this->fakeCheckoutSuccess();
