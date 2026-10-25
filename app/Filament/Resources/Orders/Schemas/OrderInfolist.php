@@ -245,6 +245,26 @@ class OrderInfolist
                                                     ->placeholder('-'),
                                             ]),
 
+                                        Section::make('Informasi WhatsApp & Tamu')
+                                            ->visible(fn (Order $record): bool => $record->isWhatsAppOrder())
+                                            ->schema([
+                                                TextEntry::make('guest_reference_code')
+                                                    ->label('Kode Referensi WhatsApp')
+                                                    ->fontFamily(FontFamily::Mono)
+                                                    ->weight('bold')
+                                                    ->copyable()
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('confirmed_at')
+                                                    ->label('Waktu Dikonfirmasi CS')
+                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->placeholder('Menunggu konfirmasi CS'),
+
+                                                TextEntry::make('confirmedBy.name')
+                                                    ->label('Dikonfirmasi Oleh')
+                                                    ->placeholder('-'),
+                                            ]),
+
                                         Section::make('Informasi Pengembalian Dana (Refund)')
                                             ->visible(fn (Order $record): bool => $record->hasRefund())
                                             ->schema([

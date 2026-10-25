@@ -111,9 +111,201 @@ class GuestCheckoutService
 
         $estimatedTotal = round($estimatedTotal, 2);
 
-        $referenceCode = 'GC-'.date('Ymd').'-'.strtoupper(Str::random(4));
         $formattedTotal = Number::currency($estimatedTotal, 'IDR', 'id');
 
+        // Batas waktu yang sama dipakai untuk mengenali order lama yang layak
+        // dipakai ulang dan oleh command `orders:expire-unconfirmed-cod`.
+        $timeoutHours = (int) (AppSetting::getValue('cod_confirmation_timeout_hours', '24') ?: 24);
+        $csNumber = $this->getCleanCsWhatsAppNumber();
+
+        return DB::transaction(function () use (
+            $snapshot,
+            $lines,
+            $estimatedTotal,
+            $formattedTotal,
+            $guestName,
+            $guestPhone,
+            $note,
+            $sessionId,
+            $csNumber,
+            $timeoutHours,
+        ) {
+            /*
+             * DEDUPE. Menekan tombol dua kali (atau mengulang setelah jeda)
+             * tidak boleh membuat dua pesanan: pembeli akan bingung dan admin
+             * harus membatalkan salah satunya. Kalau sesi ini masih punya
+             * pesanan WhatsApp yang menunggu konfirmasi, pesanan ITU yang
+             * dipakai ulang — isinya disegarkan dari keranjang terbaru, kode
+             * referensi dan nomor pesanannya tetap.
+             */
+            $order = $this->findReusableWhatsAppOrder($sessionId, $timeoutHours);
+            $reused = $order !== null;
+
+            $referenceCode = $order?->guest_reference_code
+                ?? 'GC-'.date('Ymd').'-'.strtoupper(Str::random(4));
+            $messageText = $this->composeWhatsAppMessage(
+                $lines,
+                $formattedTotal,
+                $guestName,
+                $guestPhone,
+                $note,
+                $referenceCode,
+            );
+            $waUrl = "https://wa.me/{$csNumber}?text=".rawurlencode($messageText);
+
+            $attributes = [
+                'subtotal' => $estimatedTotal,
+                'discount_amount' => 0.0,
+                // Ongkir belum diketahui: CS mengonfirmasinya di WhatsApp.
+                'shipping_cost' => 0.0,
+                'total' => $estimatedTotal,
+                'shipping_recipient_name' => filled($guestName) ? $guestName : 'Tamu',
+                'shipping_phone' => filled($guestPhone) ? $guestPhone : null,
+            ];
+
+            if ($order !== null) {
+                $order->update($attributes);
+            } else {
+                /** @var Order $order */
+                $order = Order::create($attributes + [
+                    'order_number' => $this->generateOrderNumber(),
+                    'user_id' => null,
+                    'voucher_id' => null,
+                    'status' => Order::STATUS_AWAITING_CONFIRMATION,
+                    'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
+                    'guest_reference_code' => $referenceCode,
+                    'shipping_full_address' => null,
+                    'shipping_courier' => null,
+                    'shipping_service' => null,
+                    // Tidak ada reservasi stok: stok dipotong saat admin konfirmasi.
+                    'stock_locked_until' => null,
+                ]);
+            }
+
+            // Item selalu ditulis ulang: isi keranjang bisa berubah di antara
+            // dua submissions. Snapshot lama dihapus supaya tidak ada baris
+            // hantu dari keranjang sebelumnya.
+            OrderItem::where('order_id', $order->id)->delete();
+
+            foreach ($snapshot as $line) {
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'sku_id' => $line['sku_id'],
+                    'product_name_snapshot' => $line['product_name'],
+                    'variant_name_snapshot' => $line['variant_name'] ?? 'Default',
+                    'sku_code_snapshot' => $line['sku_code'],
+                    'price_snapshot' => $line['unit_price'],
+                    'quantity' => $line['quantity'],
+                    'subtotal' => $line['subtotal'],
+                ]);
+            }
+
+            $paymentPayload = [
+                'amount' => $estimatedTotal,
+                'raw_response' => [
+                    'method' => 'whatsapp',
+                    'guest_reference_code' => $referenceCode,
+                    'whatsapp_url' => $waUrl,
+                    'whatsapp_message' => $messageText,
+                    'instructions_text' => 'CS akan menghubungi Anda untuk memilih pembayaran VA/QRIS.',
+                    'resubmitted' => $reused,
+                ],
+            ];
+
+            if ($reused) {
+                // Tenggat TIDAK diperpanjang: memperpanjang setiap submit
+                // membuat pesanan yang sama bisa digantung selamanya.
+                $order->payment?->update($paymentPayload);
+            } else {
+                Payment::create($paymentPayload + [
+                    'order_id' => $order->id,
+                    'gateway' => 'whatsapp',
+                    'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
+                    'status' => Payment::STATUS_PENDING,
+                    'expired_at' => now()->addHours($timeoutHours),
+                ]);
+            }
+
+            if (! $reused) {
+                OrderStatusHistory::create([
+                    'order_id' => $order->id,
+                    'changed_by_admin_id' => null,
+                    'from_status' => null,
+                    'to_status' => Order::STATUS_AWAITING_CONFIRMATION,
+                    'note' => 'Pesanan WhatsApp tamu dibuat, menunggu pembayaran & konfirmasi CS.',
+                    'created_at' => now(),
+                ]);
+            }
+
+            // Satu log per order: submission ulang memperbarui isi log yang
+            // sama, bukan menumpuk baris audit untuk keranjang yang identik.
+            $logAttributes = [
+                'cart_snapshot' => $snapshot,
+                'estimated_total' => $estimatedTotal,
+                'wa_message_text' => $messageText,
+                'wa_cs_number_used' => $csNumber,
+            ];
+
+            if ($reused) {
+                GuestCheckoutLog::where('order_id', $order->id)->update($logAttributes);
+            } else {
+                GuestCheckoutLog::create($logAttributes + [
+                    'order_id' => $order->id,
+                    'session_id' => $sessionId,
+                    'created_at' => now(),
+                ]);
+            }
+
+            return [
+                'reference_code' => $referenceCode,
+                'order_number' => $order->order_number,
+                'wa_url' => $waUrl,
+                'message' => $messageText,
+                'estimated_total' => $estimatedTotal,
+                'estimated_total_display' => $formattedTotal,
+                'notice' => 'Harga dan stok final dikonfirmasi Customer Service.',
+            ];
+        });
+    }
+
+    /**
+     * Pesanan WhatsApp milik sesi ini yang masih boleh dipakai ulang.
+     *
+     * Syaratnya sama dengan batas kedaluwarsa: status menunggu konfirmasi,
+     * metode WhatsApp, dan dibuat dalam jendela timeout. Begitu kedaluwarsa
+     * atau sudah dikonfirmasi admin, submission berikutnya membuat order BARU
+     * — nomor & kode lama tidak dihidupkan kembali.
+     */
+    private function findReusableWhatsAppOrder(string $sessionId, int $timeoutHours): ?Order
+    {
+        $log = GuestCheckoutLog::query()
+            ->where('session_id', $sessionId)
+            ->whereNotNull('order_id')
+            ->where('created_at', '>=', now()->subHours($timeoutHours))
+            ->whereHas('order', function ($query): void {
+                $query->where('payment_method', Order::PAYMENT_METHOD_WHATSAPP)
+                    ->where('status', Order::STATUS_AWAITING_CONFIRMATION);
+            })
+            ->latest('id')
+            ->first();
+
+        return $log?->order;
+    }
+
+    /**
+     * Susun teks pesan WhatsApp. Dipakai jalur buat-baru maupun pakai-ulang,
+     * supaya isi pesan selalu cocok dengan isi pesanan.
+     *
+     * @param  array<int, string>  $lines
+     */
+    private function composeWhatsAppMessage(
+        array $lines,
+        string $formattedTotal,
+        ?string $guestName,
+        ?string $guestPhone,
+        ?string $note,
+        string $referenceCode,
+    ): string {
         $msgParts = [];
         $msgParts[] = 'Halo Palo Mountain Goods, saya ingin memesan:';
         $msgParts[] = implode("\n", $lines);
@@ -131,95 +323,8 @@ class GuestCheckoutService
         }
 
         $msgParts[] = "Kode Referensi: {$referenceCode}";
-        $messageText = implode("\n", $msgParts);
 
-        $csNumber = $this->getCleanCsWhatsAppNumber();
-        $waUrl = "https://wa.me/{$csNumber}?text=".rawurlencode($messageText);
-
-        /** @var Order $order */
-        $order = Order::create([
-            'order_number' => $this->generateOrderNumber(),
-            'user_id' => null,
-            'voucher_id' => null,
-            'status' => Order::STATUS_AWAITING_CONFIRMATION,
-            'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
-            'guest_reference_code' => $referenceCode,
-            'subtotal' => $estimatedTotal,
-            'discount_amount' => 0.0,
-            // Ongkir belum diketahui: CS mengonfirmasinya di WhatsApp.
-            'shipping_cost' => 0.0,
-            'total' => $estimatedTotal,
-            'shipping_recipient_name' => filled($guestName) ? $guestName : 'Tamu',
-            'shipping_phone' => filled($guestPhone) ? $guestPhone : null,
-            'shipping_full_address' => null,
-            'shipping_courier' => null,
-            'shipping_service' => null,
-            // Tidak ada reservasi stok: stok dipotong saat admin konfirmasi.
-            'stock_locked_until' => null,
-        ]);
-
-        foreach ($snapshot as $line) {
-            OrderItem::create([
-                'order_id' => $order->id,
-                'sku_id' => $line['sku_id'],
-                'product_name_snapshot' => $line['product_name'],
-                'variant_name_snapshot' => $line['variant_name'] ?? 'Default',
-                'sku_code_snapshot' => $line['sku_code'],
-                'price_snapshot' => $line['unit_price'],
-                'quantity' => $line['quantity'],
-                'subtotal' => $line['subtotal'],
-            ]);
-        }
-
-        Payment::create([
-            'order_id' => $order->id,
-            'gateway' => 'whatsapp',
-            'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
-            'amount' => $estimatedTotal,
-            'status' => Payment::STATUS_PENDING,
-            // Batas bayar memakai setting yang sama dengan command
-            // `orders:expire-unconfirmed-cod`, supaya tidak ada dua sumber
-            // kebenaran untuk tenggat yang sama.
-            'expired_at' => now()->addHours(
-                (int) (AppSetting::getValue('cod_confirmation_timeout_hours', '24') ?: 24)
-            ),
-            'raw_response' => [
-                'method' => 'whatsapp',
-                'guest_reference_code' => $referenceCode,
-                'whatsapp_url' => $waUrl,
-                'whatsapp_message' => $messageText,
-                'instructions_text' => 'CS akan menghubungi Anda untuk memilih pembayaran VA/QRIS.',
-            ],
-        ]);
-
-        OrderStatusHistory::create([
-            'order_id' => $order->id,
-            'changed_by_admin_id' => null,
-            'from_status' => null,
-            'to_status' => Order::STATUS_AWAITING_CONFIRMATION,
-            'note' => 'Pesanan WhatsApp tamu dibuat, menunggu pembayaran & konfirmasi CS.',
-            'created_at' => now(),
-        ]);
-
-        GuestCheckoutLog::create([
-            'order_id' => $order->id,
-            'session_id' => $sessionId,
-            'cart_snapshot' => $snapshot,
-            'estimated_total' => $estimatedTotal,
-            'wa_message_text' => $messageText,
-            'wa_cs_number_used' => $csNumber,
-            'created_at' => now(),
-        ]);
-
-        return [
-            'reference_code' => $referenceCode,
-            'order_number' => $order->order_number,
-            'wa_url' => $waUrl,
-            'message' => $messageText,
-            'estimated_total' => $estimatedTotal,
-            'estimated_total_display' => $formattedTotal,
-            'notice' => 'Harga dan stok final dikonfirmasi Customer Service.',
-        ];
+        return implode("\n", $msgParts);
     }
 
     /**

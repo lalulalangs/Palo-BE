@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Orders;
 
 use App\Enums\AdminFeature;
+use App\Enums\OrderStatus;
 use App\Filament\Concerns\HasAdminFeatureAccess;
 use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
@@ -35,6 +36,41 @@ class OrderResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Pesanan';
 
     protected static ?string $recordTitleAttribute = 'order_number';
+
+    /**
+     * @return array<string>
+     */
+    public static function getGloballySearchableAttributes(): array
+    {
+        return [
+            'order_number',
+            'guest_reference_code',
+            'cod_reference_code',
+            'shipping_recipient_name',
+            'shipping_phone',
+        ];
+    }
+
+    /**
+     * @param  Order  $record
+     * @return array<string, string>
+     */
+    public static function getGlobalSearchResultDetails(Model $record): array
+    {
+        /** @var Order $record */
+        $details = [
+            'Penerima' => (string) $record->shipping_recipient_name,
+            'Status' => OrderStatus::labelFor($record->status),
+        ];
+
+        if ($record->isCod() && $record->cod_reference_code) {
+            $details['Ref COD'] = $record->cod_reference_code;
+        } elseif ($record->isWhatsAppOrder() && $record->guest_reference_code) {
+            $details['Ref WA'] = $record->guest_reference_code;
+        }
+
+        return $details;
+    }
 
     protected static ?int $navigationSort = 1;
 

@@ -179,6 +179,97 @@ class GuestCheckoutApiTest extends TestCase
         $this->assertTrue($order->canBeConfirmed());
     }
 
+    /**
+     * Submit dua kali dalam satu sesi = SATU pesanan.
+     *
+     * Pembeli yang menekan tombol lagi (atau mengulang setelah jeda) tidak
+     * boleh menghasilkan pesanan kembar; isi pesanan lama disegarkan dari
+     * keranjang terbaru dan nomor/nomornya tidak berubah.
+     */
+    public function test_second_submission_reuses_pending_whatsapp_order(): void
+    {
+        $token = 'dedupe-token-1';
+        $initialOrdersCount = Order::count();
+
+        $first = $this->withHeader('X-Guest-Token', $token)
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+                'guest_name' => 'Budi Santoso',
+            ])->assertCreated();
+
+        $firstNumber = $first->json('data.order_number');
+        $firstReference = $first->json('data.reference_code');
+
+        // Submit ulang dengan jumlah berbeda di sesi yang sama.
+        $second = $this->withHeader('X-Guest-Token', $token)
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 3]],
+                'guest_name' => 'Budi Santoso',
+            ])->assertCreated();
+
+        $this->assertEquals($initialOrdersCount + 1, Order::count());
+        $this->assertSame($firstNumber, $second->json('data.order_number'));
+        $this->assertSame($firstReference, $second->json('data.reference_code'));
+
+        $order = Order::query()->where('order_number', $firstNumber)->firstOrFail();
+
+        // Isi pesanan mengikuti keranjang terbaru, bukan yang pertama.
+        $this->assertEquals(1, $order->items()->count());
+        $this->assertSame(3, (int) $order->items()->first()->quantity);
+        $this->assertEquals((float) $second->json('data.estimated_total'), (float) $order->total);
+        $this->assertEquals((float) $order->total, (float) $order->payment->amount);
+
+        // Satu log per order, bukan dua.
+        $this->assertSame(1, GuestCheckoutLog::query()->where('order_id', $order->id)->count());
+    }
+
+    /**
+     * Sesi berbeda tetap membuat pesanan berbeda — dedupe tidak boleh
+     * menggabungkan dua pembeli yang kebetulan membeli barang sama.
+     */
+    public function test_different_session_creates_separate_whatsapp_order(): void
+    {
+        $initialOrdersCount = Order::count();
+
+        $this->withHeader('X-Guest-Token', 'dedupe-token-a')
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+            ])->assertCreated();
+
+        $this->withHeader('X-Guest-Token', 'dedupe-token-b')
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+            ])->assertCreated();
+
+        $this->assertEquals($initialOrdersCount + 2, Order::count());
+    }
+
+    /**
+     * Pesanan yang sudah kedaluwarsa atau dikonfirmasi admin TIDAK dipakai
+     * ulang: submission berikutnya membuat order baru dengan nomor baru.
+     */
+    public function test_expired_whatsapp_order_is_not_reused(): void
+    {
+        $token = 'dedupe-token-expired';
+
+        $first = $this->withHeader('X-Guest-Token', $token)
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+            ])->assertCreated();
+
+        Order::query()
+            ->where('order_number', $first->json('data.order_number'))
+            ->update(['status' => Order::STATUS_EXPIRED]);
+
+        $second = $this->withHeader('X-Guest-Token', $token)
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+            ])->assertCreated();
+
+        $this->assertNotSame($first->json('data.order_number'), $second->json('data.order_number'));
+        $this->assertNotSame($first->json('data.reference_code'), $second->json('data.reference_code'));
+    }
+
     public function test_guest_checkout_does_not_lock_or_deduct_inventory_stock(): void
     {
         $initialStock = $this->sku->stock;

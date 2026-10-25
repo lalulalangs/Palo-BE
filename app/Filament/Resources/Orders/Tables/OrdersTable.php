@@ -27,12 +27,12 @@ class OrdersTable
             ->columns([
                 TextColumn::make('order_number')
                     ->label('No. Pesanan')
-                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $q) use ($search) {
-                        $q->where('order_number', 'like', "%{$search}%")
-                            ->orWhere('cod_reference_code', 'like', "%{$search}%")
-                            ->orWhere('guest_reference_code', 'like', "%{$search}%")
-                            ->orWhere('shipping_phone', 'like', "%{$search}%");
-                    }))
+                    ->searchable([
+                        'order_number',
+                        'cod_reference_code',
+                        'guest_reference_code',
+                        'shipping_phone',
+                    ])
                     ->sortable()
                     ->weight('bold')
                     ->copyable()
