@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Category;
 use App\Models\GuestCheckoutLog;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sku;
@@ -127,19 +128,55 @@ class GuestCheckoutApiTest extends TestCase
         $this->assertEquals(2250000.0, (float) $response->json('data.estimated_total'));
     }
 
-    public function test_guest_checkout_does_not_create_order_in_orders_table(): void
+    /**
+     * Sejak 25-10-2026 lead WhatsApp tamu MENJADI pesanan.
+     *
+     * Dulu alur ini sengaja tidak membuat order (PRD §3.11 lama), akibatnya
+     * kode GC-xxx tidak bisa ditemukan di panel admin sama sekali. Sekarang
+     * order berstatus `awaiting_confirmation` supaya CS bisa memverifikasi
+     * pembayaran VA/QRIS lalu mengonfirmasinya; stok tetap belum dipotong
+     * sampai konfirmasi itu (lihat test di bawahnya).
+     */
+    public function test_guest_checkout_creates_awaiting_confirmation_order(): void
     {
         $initialOrdersCount = Order::count();
 
-        $this->postJson('/api/v1/guest/whatsapp-checkout', [
+        $response = $this->postJson('/api/v1/guest/whatsapp-checkout', [
             'items' => [
                 ['sku_id' => $this->sku->id, 'quantity' => 1],
             ],
-            'guest_name' => 'No Order Test',
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
         ])->assertCreated();
 
-        // PRD §3.11: Must NEVER create row in orders table
-        $this->assertEquals($initialOrdersCount, Order::count());
+        $this->assertEquals($initialOrdersCount + 1, Order::count());
+
+        $orderNumber = $response->json('data.order_number');
+        $this->assertIsString($orderNumber);
+
+        $order = Order::query()->where('order_number', $orderNumber)->firstOrFail();
+
+        $this->assertSame(Order::STATUS_AWAITING_CONFIRMATION, $order->status->value);
+        $this->assertSame(Order::PAYMENT_METHOD_WHATSAPP, $order->payment_method);
+        $this->assertNull($order->user_id);
+        // Kode yang disebut pembeli ke CS harus tersimpan & bisa dicari.
+        $this->assertSame($response->json('data.reference_code'), $order->guest_reference_code);
+        $this->assertSame('Budi Santoso', $order->shipping_recipient_name);
+        $this->assertSame('081234567890', $order->shipping_phone);
+
+        // Ongkir belum diketahui: total = subtotal, bukan angka karangan.
+        $this->assertEquals((float) $response->json('data.estimated_total'), (float) $order->total);
+        $this->assertEquals(0.0, (float) $order->shipping_cost);
+
+        $this->assertDatabaseHas('order_items', ['order_id' => $order->id, 'quantity' => 1]);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
+            'status' => Payment::STATUS_PENDING,
+        ]);
+        // Log audit tetap tertaut ke order-nya.
+        $this->assertDatabaseHas('guest_checkout_logs', ['order_id' => $order->id]);
+        $this->assertTrue($order->canBeConfirmed());
     }
 
     public function test_guest_checkout_does_not_lock_or_deduct_inventory_stock(): void

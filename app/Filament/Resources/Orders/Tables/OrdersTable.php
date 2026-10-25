@@ -29,19 +29,26 @@ class OrdersTable
                     ->label('No. Pesanan')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $q) use ($search) {
                         $q->where('order_number', 'like', "%{$search}%")
-                            ->orWhere('cod_reference_code', 'like', "%{$search}%");
+                            ->orWhere('cod_reference_code', 'like', "%{$search}%")
+                            ->orWhere('guest_reference_code', 'like', "%{$search}%")
+                            ->orWhere('shipping_phone', 'like', "%{$search}%");
                     }))
                     ->sortable()
                     ->weight('bold')
                     ->copyable()
                     ->fontFamily(FontFamily::Mono)
-                    ->description(fn (Order $record): ?string => $record->isCod() && $record->cod_reference_code ? "COD: {$record->cod_reference_code}" : null),
+                    ->description(fn (Order $record): ?string => match (true) {
+                        $record->isCod() && $record->cod_reference_code => "COD: {$record->cod_reference_code}",
+                        $record->isWhatsAppOrder() && $record->guest_reference_code => "WA: {$record->guest_reference_code}",
+                        default => null,
+                    }),
 
                 TextColumn::make('payment_method')
                     ->label('Metode Bayar')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
                         Order::PAYMENT_METHOD_COD => 'COD',
+                        Order::PAYMENT_METHOD_WHATSAPP => 'WhatsApp (VA/QRIS)',
                         Order::PAYMENT_METHOD_ONLINE => 'Online',
                         default => strtoupper($state ?? 'ONLINE'),
                     })
@@ -90,6 +97,7 @@ class OrdersTable
                     ->options([
                         Order::PAYMENT_METHOD_ONLINE => 'Online',
                         Order::PAYMENT_METHOD_COD => 'Cash On Delivery (COD)',
+                        Order::PAYMENT_METHOD_WHATSAPP => 'WhatsApp Tamu (VA/QRIS)',
                     ]),
 
                 SelectFilter::make('status')

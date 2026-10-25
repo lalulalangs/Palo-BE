@@ -24,10 +24,16 @@ class GuestCheckoutService
     ) {}
 
     /**
-     * Process Guest WhatsApp checkout, create audit log, and generate wa.me link.
+     * Process Guest WhatsApp checkout: buat PESANAN, catat audit log, dan
+     * siapkan tautan wa.me.
+     *
+     * Sejak 25-10-2026 alur ini membuat `Order` sungguhan berstatus
+     * `awaiting_confirmation` (bukan sekadar log), supaya pesanan masuk daftar
+     * pesanan admin dan bisa dikonfirmasi CS setelah pembayaran VA/QRIS
+     * diverifikasi. Ongkir tetap menyusul konfirmasi CS, jadi `total` = subtotal.
      *
      * @param  array<int, array{sku_id: int, quantity: int, price_seen?: float|null}>|null  $itemsInput
-     * @return array{reference_code: string, wa_url: string, message: string, estimated_total: float, estimated_total_display: string, notice: string}
+     * @return array{reference_code: string, order_number: string, wa_url: string, message: string, estimated_total: float, estimated_total_display: string, notice: string}
      */
     public function checkout(
         ?array $itemsInput,
@@ -130,7 +136,73 @@ class GuestCheckoutService
         $csNumber = $this->getCleanCsWhatsAppNumber();
         $waUrl = "https://wa.me/{$csNumber}?text=".rawurlencode($messageText);
 
+        /** @var Order $order */
+        $order = Order::create([
+            'order_number' => $this->generateOrderNumber(),
+            'user_id' => null,
+            'voucher_id' => null,
+            'status' => Order::STATUS_AWAITING_CONFIRMATION,
+            'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
+            'guest_reference_code' => $referenceCode,
+            'subtotal' => $estimatedTotal,
+            'discount_amount' => 0.0,
+            // Ongkir belum diketahui: CS mengonfirmasinya di WhatsApp.
+            'shipping_cost' => 0.0,
+            'total' => $estimatedTotal,
+            'shipping_recipient_name' => filled($guestName) ? $guestName : 'Tamu',
+            'shipping_phone' => filled($guestPhone) ? $guestPhone : null,
+            'shipping_full_address' => null,
+            'shipping_courier' => null,
+            'shipping_service' => null,
+            // Tidak ada reservasi stok: stok dipotong saat admin konfirmasi.
+            'stock_locked_until' => null,
+        ]);
+
+        foreach ($snapshot as $line) {
+            OrderItem::create([
+                'order_id' => $order->id,
+                'sku_id' => $line['sku_id'],
+                'product_name_snapshot' => $line['product_name'],
+                'variant_name_snapshot' => $line['variant_name'] ?? 'Default',
+                'sku_code_snapshot' => $line['sku_code'],
+                'price_snapshot' => $line['unit_price'],
+                'quantity' => $line['quantity'],
+                'subtotal' => $line['subtotal'],
+            ]);
+        }
+
+        Payment::create([
+            'order_id' => $order->id,
+            'gateway' => 'whatsapp',
+            'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
+            'amount' => $estimatedTotal,
+            'status' => Payment::STATUS_PENDING,
+            // Batas bayar memakai setting yang sama dengan command
+            // `orders:expire-unconfirmed-cod`, supaya tidak ada dua sumber
+            // kebenaran untuk tenggat yang sama.
+            'expired_at' => now()->addHours(
+                (int) (AppSetting::getValue('cod_confirmation_timeout_hours', '24') ?: 24)
+            ),
+            'raw_response' => [
+                'method' => 'whatsapp',
+                'guest_reference_code' => $referenceCode,
+                'whatsapp_url' => $waUrl,
+                'whatsapp_message' => $messageText,
+                'instructions_text' => 'CS akan menghubungi Anda untuk memilih pembayaran VA/QRIS.',
+            ],
+        ]);
+
+        OrderStatusHistory::create([
+            'order_id' => $order->id,
+            'changed_by_admin_id' => null,
+            'from_status' => null,
+            'to_status' => Order::STATUS_AWAITING_CONFIRMATION,
+            'note' => 'Pesanan WhatsApp tamu dibuat, menunggu pembayaran & konfirmasi CS.',
+            'created_at' => now(),
+        ]);
+
         GuestCheckoutLog::create([
+            'order_id' => $order->id,
             'session_id' => $sessionId,
             'cart_snapshot' => $snapshot,
             'estimated_total' => $estimatedTotal,
@@ -141,6 +213,7 @@ class GuestCheckoutService
 
         return [
             'reference_code' => $referenceCode,
+            'order_number' => $order->order_number,
             'wa_url' => $waUrl,
             'message' => $messageText,
             'estimated_total' => $estimatedTotal,
@@ -344,20 +417,7 @@ class GuestCheckoutService
             // via WhatsApp, jadi total order = subtotal saja.
             $grandTotal = max(0.0, $subtotal);
 
-            // Generate order number
-            $today = date('Ymd');
-            $countToday = Order::query()->whereDate('created_at', now()->toDateString())->count() + 1;
-            $orderNumber = sprintf('%s-%s-%05d', Order::NUMBER_PREFIX, $today, $countToday);
-
-            while (Order::query()->where('order_number', $orderNumber)->exists()) {
-                $orderNumber = sprintf(
-                    '%s-%s-%05d-%s',
-                    Order::NUMBER_PREFIX,
-                    $today,
-                    $countToday,
-                    strtoupper(Str::random(3))
-                );
-            }
+            $orderNumber = $this->generateOrderNumber();
 
             $codReferenceCode = $this->codWhatsAppService->generateReferenceCode();
 
@@ -476,6 +536,31 @@ class GuestCheckoutService
                 'notice' => 'Pesanan COD berhasil dicatat. Silakan konfirmasi pesanan via WhatsApp ke CS.',
             ];
         });
+    }
+
+    /**
+     * Nomor pesanan `PLR-YYYYMMDD-00001`, dengan sufiks acak bila bentrok.
+     *
+     * Satu sumber untuk kedua jalur tamu (COD dan WhatsApp) supaya formatnya
+     * tidak bercabang.
+     */
+    private function generateOrderNumber(): string
+    {
+        $today = date('Ymd');
+        $countToday = Order::query()->whereDate('created_at', now()->toDateString())->count() + 1;
+        $orderNumber = sprintf('%s-%s-%05d', Order::NUMBER_PREFIX, $today, $countToday);
+
+        while (Order::query()->where('order_number', $orderNumber)->exists()) {
+            $orderNumber = sprintf(
+                '%s-%s-%05d-%s',
+                Order::NUMBER_PREFIX,
+                $today,
+                $countToday,
+                strtoupper(Str::random(3))
+            );
+        }
+
+        return $orderNumber;
     }
 
     /**

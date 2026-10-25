@@ -45,6 +45,7 @@ class OrderInfolist
                                     ->badge()
                                     ->formatStateUsing(fn (?string $state): string => match ($state) {
                                         Order::PAYMENT_METHOD_COD => 'COD',
+                                        Order::PAYMENT_METHOD_WHATSAPP => 'WhatsApp (VA/QRIS)',
                                         Order::PAYMENT_METHOD_ONLINE => 'Online',
                                         default => strtoupper($state ?? 'ONLINE'),
                                     })

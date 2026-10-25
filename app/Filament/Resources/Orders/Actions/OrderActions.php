@@ -80,27 +80,37 @@ class OrderActions
     }
 
     /**
-     * Aksi konfirmasi pesanan COD oleh CS dan kurangi stok fisik inventaris gudang.
+     * Konfirmasi pesanan yang pembayarannya diverifikasi manual oleh CS.
+     *
+     * Dua metode masuk ke sini: COD (bayar saat barang tiba) dan WhatsApp tamu
+     * (pembayaran VA/QRIS setelah CS menghubungi pembeli). Keduanya berakhir
+     * sama: status Diproses + stok fisik dipotong.
      */
     public static function makeConfirmCodAction(): Action
     {
         return Action::make('confirm_cod')
-            ->label('Konfirmasi COD')
+            ->label(fn (Order $record): string => $record->isWhatsAppOrder() ? 'Konfirmasi Pesanan' : 'Konfirmasi COD')
             ->icon(Heroicon::OutlinedCheckBadge)
             ->color('success')
             ->visible(fn (Order $record): bool => $record->canBeConfirmed())
-            ->modalHeading('Konfirmasi Pesanan COD')
-            ->modalDescription('Pastikan customer telah dihubungi via WhatsApp dan mengonfirmasi pesanannya. Setelah dikonfirmasi, pesanan beralih ke status Diproses dan stok fisik gudang akan otomatis dipotong.')
+            ->modalHeading(fn (Order $record): string => $record->isWhatsAppOrder()
+                ? 'Konfirmasi Pembayaran Pesanan WhatsApp'
+                : 'Konfirmasi Pesanan COD')
+            ->modalDescription(fn (Order $record): string => $record->isWhatsAppOrder()
+                ? 'Konfirmasi SETELAH pembayaran VA/QRIS dari pembeli benar-benar masuk. Setelah dikonfirmasi, pesanan beralih ke status Diproses dan stok fisik gudang otomatis dipotong.'
+                : 'Pastikan customer telah dihubungi via WhatsApp dan mengonfirmasi pesanannya. Setelah dikonfirmasi, pesanan beralih ke status Diproses dan stok fisik gudang akan otomatis dipotong.')
             ->modalSubmitActionLabel('Konfirmasi & Kurangi Stok')
             ->form([
                 Placeholder::make('customer_info')
                     ->label('Data Penerima')
                     ->content(fn (Order $record): string => "{$record->shipping_recipient_name} ({$record->shipping_phone}) - {$record->shipping_full_address}"),
                 Placeholder::make('cod_ref')
-                    ->label('Kode Referensi COD')
-                    ->content(fn (Order $record): string => $record->cod_reference_code ?? '-'),
+                    ->label(fn (Order $record): string => $record->isWhatsAppOrder() ? 'Kode Referensi WhatsApp' : 'Kode Referensi COD')
+                    ->content(fn (Order $record): string => $record->isWhatsAppOrder()
+                        ? ($record->guest_reference_code ?? '-')
+                        : ($record->cod_reference_code ?? '-')),
                 Placeholder::make('grand_total')
-                    ->label('Total Tagihan COD')
+                    ->label(fn (Order $record): string => $record->isWhatsAppOrder() ? 'Total Tagihan (belum termasuk ongkir)' : 'Total Tagihan COD')
                     ->content(fn (Order $record): string => 'Rp '.number_format((float) $record->total, 0, ',', '.')),
                 Textarea::make('note')
                     ->label('Catatan Konfirmasi CS (Opsional)')
@@ -108,20 +118,28 @@ class OrderActions
             ])
             ->action(function (Order $record, array $data, OrderTransitionService $service): void {
                 try {
-                    $service->confirmCodOrder(
-                        $record,
-                        Auth::id() ? (int) Auth::id() : null,
-                        $data['note'] ?? null
-                    );
+                    if ($record->isWhatsAppOrder()) {
+                        $service->confirmWhatsAppOrder(
+                            $record,
+                            Auth::id() ? (int) Auth::id() : null,
+                            $data['note'] ?? null
+                        );
+                    } else {
+                        $service->confirmCodOrder(
+                            $record,
+                            Auth::id() ? (int) Auth::id() : null,
+                            $data['note'] ?? null
+                        );
+                    }
 
                     Notification::make()
-                        ->title("Pesanan COD {$record->order_number} berhasil dikonfirmasi")
+                        ->title("Pesanan {$record->order_number} berhasil dikonfirmasi")
                         ->body('Status pesanan diubah ke Diproses dan stok fisik gudang telah dipotong.')
                         ->success()
                         ->send();
                 } catch (\Throwable $e) {
                     Notification::make()
-                        ->title('Gagal mengonfirmasi pesanan COD')
+                        ->title('Gagal mengonfirmasi pesanan')
                         ->body($e->getMessage())
                         ->danger()
                         ->send();
