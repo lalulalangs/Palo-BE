@@ -300,15 +300,15 @@ class VoucherApiTest extends TestCase
             'code' => 'RATELIMITVOUCHER',
         ]);
 
-        // Send 10 valid requests
-        for ($i = 0; $i < 10; $i++) {
+        // Send 69 valid requests
+        for ($i = 0; $i < 69; $i++) {
             $this->postJson('/api/v1/vouchers/apply', [
                 'code' => 'RATELIMITVOUCHER',
                 'subtotal' => 100000,
             ])->assertOk();
         }
 
-        // The 11th request must hit 429 Too Many Requests
+        // The 70th request must hit 429 Too Many Requests
         $response = $this->postJson('/api/v1/vouchers/apply', [
             'code' => 'RATELIMITVOUCHER',
             'subtotal' => 100000,

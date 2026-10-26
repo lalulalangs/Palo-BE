@@ -160,7 +160,7 @@ class CodIntegrationQaTest extends TestCase
 
     public function test_cod_checkout_is_rate_limited(): void
     {
-        for ($i = 0; $i < 15; $i++) {
+        for ($i = 0; $i < 69; $i++) {
             $this->postJson('/api/v1/guest/cod-checkout', $this->guestPayload())
                 ->assertCreated();
         }

@@ -12,7 +12,10 @@ use App\Observers\SkuAuditObserver;
 use App\Services\Payments\Doku\DokuCheckoutClient;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use RuntimeException;
 
@@ -37,6 +40,8 @@ class AppServiceProvider extends ServiceProvider
             defaultConnection: (string) config('database.default'),
         );
 
+        $this->configureRateLimiting();
+
         Gate::before(function (mixed $user, string $ability): ?bool {
             if (! $user instanceof AdminUser) {
                 return null;
@@ -59,6 +64,48 @@ class AppServiceProvider extends ServiceProvider
         DateTimePicker::configureUsing(function (DateTimePicker $picker): void {
             $picker->displayFormat('d/m/Y H:i')
                 ->native(false);
+        });
+    }
+
+    /**
+     * Konfigurasi Named Rate Limiters untuk API v1.
+     *
+     * Setiap domain fungsional memiliki namespace kunci cache tersendiri agar
+     * tidak terjadi tabrakan akumulasi counter (rate limiter collision).
+     * Untuk request tamu, X-Guest-Token dijadikan pembeda utama sebelum IP.
+     */
+    protected function configureRateLimiting(): void
+    {
+        RateLimiter::for('auth', function (Request $request) {
+            return Limit::perMinute(69)->by('auth:'.$request->ip());
+        });
+
+        RateLimiter::for('cart', function (Request $request) {
+            return Limit::perMinute(69)->by('cart:'.($request->user()?->id ?: $request->header('X-Guest-Token') ?: $request->ip()));
+        });
+
+        RateLimiter::for('guest', function (Request $request) {
+            return Limit::perMinute(69)->by('guest:'.($request->user()?->id ?: $request->header('X-Guest-Token') ?: $request->ip()));
+        });
+
+        RateLimiter::for('checkout', function (Request $request) {
+            return Limit::perMinute(69)->by('checkout:'.($request->user()?->id ?: $request->ip()));
+        });
+
+        RateLimiter::for('vouchers', function (Request $request) {
+            return Limit::perMinute(69)->by('voucher:'.($request->user()?->id ?: $request->header('X-Guest-Token') ?: $request->ip()));
+        });
+
+        RateLimiter::for('vouchers.index', function (Request $request) {
+            return Limit::perMinute(69)->by('vouchers-list:'.($request->user()?->id ?: $request->ip()));
+        });
+
+        RateLimiter::for('shipping.destinations', function (Request $request) {
+            return Limit::perMinute(69)->by('destinations:'.($request->user()?->id ?: $request->ip()));
+        });
+
+        RateLimiter::for('catalog', function (Request $request) {
+            return Limit::perMinute(69)->by('catalog:'.($request->user()?->id ?: $request->ip()));
         });
     }
 
