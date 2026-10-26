@@ -400,7 +400,7 @@ class CustomerAuthStrictQaTest extends TestCase
      * QA-16: Rate Limiting Enforcement (69 percobaan/menit).
      * Request ke-70 dalam periode 1 menit wajib mengembalikan HTTP 429 Too Many Requests.
      */
-    public function test_rate_limiting_enforces_10_requests_per_minute_returning_429(): void
+    public function test_rate_limiting_enforces_69_requests_per_minute_returning_429(): void
     {
         // 69 request pertama
         for ($i = 1; $i <= 69; $i++) {

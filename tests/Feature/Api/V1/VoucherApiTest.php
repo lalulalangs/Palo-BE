@@ -294,7 +294,7 @@ class VoucherApiTest extends TestCase
             ->assertJsonValidationErrors(['items']);
     }
 
-    public function test_apply_enforces_rate_limit_of_10_requests_per_minute(): void
+    public function test_apply_enforces_69_requests_per_minute(): void
     {
         Voucher::factory()->fixed(10000, 50000)->create([
             'code' => 'RATELIMITVOUCHER',

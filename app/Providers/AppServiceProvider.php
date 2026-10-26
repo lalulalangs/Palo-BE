@@ -105,7 +105,7 @@ class AppServiceProvider extends ServiceProvider
         });
 
         RateLimiter::for('catalog', function (Request $request) {
-            return Limit::perMinute(69)->by('catalog:'.($request->user()?->id ?: $request->ip()));
+            return Limit::perMinute(240)->by('catalog:'.($request->user()?->id ?: $request->header('X-Guest-Token') ?: $request->ip()));
         });
     }
 
