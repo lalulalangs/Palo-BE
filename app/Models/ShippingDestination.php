@@ -36,7 +36,7 @@ class ShippingDestination extends Model
     ];
 
     /**
-     * Scope pencarian multi-kolom fleksibel.
+     * Scope pencarian multi-kolom fleksibel dan case-insensitive lintas database (SQLite & PostgreSQL).
      *
      * @param  Builder<ShippingDestination>  $query
      * @return Builder<ShippingDestination>
@@ -48,11 +48,13 @@ class ShippingDestination extends Model
             return $query;
         }
 
-        return $query->where(function (Builder $q) use ($term): void {
-            $q->where('label', 'like', "%{$term}%")
-                ->orWhere('subdistrict_name', 'like', "%{$term}%")
-                ->orWhere('district_name', 'like', "%{$term}%")
-                ->orWhere('city_name', 'like', "%{$term}%")
+        $operator = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
+        return $query->where(function (Builder $q) use ($term, $operator): void {
+            $q->where('label', $operator, "%{$term}%")
+                ->orWhere('subdistrict_name', $operator, "%{$term}%")
+                ->orWhere('district_name', $operator, "%{$term}%")
+                ->orWhere('city_name', $operator, "%{$term}%")
                 ->orWhere('zip_code', 'like', "{$term}%");
         });
     }

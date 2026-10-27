@@ -5,6 +5,10 @@ namespace Tests\Feature\Shipping;
 use App\Models\ShippingDestination;
 use App\Models\User;
 use Database\Seeders\ShippingDestinationSeeder;
+use Illuminate\Database\Connection;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Database\Query\Grammars\PostgresGrammar;
+use Illuminate\Database\Query\Processors\PostgresProcessor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -101,5 +105,42 @@ class LocalDestinationSearchTest extends TestCase
         }
 
         Http::assertNothingSent();
+    }
+
+    public function test_search_matches_lowercase_keyword_against_uppercase_destination(): void
+    {
+        $this->seed(ShippingDestinationSeeder::class);
+
+        Sanctum::actingAs($this->user);
+
+        // Seeder menyimpan 'CEMPAKA PUTIH BARAT' dalam huruf kapital penuh.
+        // User mengetik dalam huruf kecil penuh ('cempaka').
+        $response = $this->getJson('/api/v1/shipping/destinations?search=cempaka');
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.destinations.0.id', 17596);
+
+        Http::assertNothingSent();
+    }
+
+    public function test_scope_search_uses_ilike_operator_for_postgres_driver(): void
+    {
+        $connection = \Mockery::mock(Connection::class);
+        $connection->shouldReceive('getDriverName')->andReturn('pgsql');
+        $connection->shouldReceive('getTablePrefix')->andReturn('');
+        $grammar = new PostgresGrammar($connection);
+        $connection->shouldReceive('getQueryGrammar')->andReturn($grammar);
+        $connection->shouldReceive('getPostProcessor')->andReturn(new PostgresProcessor);
+
+        $baseQuery = new Builder($connection, $grammar);
+        $eloquentBuilder = (new ShippingDestination)->newEloquentBuilder($baseQuery);
+        $eloquentBuilder->setModel(new ShippingDestination);
+
+        (new ShippingDestination)->scopeSearch($eloquentBuilder, 'cempaka');
+        $sql = $eloquentBuilder->toSql();
+
+        $this->assertStringContainsString('"label"::text ilike ?', $sql);
+        $this->assertStringContainsString('"city_name"::text ilike ?', $sql);
     }
 }
