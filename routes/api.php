@@ -41,10 +41,13 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // Guest Flow (PRD §3.11, §6A & KONTRAK-API §5)
-    Route::prefix('guest')->middleware('throttle:guest')->group(function (): void {
-        Route::post('cod-checkout', [GuestCheckoutController::class, 'codCheckout']);
-        Route::post('whatsapp-checkout', [GuestCheckoutController::class, 'whatsappCheckout']);
-        Route::post('custom-inquiry', [GuestCheckoutController::class, 'customInquiry']);
+    Route::prefix('guest')->group(function (): void {
+        Route::post('cod-checkout', [GuestCheckoutController::class, 'codCheckout'])
+            ->middleware('throttle:guest');
+        Route::post('whatsapp-checkout', [GuestCheckoutController::class, 'whatsappCheckout'])
+            ->middleware('throttle:guest.orders');
+        Route::post('custom-inquiry', [GuestCheckoutController::class, 'customInquiry'])
+            ->middleware('throttle:guest');
     });
 
     // Notifikasi pembayaran DOKU (S-04).

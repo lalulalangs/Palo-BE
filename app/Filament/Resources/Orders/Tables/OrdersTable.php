@@ -88,6 +88,17 @@ class OrdersTable
                         Sum::make()
                             ->money('IDR', locale: 'id')
                             ->label('Total Omset')
+                            ->query(fn ($query) => $query->whereIn('status', [
+                                OrderStatus::Paid->value,
+                                OrderStatus::Processing->value,
+                                OrderStatus::Shipped->value,
+                                OrderStatus::Completed->value,
+                                'paid',
+                                'processing',
+                                'shipped',
+                                'delivered',
+                                'completed',
+                            ]))
                     ),
             ])
             ->defaultSort('created_at', 'desc')

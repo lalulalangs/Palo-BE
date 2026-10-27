@@ -88,6 +88,10 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(69)->by('guest:'.($request->user()?->id ?: $request->header('X-Guest-Token') ?: $request->ip()));
         });
 
+        RateLimiter::for('guest.orders', function (Request $request) {
+            return Limit::perMinute(5)->by('guest-orders:'.$request->ip());
+        });
+
         RateLimiter::for('checkout', function (Request $request) {
             return Limit::perMinute(69)->by('checkout:'.($request->user()?->id ?: $request->ip()));
         });

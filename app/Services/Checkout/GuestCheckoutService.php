@@ -138,7 +138,7 @@ class GuestCheckoutService
              * dipakai ulang — isinya disegarkan dari keranjang terbaru, kode
              * referensi dan nomor pesanannya tetap.
              */
-            $order = $this->findReusableWhatsAppOrder($sessionId, $timeoutHours);
+            $order = $this->findReusableWhatsAppOrder($sessionId, $timeoutHours, $guestPhone);
             $reused = $order !== null;
 
             $referenceCode = $order?->guest_reference_code
@@ -256,6 +256,9 @@ class GuestCheckoutService
                 ]);
             }
 
+            // Bersihkan keranjang tamu setelah checkout berhasil
+            $this->cartService->clearCart(null, $sessionId);
+
             return [
                 'reference_code' => $referenceCode,
                 'order_number' => $order->order_number,
@@ -269,27 +272,37 @@ class GuestCheckoutService
     }
 
     /**
-     * Pesanan WhatsApp milik sesi ini yang masih boleh dipakai ulang.
+     * Pesanan WhatsApp milik sesi ini atau nomor telepon ini yang masih boleh dipakai ulang.
      *
      * Syaratnya sama dengan batas kedaluwarsa: status menunggu konfirmasi,
-     * metode WhatsApp, dan dibuat dalam jendela timeout. Begitu kedaluwarsa
-     * atau sudah dikonfirmasi admin, submission berikutnya membuat order BARU
-     * — nomor & kode lama tidak dihidupkan kembali.
+     * metode WhatsApp, dan dibuat dalam jendela timeout. Dicocokkan berdasarkan
+     * session_id di guest_checkout_logs ATAU shipping_phone di tabel orders.
      */
-    private function findReusableWhatsAppOrder(string $sessionId, int $timeoutHours): ?Order
+    private function findReusableWhatsAppOrder(string $sessionId, int $timeoutHours, ?string $guestPhone = null): ?Order
     {
-        $log = GuestCheckoutLog::query()
-            ->where('session_id', $sessionId)
-            ->whereNotNull('order_id')
+        $cleanPhone = filled($guestPhone) ? preg_replace('/[^0-9]/', '', (string) $guestPhone) : null;
+
+        return Order::query()
+            ->where('payment_method', Order::PAYMENT_METHOD_WHATSAPP)
+            ->where('status', Order::STATUS_AWAITING_CONFIRMATION)
             ->where('created_at', '>=', now()->subHours($timeoutHours))
-            ->whereHas('order', function ($query): void {
-                $query->where('payment_method', Order::PAYMENT_METHOD_WHATSAPP)
-                    ->where('status', Order::STATUS_AWAITING_CONFIRMATION);
+            ->where(function ($query) use ($sessionId, $guestPhone, $cleanPhone): void {
+                $query->whereHas('guestCheckoutLog', function ($logQuery) use ($sessionId): void {
+                    $logQuery->where('session_id', $sessionId);
+                });
+
+                if (filled($cleanPhone) && strlen($cleanPhone) >= 9 && strlen($cleanPhone) <= 15) {
+                    $phones = array_filter([
+                        $guestPhone,
+                        $cleanPhone,
+                        str_starts_with($cleanPhone, '0') ? '62'.substr($cleanPhone, 1) : null,
+                        str_starts_with($cleanPhone, '62') ? '0'.substr($cleanPhone, 2) : null,
+                    ]);
+                    $query->orWhereIn('shipping_phone', array_unique($phones));
+                }
             })
             ->latest('id')
             ->first();
-
-        return $log?->order;
     }
 
     /**
