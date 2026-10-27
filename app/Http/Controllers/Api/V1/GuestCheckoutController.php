@@ -55,7 +55,9 @@ class GuestCheckoutController extends Controller
             guestName: $request->input('guest_name'),
             guestPhone: $request->input('guest_phone'),
             note: $request->input('note'),
-            sessionId: $sessionId
+            sessionId: $sessionId,
+            shippingAddress: $request->input('shipping_address'),
+            courier: $request->input('courier'),
         );
 
         return $this->respond($result, 'Tautan WhatsApp pesanan berhasil dibuat.', status: 201);

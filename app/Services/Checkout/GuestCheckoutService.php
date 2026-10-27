@@ -40,7 +40,9 @@ class GuestCheckoutService
         ?string $guestName,
         ?string $guestPhone,
         ?string $note,
-        string $sessionId
+        string $sessionId,
+        ?array $shippingAddress = null,
+        ?string $courier = null
     ): array {
         $rawItems = $itemsInput;
 
@@ -118,6 +120,18 @@ class GuestCheckoutService
         $timeoutHours = (int) (AppSetting::getValue('cod_confirmation_timeout_hours', '24') ?: 24);
         $csNumber = $this->getCleanCsWhatsAppNumber();
 
+        $fullAddress = null;
+        if (! empty($shippingAddress) && is_array($shippingAddress)) {
+            $fullAddress = trim(implode(', ', array_filter([
+                $shippingAddress['street'] ?? '',
+                $shippingAddress['subdistrict'] ?? '',
+                $shippingAddress['district'] ?? '',
+                $shippingAddress['city'] ?? '',
+                $shippingAddress['province'] ?? '',
+                $shippingAddress['postal_code'] ?? '',
+            ])), ', ');
+        }
+
         return DB::transaction(function () use (
             $snapshot,
             $lines,
@@ -129,6 +143,9 @@ class GuestCheckoutService
             $sessionId,
             $csNumber,
             $timeoutHours,
+            $shippingAddress,
+            $courier,
+            $fullAddress,
         ) {
             /*
              * DEDUPE. Menekan tombol dua kali (atau mengulang setelah jeda)
@@ -150,6 +167,8 @@ class GuestCheckoutService
                 $guestPhone,
                 $note,
                 $referenceCode,
+                $fullAddress,
+                $courier,
             );
             $waUrl = "https://wa.me/{$csNumber}?text=".rawurlencode($messageText);
 
@@ -161,6 +180,10 @@ class GuestCheckoutService
                 'total' => $estimatedTotal,
                 'shipping_recipient_name' => filled($guestName) ? $guestName : 'Tamu',
                 'shipping_phone' => filled($guestPhone) ? $guestPhone : null,
+                'shipping_full_address' => filled($fullAddress) ? $fullAddress : null,
+                'shipping_courier' => filled($courier) ? $courier : null,
+                'shipping_destination_id' => ! empty($shippingAddress['destination_id']) ? (int) $shippingAddress['destination_id'] : null,
+                'shipping_address_snapshot' => ! empty($shippingAddress) ? $shippingAddress : null,
             ];
 
             if ($order !== null) {
@@ -174,8 +197,6 @@ class GuestCheckoutService
                     'status' => Order::STATUS_AWAITING_CONFIRMATION,
                     'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
                     'guest_reference_code' => $referenceCode,
-                    'shipping_full_address' => null,
-                    'shipping_courier' => null,
                     'shipping_service' => null,
                     // Tidak ada reservasi stok: stok dipotong saat admin konfirmasi.
                     'stock_locked_until' => null,
@@ -318,6 +339,8 @@ class GuestCheckoutService
         ?string $guestPhone,
         ?string $note,
         string $referenceCode,
+        ?string $fullAddress = null,
+        ?string $courier = null,
     ): string {
         $msgParts = [];
         $msgParts[] = 'Halo Palo Mountain Goods, saya ingin memesan:';
@@ -330,6 +353,18 @@ class GuestCheckoutService
         }
         if (filled($guestPhone)) {
             $msgParts[] = "Nomor HP: {$guestPhone}";
+        }
+        if (filled($fullAddress)) {
+            $msgParts[] = "Alamat Pengiriman: {$fullAddress}";
+        }
+        if (filled($courier)) {
+            $courierLabel = match (strtolower((string) $courier)) {
+                'jne' => 'JNE (Reguler/YES)',
+                'jnt' => 'J&T Express',
+                'cs_recommendation' => 'Rekomendasi CS (Paling Hemat)',
+                default => strtoupper((string) $courier),
+            };
+            $msgParts[] = "Pilihan Ekspedisi: {$courierLabel}";
         }
         if (filled($note)) {
             $msgParts[] = "Catatan: {$note}";

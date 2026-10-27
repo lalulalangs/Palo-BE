@@ -363,4 +363,44 @@ class GuestCheckoutApiTest extends TestCase
             'estimated_total' => 0,
         ]);
     }
+
+    public function test_guest_checkout_includes_shipping_address_and_courier(): void
+    {
+        $payload = [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Lalu Explorer',
+            'guest_phone' => '08123456789',
+            'shipping_address' => [
+                'street' => 'Jl. Pariwisata Senaru No. 12',
+                'destination_id' => 751,
+                'city' => 'Lombok Utara',
+                'district' => 'Bayan',
+                'subdistrict' => 'Senaru',
+                'province' => 'NTB',
+                'postal_code' => '83354',
+            ],
+            'courier' => 'jne',
+            'note' => 'Mohon packing kayu',
+        ];
+
+        $response = $this->postJson('/api/v1/guest/whatsapp-checkout', $payload);
+
+        $response->assertCreated();
+
+        $waUrl = urldecode($response->json('data.wa_url'));
+        $this->assertStringContainsString('Jl. Pariwisata Senaru No. 12', $waUrl);
+        $this->assertStringContainsString('Senaru', $waUrl);
+        $this->assertStringContainsString('JNE (Reguler/YES)', $waUrl);
+        $this->assertStringContainsString('Mohon packing kayu', $waUrl);
+
+        $orderNumber = $response->json('data.order_number');
+        $this->assertDatabaseHas('orders', [
+            'order_number' => $orderNumber,
+            'shipping_full_address' => 'Jl. Pariwisata Senaru No. 12, Senaru, Bayan, Lombok Utara, NTB, 83354',
+            'shipping_courier' => 'jne',
+            'shipping_destination_id' => 751,
+        ]);
+    }
 }
