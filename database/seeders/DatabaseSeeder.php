@@ -111,5 +111,8 @@ class DatabaseSeeder extends Seeder
         AppSetting::setValue('shipping_origin_label', AppSetting::getValue('shipping_origin_label', 'Bayan, Lombok Utara, NTB, 83354'));
         AppSetting::setValue('shipping_enabled_couriers', AppSetting::getValue('shipping_enabled_couriers', 'jne:jnt'));
         AppSetting::setValue('shipping_excluded_services', AppSetting::getValue('shipping_excluded_services', 'JTR,JTR<130,JTR>130,JTR>200'));
+
+        // 7. Master Destinasi Lokal (Zero-HIT cache untuk pencarian destinasi cepat)
+        $this->call(ShippingDestinationSeeder::class);
     }
 }

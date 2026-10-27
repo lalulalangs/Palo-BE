@@ -4,6 +4,7 @@ namespace App\Services\Shipping;
 
 use App\Exceptions\ShippingProviderException;
 use App\Models\AppSetting;
+use App\Models\ShippingDestination;
 use App\Models\Sku;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -150,7 +151,8 @@ class ShippingRateService
     }
 
     /**
-     * Pencarian destinasi dengan cache 7 hari — data wilayah jarang berubah.
+     * Pencarian destinasi: Database Lokal terlebih dahulu (Zero-HIT),
+     * baru fallback ke live API RajaOngkir bila belum ada di database lokal.
      *
      * @return array<int, array{id: int, label: string, province_name: string|null, city_name: string|null, district_name: string|null, subdistrict_name: string|null, zip_code: string|null}>
      */
@@ -162,16 +164,42 @@ class ShippingRateService
             throw ShippingProviderException::destinationNotFound($keyword);
         }
 
-        $cacheKey = 'shipping:dest:'.sha1(Str::lower($keyword).'|'.$limit);
+        // 1. Cek database master destinasi lokal (Zero-HIT, kecepatan < 15 ms)
+        $localDestinations = ShippingDestination::search($keyword)
+            ->limit($limit)
+            ->get();
 
+        if ($localDestinations->isNotEmpty()) {
+            return $localDestinations->map(fn (ShippingDestination $dest): array => $dest->toDestinationArray())->values()->all();
+        }
+
+        // 2. Cek cache
+        $cacheKey = 'shipping:dest:'.sha1(Str::lower($keyword).'|'.$limit);
         $cached = Cache::get($cacheKey);
 
         if (is_array($cached)) {
             return $cached;
         }
 
+        // 3. Fallback: panggil API RajaOngkir dan simpan ke database lokal secara otomatis
         $rows = $this->client->searchDestinations($keyword, $limit);
         $this->recordApiHit();
+
+        foreach ($rows as $row) {
+            if (isset($row['id']) && $row['id'] > 0) {
+                ShippingDestination::updateOrCreate(
+                    ['id' => (int) $row['id']],
+                    [
+                        'label' => (string) ($row['label'] ?? ''),
+                        'province_name' => (string) ($row['province_name'] ?? ''),
+                        'city_name' => (string) ($row['city_name'] ?? ''),
+                        'district_name' => $row['district_name'] ?? null,
+                        'subdistrict_name' => $row['subdistrict_name'] ?? null,
+                        'zip_code' => $row['zip_code'] ?? null,
+                    ]
+                );
+            }
+        }
 
         Cache::put($cacheKey, $rows, self::DESTINATION_CACHE_TTL);
 
