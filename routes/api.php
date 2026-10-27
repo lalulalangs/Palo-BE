@@ -46,6 +46,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:guest');
         Route::post('whatsapp-checkout', [GuestCheckoutController::class, 'whatsappCheckout'])
             ->middleware('throttle:guest.orders');
+        Route::post('cancel-order', [GuestCheckoutController::class, 'cancelOrder'])
+            ->middleware('throttle:guest');
         Route::post('custom-inquiry', [GuestCheckoutController::class, 'customInquiry'])
             ->middleware('throttle:guest');
     });
