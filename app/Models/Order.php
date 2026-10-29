@@ -13,6 +13,12 @@ class Order extends Model
 {
     use HasFactory;
 
+    /**
+     * Prefix nomor pesanan. Diubah dari `UJN` ke `PLR`; order lama tetap
+     * memakai prefix lamanya.
+     */
+    public const NUMBER_PREFIX = 'PLR';
+
     public const STATUS_PENDING = 'pending';
 
     public const STATUS_AWAITING_CONFIRMATION = 'awaiting_confirmation';
@@ -32,6 +38,16 @@ class Order extends Model
     public const PAYMENT_METHOD_ONLINE = 'online';
 
     public const PAYMENT_METHOD_COD = 'cod';
+
+    /**
+     * Lead WhatsApp tamu yang sudah berstatus pesanan dan menunggu
+     * konfirmasi/pembayaran lewat CS (VA/QRIS), bukan bayar di tempat.
+     *
+     * Dipisah dari COD karena artinya berbeda: COD ditagih saat barang tiba,
+     * sedangkan pesanan ini dibayar SETELAH CS menghubungi pembeli dan
+     * pembayarannya diverifikasi manual oleh admin.
+     */
+    public const PAYMENT_METHOD_WHATSAPP = 'whatsapp';
 
     public const REFUND_STATUS_PENDING = 'diajukan';
 
@@ -146,6 +162,7 @@ class Order extends Model
         'status',
         'payment_method',
         'cod_reference_code',
+        'guest_reference_code',
         'subtotal',
         'discount_amount',
         'shipping_cost',
@@ -155,7 +172,11 @@ class Order extends Model
         'shipping_full_address',
         'shipping_address_snapshot',
         'shipping_courier',
+        'shipping_courier_code',
         'shipping_service',
+        'shipping_quote_snapshot',
+        'shipping_weight_grams',
+        'shipping_destination_id',
         'tracking_number',
         'stock_locked_until',
         'confirmed_at',
@@ -181,6 +202,9 @@ class Order extends Model
             'shipping_cost' => 'decimal:2',
             'total' => 'decimal:2',
             'shipping_address_snapshot' => 'array',
+            'shipping_quote_snapshot' => 'array',
+            'shipping_weight_grams' => 'integer',
+            'shipping_destination_id' => 'integer',
             'stock_locked_until' => 'datetime',
             'confirmed_at' => 'datetime',
             'refund_amount' => 'decimal:2',
@@ -245,11 +269,33 @@ class Order extends Model
         return $this->payment_method === self::PAYMENT_METHOD_COD;
     }
 
+    /** Lead WhatsApp tamu: pesanan nyata yang menunggu konfirmasi CS. */
+    public function isWhatsAppOrder(): bool
+    {
+        return $this->payment_method === self::PAYMENT_METHOD_WHATSAPP;
+    }
+
+    /**
+     * Metode bayar yang dikonfirmasi manual oleh admin (tanpa gateway).
+     *
+     * Dipakai gerbang tombol "Konfirmasi Pesanan" di panel: satu aturan untuk
+     * dua metode, supaya menambah metode manual berikutnya tidak perlu
+     * menyentuh beberapa tempat sekaligus.
+     */
+    public function isManualPayment(): bool
+    {
+        return in_array(
+            $this->payment_method,
+            [self::PAYMENT_METHOD_COD, self::PAYMENT_METHOD_WHATSAPP],
+            true,
+        );
+    }
+
     public function canBeConfirmed(): bool
     {
         $statusValue = $this->status instanceof OrderStatus ? $this->status->value : $this->status;
 
-        return $this->isCod() && $statusValue === self::STATUS_AWAITING_CONFIRMATION;
+        return $this->isManualPayment() && $statusValue === self::STATUS_AWAITING_CONFIRMATION;
     }
 
     public function hasRefund(): bool

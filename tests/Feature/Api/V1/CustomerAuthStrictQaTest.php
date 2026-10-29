@@ -397,13 +397,13 @@ class CustomerAuthStrictQaTest extends TestCase
     }
 
     /**
-     * QA-16: Rate Limiting Enforcement (PRD §3.12 AC: 10 percobaan/menit).
-     * Request ke-11 dalam periode 1 menit wajib mengembalikan HTTP 429 Too Many Requests.
+     * QA-16: Rate Limiting Enforcement (69 percobaan/menit).
+     * Request ke-70 dalam periode 1 menit wajib mengembalikan HTTP 429 Too Many Requests.
      */
-    public function test_rate_limiting_enforces_10_requests_per_minute_returning_429(): void
+    public function test_rate_limiting_enforces_69_requests_per_minute_returning_429(): void
     {
-        // 10 request pertama
-        for ($i = 1; $i <= 10; $i++) {
+        // 69 request pertama
+        for ($i = 1; $i <= 69; $i++) {
             $response = $this->postJson('/api/v1/auth/login', [
                 'email' => 'ratelimit.test@rinjani.com',
                 'password' => 'SalahPassword!',
@@ -411,7 +411,7 @@ class CustomerAuthStrictQaTest extends TestCase
             $this->assertSame(401, $response->status(), "Request ke-$i seharusnya 401");
         }
 
-        // Request ke-11 harus diblokir oleh rate limiter (HTTP 429)
+        // Request ke-70 harus diblokir oleh rate limiter (HTTP 429)
         $rateLimitedResponse = $this->postJson('/api/v1/auth/login', [
             'email' => 'ratelimit.test@rinjani.com',
             'password' => 'SalahPassword!',

@@ -104,5 +104,15 @@ class DatabaseSeeder extends Seeder
         AppSetting::setValue('cod_enabled', AppSetting::getValue('cod_enabled', 'true'));
         AppSetting::setValue('cod_cs_whatsapp_number', AppSetting::getValue('cod_cs_whatsapp_number', '081234567890'));
         AppSetting::setValue('cod_confirmation_timeout_hours', AppSetting::getValue('cod_confirmation_timeout_hours', '24'));
+
+        // 6. Default AppSettings ongkir (RajaOngkir). Origin = gudang Bayan,
+        // Lombok Utara (subdistrict 746); tarif identik dengan Senaru (751).
+        AppSetting::setValue('shipping_origin_subdistrict_id', AppSetting::getValue('shipping_origin_subdistrict_id', '746'));
+        AppSetting::setValue('shipping_origin_label', AppSetting::getValue('shipping_origin_label', 'Bayan, Lombok Utara, NTB, 83354'));
+        AppSetting::setValue('shipping_enabled_couriers', AppSetting::getValue('shipping_enabled_couriers', 'jne:jnt'));
+        AppSetting::setValue('shipping_excluded_services', AppSetting::getValue('shipping_excluded_services', 'JTR,JTR<130,JTR>130,JTR>200'));
+
+        // 7. Master Destinasi Lokal (Zero-HIT cache untuk pencarian destinasi cepat)
+        $this->call(ShippingDestinationSeeder::class);
     }
 }

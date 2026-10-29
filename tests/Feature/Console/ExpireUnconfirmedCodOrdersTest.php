@@ -129,7 +129,7 @@ class ExpireUnconfirmedCodOrdersTest extends TestCase
         $processingCodOrder = $this->createCodOrder(Order::STATUS_PROCESSING, 30);
 
         $this->artisan('orders:expire-unconfirmed-cod')
-            ->expectsOutputToContain('Ditemukan 1 pesanan COD yang memenuhi kriteria kedaluwarsa.')
+            ->expectsOutputToContain('Ditemukan 1 pesanan COD/WhatsApp yang memenuhi kriteria kedaluwarsa.')
             ->expectsOutputToContain("Pesanan COD #{$expiredCodOrder->order_number} berhasil dikedaluwarsakan.")
             ->assertSuccessful();
 
@@ -148,13 +148,45 @@ class ExpireUnconfirmedCodOrdersTest extends TestCase
         ]);
     }
 
+    /**
+     * Order WhatsApp tamu memakai batas waktu yang sama (default 24 jam).
+     * Tanpa ini, lead yang tidak pernah dibayar akan menggantung selamanya di
+     * daftar pesanan admin.
+     */
+    public function test_expires_whatsapp_guest_orders_older_than_timeout(): void
+    {
+        $createdAt = now()->subHours(25);
+
+        $stale = Order::create([
+            'order_number' => 'PLR-WA-STALE-001',
+            'user_id' => null,
+            'status' => Order::STATUS_AWAITING_CONFIRMATION,
+            'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
+            'guest_reference_code' => 'GC-20261024-AAAA',
+            'subtotal' => 150000,
+            'discount_amount' => 0,
+            'shipping_cost' => 0,
+            'total' => 150000,
+            'shipping_recipient_name' => 'Budi Santoso',
+            'shipping_phone' => '081234567890',
+        ]);
+        $stale->timestamps = false;
+        $stale->created_at = $createdAt;
+        $stale->updated_at = $createdAt;
+        $stale->save();
+
+        $this->artisan('orders:expire-unconfirmed-cod')->assertSuccessful();
+
+        $this->assertEquals(OrderStatus::Expired, $stale->fresh()->status);
+    }
+
     public function test_respects_custom_hours_option(): void
     {
         $order = $this->createCodOrder(Order::STATUS_AWAITING_CONFIRMATION, 5);
 
         // Jika batas waktu di-set 6 jam, order 5 jam lalu belum kedaluwarsa
         $this->artisan('orders:expire-unconfirmed-cod', ['--hours' => 6])
-            ->expectsOutputToContain('Tidak ditemukan pesanan COD yang kedaluwarsa.')
+            ->expectsOutputToContain('Tidak ditemukan pesanan COD/WhatsApp yang kedaluwarsa.')
             ->assertSuccessful();
 
         $this->assertEquals(OrderStatus::AwaitingConfirmation, $order->fresh()->status);

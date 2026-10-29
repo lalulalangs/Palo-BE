@@ -171,7 +171,7 @@ class OrderStrictQaTest extends TestCase
             'subtotal' => 1200000,
         ]);
 
-        $paidOrder = $this->service->markAsPaid($order, actorId: null, note: 'Midtrans Webhook HTTP Notification');
+        $paidOrder = $this->service->markAsPaid($order, actorId: null, note: 'DOKU Webhook HTTP Notification');
 
         $this->assertEquals(OrderStatus::Paid, $paidOrder->status);
         $this->assertEquals(9, $this->skuPrimary->fresh()->stock);
@@ -179,7 +179,7 @@ class OrderStrictQaTest extends TestCase
         $history = OrderStatusHistory::where('order_id', $order->id)->first();
         $this->assertNotNull($history);
         $this->assertNull($history->changed_by_admin_id);
-        $this->assertEquals('Midtrans Webhook HTTP Notification', $history->note);
+        $this->assertEquals('DOKU Webhook HTTP Notification', $history->note);
     }
 
     /**

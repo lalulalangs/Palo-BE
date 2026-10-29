@@ -96,6 +96,7 @@ class AdminNavigationStructureTest extends TestCase
 
         $this->assertSame([
             ['label' => 'Media Sosial & Kontak', 'sort' => 1],
+            ['label' => 'Ekspedisi & Ongkir', 'sort' => 2],
         ], $pengaturanItems);
 
         // Group: Role & Pengguna

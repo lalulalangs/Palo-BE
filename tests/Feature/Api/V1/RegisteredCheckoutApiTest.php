@@ -16,10 +16,14 @@ use App\Models\Voucher;
 use App\Services\Orders\OrderTransitionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\FakesRajaOngkir;
+use Tests\Support\FakesDokuCheckout;
 use Tests\TestCase;
 
 class RegisteredCheckoutApiTest extends TestCase
 {
+    use FakesDokuCheckout;
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     protected User $user;
@@ -35,6 +39,9 @@ class RegisteredCheckoutApiTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->configureDokuForTests();
+        $this->fakeDokuCheckout();
 
         $this->user = User::create([
             'name' => 'Rinjani Hiker',
@@ -114,15 +121,20 @@ class RegisteredCheckoutApiTest extends TestCase
 
     public function test_shipping_quote_returns_503_when_courier_service_down(): void
     {
+        // Penyedia gagal dan belum ada cache: checkout harus fail-closed,
+        // bukan memakai angka perkiraan.
+        $this->rajaOngkirOutage = true;
+
         $response = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/v1/shipping/quote', [
-                'destination_city' => 'SIMULATE_DOWN',
+                'destination_id' => 17596,
                 'items' => [
                     ['sku_id' => $this->sku->id, 'quantity' => 1],
                 ],
             ]);
 
-        $response->assertStatus(503);
+        $response->assertStatus(503)
+            ->assertJsonPath('error_code', 'shipping_provider_invalid_response');
     }
 
     public function test_registered_user_can_create_order_successfully(): void
@@ -170,7 +182,7 @@ class RegisteredCheckoutApiTest extends TestCase
             ->assertJsonPath('data.payment.method', 'qris');
 
         $orderNumber = $response->json('data.order_number');
-        $this->assertStringStartsWith('UJN-', $orderNumber);
+        $this->assertStringStartsWith('PLR-', $orderNumber);
 
         // Verify order in database
         $order = Order::where('order_number', $orderNumber)->firstOrFail();
@@ -183,6 +195,52 @@ class RegisteredCheckoutApiTest extends TestCase
         // Verify user cart is cleared
         $cartCheck = $this->actingAs($this->user, 'sanctum')->getJson('/api/v1/cart');
         $cartCheck->assertOk()->assertJsonPath('data.summary.item_count', 0);
+    }
+
+    /**
+     * `online` = jalur pembayaran DOKU tanpa mengunci kanal.
+     *
+     * Ini nilai yang dikirim storefront sejak checkout berhenti menanyakan
+     * metode: pembeli memilih QRIS/VA/e-wallet/kartu DI HALAMAN DOKU. Test ini
+     * menjaga dua hal sekaligus — endpoint menerima nilainya, dan payment
+     * tersimpan sebagai `online` (kanal sebenarnya baru diketahui dari webhook).
+     */
+    public function test_checkout_accepts_neutral_online_payment_method(): void
+    {
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Rinjani Hiker',
+                'phone' => '081234567890',
+                'street' => 'Jl. Pariwisata Senaru No. 12',
+                'city' => 'Lombok Utara',
+                'province' => 'Nusa Tenggara Barat',
+                'postal_code' => '83354',
+            ],
+            'items' => [
+                [
+                    'sku_id' => $this->sku->id,
+                    'quantity' => 1,
+                    'price_seen' => 350000,
+                ],
+            ],
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+            'shipping_cost' => 28000,
+            'payment_method' => 'online',
+        ];
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload);
+
+        $response->assertCreated()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.status', 'menunggu_pembayaran');
+
+        $order = Order::where('order_number', $response->json('data.order_number'))->firstOrFail();
+
+        // Order menyimpan jalur "online"; payment menyimpan kanal yang diminta.
+        $this->assertSame(Order::PAYMENT_METHOD_ONLINE, $order->payment_method);
+        $this->assertSame('online', $order->payment?->payment_method);
     }
 
     public function test_checkout_ignores_client_shipping_cost_and_records_server_rate(): void
@@ -662,7 +720,7 @@ class RegisteredCheckoutApiTest extends TestCase
 
         Payment::create([
             'order_id' => $order->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'payment_method' => 'qris',
             'amount' => 370000,
             'status' => Payment::STATUS_PENDING,

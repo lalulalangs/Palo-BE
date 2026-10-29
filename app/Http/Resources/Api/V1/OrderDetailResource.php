@@ -73,7 +73,10 @@ class OrderDetailResource extends JsonResource
         $paymentData = null;
         if ($this->relationLoaded('payment') && $this->payment) {
             $paymentData = [
+                'gateway' => $this->payment->gateway,
                 'method' => $this->payment->payment_method,
+                'reference' => $this->payment->gateway_transaction_id,
+                'payment_url' => $this->payment->raw_response['payment_url'] ?? null,
                 'amount' => (float) $this->payment->amount,
                 'status' => $this->payment->status,
                 'instructions' => $this->payment->raw_response,

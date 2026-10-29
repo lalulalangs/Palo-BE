@@ -45,6 +45,7 @@ class OrderInfolist
                                     ->badge()
                                     ->formatStateUsing(fn (?string $state): string => match ($state) {
                                         Order::PAYMENT_METHOD_COD => 'COD',
+                                        Order::PAYMENT_METHOD_WHATSAPP => 'WhatsApp (VA/QRIS)',
                                         Order::PAYMENT_METHOD_ONLINE => 'Online',
                                         default => strtoupper($state ?? 'ONLINE'),
                                     })
@@ -198,6 +199,26 @@ class OrderInfolist
                                                     ->badge()
                                                     ->placeholder('Belum ada transaksi'),
 
+                                                TextEntry::make('payment.gateway_transaction_id')
+                                                    ->label('Referensi Gateway (Invoice DOKU)')
+                                                    ->fontFamily(FontFamily::Mono)
+                                                    ->copyable()
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('payment_url')
+                                                    ->label('Halaman Pembayaran DOKU')
+                                                    ->state(fn (Order $record): ?string => $record->payment?->raw_response['payment_url'] ?? null)
+                                                    ->url(fn (?string $state): ?string => $state, shouldOpenInNewTab: true)
+                                                    ->copyable()
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('needs_reconciliation')
+                                                    ->label('Rekonsiliasi')
+                                                    ->badge()
+                                                    ->state(fn (Order $record): ?string => $record->needsReconciliation() ? 'Perlu rekonsiliasi' : null)
+                                                    ->color('danger')
+                                                    ->placeholder('-'),
+
                                                 TextEntry::make('payment.paid_at')
                                                     ->label('Waktu Pelunasan')
                                                     ->dateTime('d/m/Y H:i:s')
@@ -209,6 +230,26 @@ class OrderInfolist
                                             ->schema([
                                                 TextEntry::make('cod_reference_code')
                                                     ->label('Kode Referensi COD')
+                                                    ->fontFamily(FontFamily::Mono)
+                                                    ->weight('bold')
+                                                    ->copyable()
+                                                    ->placeholder('-'),
+
+                                                TextEntry::make('confirmed_at')
+                                                    ->label('Waktu Dikonfirmasi CS')
+                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->placeholder('Menunggu konfirmasi CS'),
+
+                                                TextEntry::make('confirmedBy.name')
+                                                    ->label('Dikonfirmasi Oleh')
+                                                    ->placeholder('-'),
+                                            ]),
+
+                                        Section::make('Informasi WhatsApp & Tamu')
+                                            ->visible(fn (Order $record): bool => $record->isWhatsAppOrder())
+                                            ->schema([
+                                                TextEntry::make('guest_reference_code')
+                                                    ->label('Kode Referensi WhatsApp')
                                                     ->fontFamily(FontFamily::Mono)
                                                     ->weight('bold')
                                                     ->copyable()

@@ -26,15 +26,16 @@ class ProductForm
                 Section::make('Informasi Dasar Produk')
                     ->schema([
                         Select::make('category_id')
+                            ->label('Kategori')
                             ->relationship('category', 'name')
-                            ->searchable()
-                            ->preload(),
+                            // Tanpa preload(): opsi dicari ke database saat
+                            // diketik, bukan memuat semua kategori ke payload.
+                            ->searchable(),
                         Select::make('collections')
                             ->label('Koleksi / Series (Opsional)')
                             ->relationship('collections', 'name')
                             ->multiple()
                             ->searchable()
-                            ->preload()
                             ->helperText('Pilih satu atau lebih koleksi yang menaungi produk ini.'),
                         TextInput::make('name')
                             ->label('Nama Produk')
@@ -81,20 +82,39 @@ class ProductForm
                     ])
                     ->columns(2),
 
-                Section::make('Foto Utama Produk')
-                    ->description('Unggah 1 foto produk utama (maksimal 5MB, format JPG/PNG/WEBP). Foto otomatis dikompres dan dikonversi ke WebP.')
+                Section::make('Galeri & Foto Produk')
+                    ->description('Unggah hingga 8 foto produk (format JPG, PNG, atau WEBP, maks 2MB per foto). Foto teratas bertanda "⭐ Foto Utama" otomatis menjadi thumbnail produk di etalase toko. Geser posisi kartu foto (drag & drop) untuk mengatur urutan galeri.')
                     ->schema([
                         Repeater::make('media')
                             ->relationship('media')
                             ->orderColumn('sort_order')
-                            ->maxItems(1)
-                            ->reorderable(false)
-                            ->addActionLabel('Unggah Foto Produk')
+                            ->maxItems(8)
+                            ->reorderable(true)
+                            ->addActionLabel('Tambah Foto Produk')
+                            ->grid([
+                                'default' => 1,
+                                'sm' => 2,
+                                'md' => 2,
+                                'lg' => 4,
+                            ])
+                            ->itemLabel(function (?int $index): string {
+                                if ($index === 0) {
+                                    return '⭐ Foto Utama (Thumbnail)';
+                                }
+
+                                if ($index !== null) {
+                                    return 'Foto #' . ($index + 1) . ' (Galeri)';
+                                }
+
+                                return 'Foto Produk';
+                            })
                             ->schema([
                                 ImageFileUpload::make('url')
-                                    ->label('File Foto')
+                                    ->hiddenLabel()
                                     ->disk('public')
                                     ->directory('products')
+                                    ->imagePreviewHeight('180px')
+                                    ->openable()
                                     ->required(),
                                 Hidden::make('type')
                                     ->default('image'),

@@ -17,6 +17,7 @@ enum AdminFeature: string implements HasLabel
     case StockOpnames = 'stock-opnames';
     case StockMovements = 'stock-movements';
     case SocialMediaSettings = 'social-media-settings';
+    case ShippingSettings = 'shipping-settings';
     case Roles = 'roles';
     case AdminUsers = 'admin-users';
 
@@ -33,6 +34,7 @@ enum AdminFeature: string implements HasLabel
             self::StockOpnames => 'Opname Stok',
             self::StockMovements => 'Riwayat Mutasi Stok',
             self::SocialMediaSettings => 'Media Sosial & Kontak',
+            self::ShippingSettings => 'Ekspedisi & Ongkir',
             self::Roles => 'Role',
             self::AdminUsers => 'Pengguna',
         };
@@ -51,6 +53,7 @@ enum AdminFeature: string implements HasLabel
             self::StockOpnames => Heroicon::OutlinedScale,
             self::StockMovements => Heroicon::OutlinedClipboardDocumentList,
             self::SocialMediaSettings => Heroicon::OutlinedGlobeAlt,
+            self::ShippingSettings => Heroicon::OutlinedTruck,
             self::Roles => Heroicon::OutlinedShieldCheck,
             self::AdminUsers => Heroicon::OutlinedUsers,
         };

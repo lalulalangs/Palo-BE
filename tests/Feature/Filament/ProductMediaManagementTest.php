@@ -137,20 +137,23 @@ class ProductMediaManagementTest extends TestCase
         $this->assertStringEndsWith('.webp', $product->media->first()->url);
     }
 
-    public function test_cannot_upload_more_than_one_media_item(): void
+    public function test_can_upload_and_save_product_with_multiple_media(): void
     {
         Storage::fake('public');
 
         $file1 = UploadedFile::fake()->image('photo1.jpg');
-        $file2 = UploadedFile::fake()->image('photo2.png');
+        $file2 = UploadedFile::fake()->image('photo2.jpg');
+        $file3 = UploadedFile::fake()->image('photo3.jpg');
 
         Livewire::actingAs($this->admin, 'admin')
             ->test(CreateProduct::class)
             ->fillForm([
                 'category_id' => $this->category->id,
-                'name' => 'Tenda Dome 2P',
-                'slug' => 'tenda-dome-2p',
-                'base_price' => 500000.00,
+                'name' => 'Jaket Windbreaker Packable',
+                'slug' => 'jaket-windbreaker-packable',
+                'base_price' => 350000.00,
+                'is_featured' => true,
+                'is_active' => true,
                 'media' => [
                     [
                         'url' => [$file1],
@@ -160,7 +163,46 @@ class ProductMediaManagementTest extends TestCase
                         'url' => [$file2],
                         'type' => 'image',
                     ],
+                    [
+                        'url' => [$file3],
+                        'type' => 'image',
+                    ],
                 ],
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $product = Product::where('slug', 'jaket-windbreaker-packable')->first();
+        $this->assertNotNull($product);
+
+        $mediaList = $product->media()->orderBy('sort_order')->get();
+        $this->assertCount(3, $mediaList);
+        $this->assertEquals(1, $mediaList[0]->sort_order);
+        $this->assertEquals(2, $mediaList[1]->sort_order);
+        $this->assertEquals(3, $mediaList[2]->sort_order);
+        $this->assertEquals($mediaList[0]->id, $product->thumbnail->id);
+    }
+
+    public function test_cannot_upload_more_than_eight_media_items(): void
+    {
+        Storage::fake('public');
+
+        $mediaData = [];
+        for ($i = 1; $i <= 9; $i++) {
+            $mediaData[] = [
+                'url' => [UploadedFile::fake()->image("photo{$i}.jpg")],
+                'type' => 'image',
+            ];
+        }
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(CreateProduct::class)
+            ->fillForm([
+                'category_id' => $this->category->id,
+                'name' => 'Tenda Dome 2P',
+                'slug' => 'tenda-dome-2p',
+                'base_price' => 500000.00,
+                'media' => $mediaData,
             ])
             ->call('create')
             ->assertHasFormErrors(['media']);

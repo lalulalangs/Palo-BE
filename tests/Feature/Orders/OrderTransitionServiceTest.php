@@ -96,7 +96,7 @@ class OrderTransitionServiceTest extends TestCase
     {
         $order = $this->createSampleOrder(Order::STATUS_PENDING, 3);
 
-        $result = $this->service->markAsPaid($order, $this->admin->id, 'Pembayaran Midtrans VA sukses');
+        $result = $this->service->markAsPaid($order, $this->admin->id, 'Pembayaran DOKU VA sukses');
 
         $this->assertEquals(OrderStatus::Paid, $result->status);
         $this->assertEquals(12, $this->sku->fresh()->stock);
@@ -117,7 +117,7 @@ class OrderTransitionServiceTest extends TestCase
             'changed_by_admin_id' => $this->admin->id,
             'from_status' => Order::STATUS_PENDING,
             'to_status' => Order::STATUS_PAID,
-            'note' => 'Pembayaran Midtrans VA sukses',
+            'note' => 'Pembayaran DOKU VA sukses',
         ]);
     }
 
@@ -139,7 +139,7 @@ class OrderTransitionServiceTest extends TestCase
 
         Payment::create([
             'order_id' => $order->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'gateway_transaction_id' => 'MID-TEST-9988',
             'payment_method' => 'bank_transfer_bca',
             'amount' => 520000,
@@ -279,6 +279,25 @@ class OrderTransitionServiceTest extends TestCase
         $this->assertDatabaseMissing('stock_movements', [
             'reference_id' => $order->id,
         ]);
+    }
+
+    public function test_cancelling_with_expiry_wording_still_marks_payment_cancelled(): void
+    {
+        $order = $this->createSampleOrder(Order::STATUS_PENDING, 1);
+
+        Payment::create([
+            'order_id' => $order->id,
+            'gateway' => 'manual',
+            'payment_method' => 'bank_transfer',
+            'amount' => 100000,
+            'status' => Payment::STATUS_PENDING,
+        ]);
+
+        // Status payment tidak lagi ditebak dari teks alasan: pembatalan manual
+        // selalu `cancel`, sedangkan kedaluwarsa punya jalur expireOrder().
+        $this->service->cancelOrder($order, 'Dibatalkan karena voucher kedaluwarsa', $this->admin->id);
+
+        $this->assertSame(Payment::STATUS_CANCEL, $order->payment->fresh()->status);
     }
 
     public function test_cannot_cancel_shipped_order(): void

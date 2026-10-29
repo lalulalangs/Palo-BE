@@ -45,6 +45,9 @@ class CheckoutOrderRequest extends FormRequest
             'shipping_address.street' => ['required', 'string', 'max:255'],
             'shipping_address.city' => ['required', 'string', 'max:100'],
             'shipping_address.city_code' => ['nullable', 'string', 'max:50'],
+            // Subdistrict ID RajaOngkir: cara yang benar menghitung ongkir.
+            // Bila kosong, server mencari dari `city` (satu rilis transisi).
+            'shipping_address.destination_id' => ['nullable', 'integer', 'min:1'],
             'shipping_address.province' => ['required', 'string', 'max:100'],
             'shipping_address.province_code' => ['nullable', 'string', 'max:50'],
             'shipping_address.district' => ['nullable', 'string', 'max:100'],
@@ -63,7 +66,11 @@ class CheckoutOrderRequest extends FormRequest
             // S-02): tarif resmi dihitung ulang server-side di RegisteredCheckoutService.
             'shipping_etd' => ['nullable', 'string', 'max:50'],
 
-            'payment_method' => ['required', 'string', 'in:qris,virtual_account,ewallet,bank_transfer,credit_card,cod'],
+            // `online` = pembayaran lewat DOKU Checkout TANPA mengunci kanal:
+            // pembeli memilih QRIS/VA/e-wallet/kartu di halaman DOKU. Nilai
+            // kanal spesifik (qris, virtual_account, ...) tetap diterima untuk
+            // klien lama, tetapi mengunci halaman DOKU ke kanal itu saja.
+            'payment_method' => ['required', 'string', 'in:qris,virtual_account,ewallet,bank_transfer,credit_card,online,cod'],
             'voucher_code' => ['nullable', 'string', 'max:50'],
             'acknowledge_price_change' => ['nullable', 'boolean'],
             'shipping_address_id' => ['nullable', 'integer'],

@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Orders\Tables;
 use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\Actions\OrderActions;
 use App\Models\Order;
+use Carbon\CarbonImmutable;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
@@ -16,6 +17,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 
 class OrdersTable
 {
@@ -25,21 +27,28 @@ class OrdersTable
             ->columns([
                 TextColumn::make('order_number')
                     ->label('No. Pesanan')
-                    ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $q) use ($search) {
-                        $q->where('order_number', 'like', "%{$search}%")
-                            ->orWhere('cod_reference_code', 'like', "%{$search}%");
-                    }))
+                    ->searchable([
+                        'order_number',
+                        'cod_reference_code',
+                        'guest_reference_code',
+                        'shipping_phone',
+                    ])
                     ->sortable()
                     ->weight('bold')
                     ->copyable()
                     ->fontFamily(FontFamily::Mono)
-                    ->description(fn (Order $record): ?string => $record->isCod() && $record->cod_reference_code ? "COD: {$record->cod_reference_code}" : null),
+                    ->description(fn (Order $record): ?string => match (true) {
+                        $record->isCod() && $record->cod_reference_code => "COD: {$record->cod_reference_code}",
+                        $record->isWhatsAppOrder() && $record->guest_reference_code => "WA: {$record->guest_reference_code}",
+                        default => null,
+                    }),
 
                 TextColumn::make('payment_method')
                     ->label('Metode Bayar')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => match ($state) {
                         Order::PAYMENT_METHOD_COD => 'COD',
+                        Order::PAYMENT_METHOD_WHATSAPP => 'WhatsApp (VA/QRIS)',
                         Order::PAYMENT_METHOD_ONLINE => 'Online',
                         default => strtoupper($state ?? 'ONLINE'),
                     })
@@ -79,6 +88,17 @@ class OrdersTable
                         Sum::make()
                             ->money('IDR', locale: 'id')
                             ->label('Total Omset')
+                            ->query(fn ($query) => $query->whereIn('status', [
+                                OrderStatus::Paid->value,
+                                OrderStatus::Processing->value,
+                                OrderStatus::Shipped->value,
+                                OrderStatus::Completed->value,
+                                'paid',
+                                'processing',
+                                'shipped',
+                                'delivered',
+                                'completed',
+                            ]))
                     ),
             ])
             ->defaultSort('created_at', 'desc')
@@ -88,6 +108,7 @@ class OrdersTable
                     ->options([
                         Order::PAYMENT_METHOD_ONLINE => 'Online',
                         Order::PAYMENT_METHOD_COD => 'Cash On Delivery (COD)',
+                        Order::PAYMENT_METHOD_WHATSAPP => 'WhatsApp Tamu (VA/QRIS)',
                     ]),
 
                 SelectFilter::make('status')
@@ -100,12 +121,19 @@ class OrdersTable
 
                 SelectFilter::make('shipping_courier')
                     ->label('Kurir Ekspedisi')
-                    ->options(fn (): array => Order::query()
-                        ->whereNotNull('shipping_courier')
-                        ->distinct()
-                        ->pluck('shipping_courier', 'shipping_courier')
-                        ->all()
-                    ),
+                    // `distinct()` tanpa indeks = full scan, dan closure ini
+                    // dievaluasi setiap render. Cache 10 menit sudah cukup:
+                    // daftar kurir berubah hanya saat ada order baru.
+                    ->options(fn (): array => Cache::remember(
+                        'orders:shipping-courier-options',
+                        now()->addMinutes(10),
+                        fn (): array => Order::query()
+                            ->whereNotNull('shipping_courier')
+                            ->distinct()
+                            ->orderBy('shipping_courier')
+                            ->pluck('shipping_courier', 'shipping_courier')
+                            ->all(),
+                    )),
 
                 Filter::make('tracking_status')
                     ->label('Status Resi')
@@ -136,14 +164,20 @@ class OrdersTable
                         DatePicker::make('created_until')->label('Sampai Tanggal'),
                     ])
                     ->query(function (Builder $query, array $data): Builder {
+                        $from = $data['created_from'] ?? null;
+                        $until = $data['created_until'] ?? null;
+
                         return $query
+                            // Rentang setengah terbuka. `whereDate()` membuat
+                            // PostgreSQL menghitung created_at::date sehingga
+                            // indeks created_at tidak pernah terpakai.
                             ->when(
-                                $data['created_from'] ?? null,
-                                fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date)
+                                $from,
+                                fn (Builder $q, string $date): Builder => $q->where('created_at', '>=', CarbonImmutable::parse($date)->startOfDay())
                             )
                             ->when(
-                                $data['created_until'] ?? null,
-                                fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date)
+                                $until,
+                                fn (Builder $q, string $date): Builder => $q->where('created_at', '<', CarbonImmutable::parse($date)->addDay()->startOfDay())
                             );
                     }),
             ])

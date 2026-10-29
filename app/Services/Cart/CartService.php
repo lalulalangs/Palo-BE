@@ -33,6 +33,7 @@ class CartService
 
         if ($request) {
             $token = $request->header('X-Guest-Token')
+                ?? $request->cookie('palorinjani_guest_token')
                 ?? $request->cookie('guest_cart_id')
                 ?? $request->cookie('guest_token')
                 ?? $request->input('guest_token');

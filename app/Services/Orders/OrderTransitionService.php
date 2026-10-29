@@ -132,19 +132,57 @@ class OrderTransitionService
     }
 
     /**
-     * Konfirmasi pesanan COD oleh CS dan kurangi stok fisik inventaris gudang.
+     * Konfirmasi pesanan COD (bayar di tempat) oleh CS + potong stok fisik.
      */
     public function confirmCodOrder(Order $order, ?int $actorId = null, ?string $note = null): Order
     {
-        return DB::transaction(function () use ($order, $actorId, $note) {
+        // Pesan galat tetap spesifik COD: pemanggil yang salah metode harus
+        // tahu bedanya, bukan disamarkan jadi "konfirmasi manual".
+        if (! $order->isCod()) {
+            throw new LogicException("Pesanan #{$order->order_number} bukan merupakan pesanan COD.");
+        }
+
+        return $this->confirmManualOrder($order, $actorId, $note, 'COD', 'Pesanan COD berhasil diverifikasi dan dikonfirmasi oleh Admin CS.');
+    }
+
+    /**
+     * Konfirmasi pesanan WhatsApp tamu setelah pembayaran (VA/QRIS) diverifikasi admin.
+     *
+     * Alurnya sama dengan COD: pesanan menunggu konfirmasi, lalu stok fisik
+     * dipotong saat admin menyatakan pembayaran/pesanan sah. Bedanya hanya
+     * cara bayarnya, bukan cara konfirmasinya.
+     */
+    public function confirmWhatsAppOrder(Order $order, ?int $actorId = null, ?string $note = null): Order
+    {
+        if (! $order->isWhatsAppOrder()) {
+            throw new LogicException("Pesanan #{$order->order_number} bukan merupakan pesanan WhatsApp.");
+        }
+
+        return $this->confirmManualOrder($order, $actorId, $note, 'WhatsApp', 'Pembayaran pesanan WhatsApp berhasil diverifikasi dan pesanan dikonfirmasi oleh Admin CS.');
+    }
+
+    /**
+     * Jalur konfirmasi bersama untuk metode bayar yang diverifikasi manual.
+     *
+     * `$label` hanya dipakai di catatan stok & riwayat status supaya laporan
+     * tetap bisa dibedakan; aturan stok dan transisi statusnya satu.
+     */
+    private function confirmManualOrder(
+        Order $order,
+        ?int $actorId,
+        ?string $note,
+        string $label,
+        string $defaultNote,
+    ): Order {
+        return DB::transaction(function () use ($order, $actorId, $note, $label, $defaultNote) {
             /** @var Order $lockedOrder */
             $lockedOrder = Order::query()
                 ->whereKey($order->id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (! $lockedOrder->isCod()) {
-                throw new LogicException("Pesanan #{$lockedOrder->order_number} bukan merupakan pesanan COD.");
+            if (! $lockedOrder->isManualPayment()) {
+                throw new LogicException("Pesanan #{$lockedOrder->order_number} bukan pesanan dengan konfirmasi manual.");
             }
 
             $statusValue = $lockedOrder->status instanceof OrderStatus ? $lockedOrder->status->value : $lockedOrder->status;
@@ -165,7 +203,7 @@ class OrderTransitionService
                             type: StockMovement::TYPE_SALE,
                             userId: $actorId,
                             reference: $lockedOrder,
-                            notes: "Penjualan pesanan COD {$lockedOrder->order_number} ({$item->product_name_snapshot})"
+                            notes: "Penjualan pesanan {$label} {$lockedOrder->order_number} ({$item->product_name_snapshot})"
                         );
                     }
                 }
@@ -183,7 +221,7 @@ class OrderTransitionService
                 'changed_by_admin_id' => $actorId,
                 'from_status' => $fromStatus,
                 'to_status' => OrderStatus::Processing->value,
-                'note' => $note ?? 'Pesanan COD berhasil diverifikasi dan dikonfirmasi oleh Admin CS.',
+                'note' => $note ?? $defaultNote,
                 'created_at' => now(),
             ]);
 
@@ -339,10 +377,13 @@ class OrderTransitionService
                     'cancelled_reason' => $cleanReason,
                 ]);
 
+                // Pembatalan manual selalu berarti `cancel`. Kedaluwarsa punya
+                // jalurnya sendiri (expireOrder) yang sekaligus mengubah status
+                // order; sebelumnya status payment ditebak dari teks alasan,
+                // sehingga mengubah kalimat alasan diam-diam mengubah status.
                 if ($lockedOrder->payment && $lockedOrder->payment->status === Payment::STATUS_PENDING) {
-                    $isExpired = str_contains(strtolower($cleanReason), 'kedaluwarsa') || str_contains(strtolower($cleanReason), 'expired');
                     $lockedOrder->payment->update([
-                        'status' => $isExpired ? Payment::STATUS_EXPIRE : Payment::STATUS_CANCEL,
+                        'status' => Payment::STATUS_CANCEL,
                     ]);
                 }
 

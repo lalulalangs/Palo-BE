@@ -73,7 +73,7 @@ class OrderReconciliationFlagTest extends TestCase
     {
         return Payment::create([
             'order_id' => $order->id,
-            'gateway' => 'midtrans',
+            'gateway' => 'doku',
             'payment_method' => 'qris',
             'amount' => 100000,
             'status' => $status,

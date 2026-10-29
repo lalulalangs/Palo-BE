@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Category;
 use App\Models\GuestCheckoutLog;
 use App\Models\Order;
+use App\Models\Payment;
 use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Sku;
@@ -127,19 +128,146 @@ class GuestCheckoutApiTest extends TestCase
         $this->assertEquals(2250000.0, (float) $response->json('data.estimated_total'));
     }
 
-    public function test_guest_checkout_does_not_create_order_in_orders_table(): void
+    /**
+     * Sejak 25-10-2026 lead WhatsApp tamu MENJADI pesanan.
+     *
+     * Dulu alur ini sengaja tidak membuat order (PRD §3.11 lama), akibatnya
+     * kode GC-xxx tidak bisa ditemukan di panel admin sama sekali. Sekarang
+     * order berstatus `awaiting_confirmation` supaya CS bisa memverifikasi
+     * pembayaran VA/QRIS lalu mengonfirmasinya; stok tetap belum dipotong
+     * sampai konfirmasi itu (lihat test di bawahnya).
+     */
+    public function test_guest_checkout_creates_awaiting_confirmation_order(): void
     {
         $initialOrdersCount = Order::count();
 
-        $this->postJson('/api/v1/guest/whatsapp-checkout', [
+        $response = $this->postJson('/api/v1/guest/whatsapp-checkout', [
             'items' => [
                 ['sku_id' => $this->sku->id, 'quantity' => 1],
             ],
-            'guest_name' => 'No Order Test',
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
         ])->assertCreated();
 
-        // PRD §3.11: Must NEVER create row in orders table
-        $this->assertEquals($initialOrdersCount, Order::count());
+        $this->assertEquals($initialOrdersCount + 1, Order::count());
+
+        $orderNumber = $response->json('data.order_number');
+        $this->assertIsString($orderNumber);
+
+        $order = Order::query()->where('order_number', $orderNumber)->firstOrFail();
+
+        $this->assertSame(Order::STATUS_AWAITING_CONFIRMATION, $order->status->value);
+        $this->assertSame(Order::PAYMENT_METHOD_WHATSAPP, $order->payment_method);
+        $this->assertNull($order->user_id);
+        // Kode yang disebut pembeli ke CS harus tersimpan & bisa dicari.
+        $this->assertSame($response->json('data.reference_code'), $order->guest_reference_code);
+        $this->assertSame('Budi Santoso', $order->shipping_recipient_name);
+        $this->assertSame('081234567890', $order->shipping_phone);
+
+        // Ongkir belum diketahui: total = subtotal, bukan angka karangan.
+        $this->assertEquals((float) $response->json('data.estimated_total'), (float) $order->total);
+        $this->assertEquals(0.0, (float) $order->shipping_cost);
+
+        $this->assertDatabaseHas('order_items', ['order_id' => $order->id, 'quantity' => 1]);
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $order->id,
+            'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
+            'status' => Payment::STATUS_PENDING,
+        ]);
+        // Log audit tetap tertaut ke order-nya.
+        $this->assertDatabaseHas('guest_checkout_logs', ['order_id' => $order->id]);
+        $this->assertTrue($order->canBeConfirmed());
+    }
+
+    /**
+     * Submit dua kali dalam satu sesi = SATU pesanan.
+     *
+     * Pembeli yang menekan tombol lagi (atau mengulang setelah jeda) tidak
+     * boleh menghasilkan pesanan kembar; isi pesanan lama disegarkan dari
+     * keranjang terbaru dan nomor/nomornya tidak berubah.
+     */
+    public function test_second_submission_reuses_pending_whatsapp_order(): void
+    {
+        $token = 'dedupe-token-1';
+        $initialOrdersCount = Order::count();
+
+        $first = $this->withHeader('X-Guest-Token', $token)
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+                'guest_name' => 'Budi Santoso',
+            ])->assertCreated();
+
+        $firstNumber = $first->json('data.order_number');
+        $firstReference = $first->json('data.reference_code');
+
+        // Submit ulang dengan jumlah berbeda di sesi yang sama.
+        $second = $this->withHeader('X-Guest-Token', $token)
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 3]],
+                'guest_name' => 'Budi Santoso',
+            ])->assertCreated();
+
+        $this->assertEquals($initialOrdersCount + 1, Order::count());
+        $this->assertSame($firstNumber, $second->json('data.order_number'));
+        $this->assertSame($firstReference, $second->json('data.reference_code'));
+
+        $order = Order::query()->where('order_number', $firstNumber)->firstOrFail();
+
+        // Isi pesanan mengikuti keranjang terbaru, bukan yang pertama.
+        $this->assertEquals(1, $order->items()->count());
+        $this->assertSame(3, (int) $order->items()->first()->quantity);
+        $this->assertEquals((float) $second->json('data.estimated_total'), (float) $order->total);
+        $this->assertEquals((float) $order->total, (float) $order->payment->amount);
+
+        // Satu log per order, bukan dua.
+        $this->assertSame(1, GuestCheckoutLog::query()->where('order_id', $order->id)->count());
+    }
+
+    /**
+     * Sesi berbeda tetap membuat pesanan berbeda — dedupe tidak boleh
+     * menggabungkan dua pembeli yang kebetulan membeli barang sama.
+     */
+    public function test_different_session_creates_separate_whatsapp_order(): void
+    {
+        $initialOrdersCount = Order::count();
+
+        $this->withHeader('X-Guest-Token', 'dedupe-token-a')
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+            ])->assertCreated();
+
+        $this->withHeader('X-Guest-Token', 'dedupe-token-b')
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+            ])->assertCreated();
+
+        $this->assertEquals($initialOrdersCount + 2, Order::count());
+    }
+
+    /**
+     * Pesanan yang sudah kedaluwarsa atau dikonfirmasi admin TIDAK dipakai
+     * ulang: submission berikutnya membuat order baru dengan nomor baru.
+     */
+    public function test_expired_whatsapp_order_is_not_reused(): void
+    {
+        $token = 'dedupe-token-expired';
+
+        $first = $this->withHeader('X-Guest-Token', $token)
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+            ])->assertCreated();
+
+        Order::query()
+            ->where('order_number', $first->json('data.order_number'))
+            ->update(['status' => Order::STATUS_EXPIRED]);
+
+        $second = $this->withHeader('X-Guest-Token', $token)
+            ->postJson('/api/v1/guest/whatsapp-checkout', [
+                'items' => [['sku_id' => $this->sku->id, 'quantity' => 1]],
+            ])->assertCreated();
+
+        $this->assertNotSame($first->json('data.order_number'), $second->json('data.order_number'));
+        $this->assertNotSame($first->json('data.reference_code'), $second->json('data.reference_code'));
     }
 
     public function test_guest_checkout_does_not_lock_or_deduct_inventory_stock(): void
@@ -233,6 +361,46 @@ class GuestCheckoutApiTest extends TestCase
         $this->assertDatabaseHas('guest_checkout_logs', [
             'wa_cs_number_used' => '6281234567890',
             'estimated_total' => 0,
+        ]);
+    }
+
+    public function test_guest_checkout_includes_shipping_address_and_courier(): void
+    {
+        $payload = [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Lalu Explorer',
+            'guest_phone' => '08123456789',
+            'shipping_address' => [
+                'street' => 'Jl. Pariwisata Senaru No. 12',
+                'destination_id' => 751,
+                'city' => 'Lombok Utara',
+                'district' => 'Bayan',
+                'subdistrict' => 'Senaru',
+                'province' => 'NTB',
+                'postal_code' => '83354',
+            ],
+            'courier' => 'jne',
+            'note' => 'Mohon packing kayu',
+        ];
+
+        $response = $this->postJson('/api/v1/guest/whatsapp-checkout', $payload);
+
+        $response->assertCreated();
+
+        $waUrl = urldecode($response->json('data.wa_url'));
+        $this->assertStringContainsString('Jl. Pariwisata Senaru No. 12', $waUrl);
+        $this->assertStringContainsString('Senaru', $waUrl);
+        $this->assertStringContainsString('JNE (Reguler/YES)', $waUrl);
+        $this->assertStringContainsString('Mohon packing kayu', $waUrl);
+
+        $orderNumber = $response->json('data.order_number');
+        $this->assertDatabaseHas('orders', [
+            'order_number' => $orderNumber,
+            'shipping_full_address' => 'Jl. Pariwisata Senaru No. 12, Senaru, Bayan, Lombok Utara, NTB, 83354',
+            'shipping_courier' => 'jne',
+            'shipping_destination_id' => 751,
         ]);
     }
 }

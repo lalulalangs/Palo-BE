@@ -15,11 +15,11 @@ use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Number;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class OrderActions
 {
-    /**
     /**
      * Aksi mengonfirmasi pembayaran pesanan non-COD dari status Menunggu Pembayaran.
      *
@@ -28,6 +28,9 @@ class OrderActions
      * dipotong via StockMovement TYPE_SALE, dan riwayat status tercatat.
      * Pesanan COD (awaiting_confirmation) alurnya terpisah via aksi konfirmasi
      * COD, bukan lewat method ini.
+     *
+     * Tanpa field input: catatan riwayat dibentuk otomatis dari data payment
+     * (gateway, status, invoice) supaya jejak audit tidak bergantung ketikan admin.
      */
     public static function makeMarkAsPaidAction(): Action
     {
@@ -37,32 +40,28 @@ class OrderActions
             ->color('success')
             ->visible(fn (Order $record): bool => $record->status === OrderStatus::Pending)
             ->modalHeading('Konfirmasi Pembayaran Pesanan')
-            ->modalDescription('Tandai pesanan ini telah Lunas. Stok fisik gudang akan otomatis dipotong dan tombol "Proses Pesanan" akan aktif setelah konfirmasi disimpan.')
+            ->modalDescription(fn (Order $record): string => sprintf(
+                '%s • %s • Status %s: %s • Invoice: %s. Stok fisik gudang akan otomatis dipotong dan tombol "Proses Pesanan" aktif setelah konfirmasi.',
+                $record->order_number,
+                Number::currency($record->total, 'IDR', 'id'),
+                strtoupper((string) ($record->payment?->gateway ?? 'gateway')),
+                $record->payment?->status ?? '-',
+                $record->payment?->gateway_transaction_id ?? '-',
+            ))
             ->modalSubmitActionLabel('Ya, Konfirmasi Lunas')
-            ->form([
-                TextInput::make('payment_reference')
-                    ->label('Nomor Referensi Pembayaran (Opsional)')
-                    ->placeholder('Contoh: No. ref transfer bank / mutasi: BCVA1234567890'),
-                Textarea::make('note')
-                    ->label('Catatan Verifikasi Admin (Opsional)')
-                    ->placeholder('Contoh: Dana diverifikasi melalui cek mutasi rekening'),
-            ])
-            ->action(function (Order $record, array $data, OrderTransitionService $service): void {
+            ->action(function (Order $record, OrderTransitionService $service): void {
+                $payment = $record->payment;
+
                 try {
-                    $noteParts = ['Pembayaran dikonfirmasi manual oleh admin.'];
-
-                    if (filled($data['payment_reference'] ?? null)) {
-                        $noteParts[] = "Referensi: {$data['payment_reference']}.";
-                    }
-
-                    if (filled($data['note'] ?? null)) {
-                        $noteParts[] = $data['note'];
-                    }
-
                     $service->markAsPaid(
                         $record,
                         Auth::id() ? (int) Auth::id() : null,
-                        implode(' ', $noteParts)
+                        sprintf(
+                            'Pembayaran dikonfirmasi manual oleh admin. Gateway: %s, status: %s, invoice: %s.',
+                            $payment?->gateway ?? '-',
+                            $payment?->status ?? '-',
+                            $payment?->gateway_transaction_id ?? '-',
+                        )
                     );
 
                     Notification::make()
@@ -81,27 +80,37 @@ class OrderActions
     }
 
     /**
-     * Aksi konfirmasi pesanan COD oleh CS dan kurangi stok fisik inventaris gudang.
+     * Konfirmasi pesanan yang pembayarannya diverifikasi manual oleh CS.
+     *
+     * Dua metode masuk ke sini: COD (bayar saat barang tiba) dan WhatsApp tamu
+     * (pembayaran VA/QRIS setelah CS menghubungi pembeli). Keduanya berakhir
+     * sama: status Diproses + stok fisik dipotong.
      */
     public static function makeConfirmCodAction(): Action
     {
         return Action::make('confirm_cod')
-            ->label('Konfirmasi COD')
+            ->label(fn (Order $record): string => $record->isWhatsAppOrder() ? 'Konfirmasi Pesanan' : 'Konfirmasi COD')
             ->icon(Heroicon::OutlinedCheckBadge)
             ->color('success')
             ->visible(fn (Order $record): bool => $record->canBeConfirmed())
-            ->modalHeading('Konfirmasi Pesanan COD')
-            ->modalDescription('Pastikan customer telah dihubungi via WhatsApp dan mengonfirmasi pesanannya. Setelah dikonfirmasi, pesanan beralih ke status Diproses dan stok fisik gudang akan otomatis dipotong.')
+            ->modalHeading(fn (Order $record): string => $record->isWhatsAppOrder()
+                ? 'Konfirmasi Pembayaran Pesanan WhatsApp'
+                : 'Konfirmasi Pesanan COD')
+            ->modalDescription(fn (Order $record): string => $record->isWhatsAppOrder()
+                ? 'Konfirmasi SETELAH pembayaran VA/QRIS dari pembeli benar-benar masuk. Setelah dikonfirmasi, pesanan beralih ke status Diproses dan stok fisik gudang otomatis dipotong.'
+                : 'Pastikan customer telah dihubungi via WhatsApp dan mengonfirmasi pesanannya. Setelah dikonfirmasi, pesanan beralih ke status Diproses dan stok fisik gudang akan otomatis dipotong.')
             ->modalSubmitActionLabel('Konfirmasi & Kurangi Stok')
             ->form([
                 Placeholder::make('customer_info')
                     ->label('Data Penerima')
                     ->content(fn (Order $record): string => "{$record->shipping_recipient_name} ({$record->shipping_phone}) - {$record->shipping_full_address}"),
                 Placeholder::make('cod_ref')
-                    ->label('Kode Referensi COD')
-                    ->content(fn (Order $record): string => $record->cod_reference_code ?? '-'),
+                    ->label(fn (Order $record): string => $record->isWhatsAppOrder() ? 'Kode Referensi WhatsApp' : 'Kode Referensi COD')
+                    ->content(fn (Order $record): string => $record->isWhatsAppOrder()
+                        ? ($record->guest_reference_code ?? '-')
+                        : ($record->cod_reference_code ?? '-')),
                 Placeholder::make('grand_total')
-                    ->label('Total Tagihan COD')
+                    ->label(fn (Order $record): string => $record->isWhatsAppOrder() ? 'Total Tagihan (belum termasuk ongkir)' : 'Total Tagihan COD')
                     ->content(fn (Order $record): string => 'Rp '.number_format((float) $record->total, 0, ',', '.')),
                 Textarea::make('note')
                     ->label('Catatan Konfirmasi CS (Opsional)')
@@ -109,20 +118,28 @@ class OrderActions
             ])
             ->action(function (Order $record, array $data, OrderTransitionService $service): void {
                 try {
-                    $service->confirmCodOrder(
-                        $record,
-                        Auth::id() ? (int) Auth::id() : null,
-                        $data['note'] ?? null
-                    );
+                    if ($record->isWhatsAppOrder()) {
+                        $service->confirmWhatsAppOrder(
+                            $record,
+                            Auth::id() ? (int) Auth::id() : null,
+                            $data['note'] ?? null
+                        );
+                    } else {
+                        $service->confirmCodOrder(
+                            $record,
+                            Auth::id() ? (int) Auth::id() : null,
+                            $data['note'] ?? null
+                        );
+                    }
 
                     Notification::make()
-                        ->title("Pesanan COD {$record->order_number} berhasil dikonfirmasi")
+                        ->title("Pesanan {$record->order_number} berhasil dikonfirmasi")
                         ->body('Status pesanan diubah ke Diproses dan stok fisik gudang telah dipotong.')
                         ->success()
                         ->send();
                 } catch (\Throwable $e) {
                     Notification::make()
-                        ->title('Gagal mengonfirmasi pesanan COD')
+                        ->title('Gagal mengonfirmasi pesanan')
                         ->body($e->getMessage())
                         ->danger()
                         ->send();

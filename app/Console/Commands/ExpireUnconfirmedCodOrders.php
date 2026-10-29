@@ -23,7 +23,7 @@ class ExpireUnconfirmedCodOrders extends Command
      *
      * @var string
      */
-    protected $description = 'Membatalkan/kedaluwarsa otomatis pesanan COD yang melebihi batas waktu konfirmasi CS.';
+    protected $description = 'Membatalkan/kedaluwarsa otomatis pesanan COD & WhatsApp tamu yang melebihi batas waktu konfirmasi CS.';
 
     /**
      * Execute the console command.
@@ -43,19 +43,25 @@ class ExpireUnconfirmedCodOrders extends Command
 
         $this->info("Memeriksa pesanan COD yang belum dikonfirmasi lebih dari {$timeoutHours} jam (dibuat sebelum: {$threshold->format('Y-m-d H:i:s')})...");
 
+        // Dua metode yang dikonfirmasi manual oleh CS: COD (bayar saat barang
+        // tiba) dan WhatsApp tamu (bayar VA/QRIS setelah CS menghubungi).
+        // Keduanya kedaluwarsa dengan batas waktu yang sama.
         $orders = Order::query()
-            ->where('payment_method', Order::PAYMENT_METHOD_COD)
+            ->whereIn('payment_method', [
+                Order::PAYMENT_METHOD_COD,
+                Order::PAYMENT_METHOD_WHATSAPP,
+            ])
             ->where('status', Order::STATUS_AWAITING_CONFIRMATION)
             ->where('created_at', '<=', $threshold)
             ->get();
 
         if ($orders->isEmpty()) {
-            $this->info('Tidak ditemukan pesanan COD yang kedaluwarsa.');
+            $this->info('Tidak ditemukan pesanan COD/WhatsApp yang kedaluwarsa.');
 
             return self::SUCCESS;
         }
 
-        $this->warn("Ditemukan {$orders->count()} pesanan COD yang memenuhi kriteria kedaluwarsa.");
+        $this->warn("Ditemukan {$orders->count()} pesanan COD/WhatsApp yang memenuhi kriteria kedaluwarsa.");
 
         $processedCount = 0;
         $failedCount = 0;

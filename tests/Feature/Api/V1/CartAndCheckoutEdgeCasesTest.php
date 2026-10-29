@@ -13,10 +13,14 @@ use App\Models\User;
 use App\Models\Voucher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Tests\Concerns\FakesRajaOngkir;
+use Tests\Support\FakesDokuCheckout;
 use Tests\TestCase;
 
 class CartAndCheckoutEdgeCasesTest extends TestCase
 {
+    use FakesDokuCheckout;
+    use FakesRajaOngkir;
     use RefreshDatabase;
 
     protected User $user;
@@ -32,6 +36,9 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        $this->configureDokuForTests();
+        $this->fakeDokuCheckout();
 
         $this->user = User::create([
             'name' => 'Edge Case Hunter',
@@ -193,7 +200,7 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
     /**
      * Edge Case 5: Cart merge ignores inactive or soft-deleted products.
      */
-    public function test_cart_merge_ignores_inactive_or_deleted_products(): void
+    public function test_cart_merge_upon_login_ignores_inactive_or_deleted_products(): void
     {
         $guestToken = 'guest-edge-merge';
 
@@ -207,9 +214,12 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
         // Product gets soft-deleted before user logs in
         $this->product->delete();
 
-        // User logs in and attempts merge
-        $this->actingAs($this->user, 'sanctum')
-            ->postJson('/api/v1/cart/merge', [
+        // User logs in; login yang menggabungkan keranjang tamu
+        // (endpoint /cart/merge sudah dihapus).
+        $this->withHeader('X-Guest-Token', $guestToken)
+            ->postJson('/api/v1/auth/login', [
+                'email' => 'edge@example.test',
+                'password' => 'Password123!',
                 'guest_token' => $guestToken,
             ])->assertOk();
 
@@ -259,9 +269,9 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
     }
 
     /**
-     * Edge Case 8: Soft lock expires cleanly after 15 minutes, restoring available stock.
+     * Edge Case 8: Soft lock expires cleanly after the payment window, restoring available stock.
      */
-    public function test_soft_lock_expires_cleanly_after_15_minutes_and_restores_available_stock(): void
+    public function test_soft_lock_expires_cleanly_after_payment_window_and_restores_available_stock(): void
     {
         // Physical stock is 5.
         // User creates order for 4 units
@@ -271,7 +281,7 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
             'status' => Order::STATUS_PENDING,
             'subtotal' => 125000 * 4,
             'total' => 125000 * 4,
-            'stock_locked_until' => now()->addMinutes(15),
+            'stock_locked_until' => now()->addMinutes(60),
         ]);
 
         OrderItem::create([
@@ -288,8 +298,8 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
         // While lock is active, available stock is 5 - 4 = 1.
         $this->assertEquals(1, $this->sku->fresh()->available_stock);
 
-        // Fast-forward time past 15 minutes
-        $this->travel(16)->minutes();
+        // Fast-forward time past the payment window (60 menit).
+        $this->travel(61)->minutes();
 
         // Lock has expired! Available stock must now be 5 again!
         $this->assertEquals(5, $this->sku->fresh()->available_stock);
