@@ -27,13 +27,17 @@ class BannerResource extends Resource
 
     protected static string|UnitEnum|null $navigationGroup = 'Konten & Promosi';
 
-    protected static ?string $navigationLabel = 'Banner';
+    protected static ?string $navigationLabel = 'Banner (Legacy)';
 
-    protected static ?string $modelLabel = 'Banner';
+    protected static ?string $modelLabel = 'Banner (Legacy)';
 
-    protected static ?string $pluralModelLabel = 'Daftar Banner';
+    protected static ?string $pluralModelLabel = 'Daftar Banner (Legacy)';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?string $slug = 'legacy-banners';
+
+    protected static bool $shouldRegisterNavigation = false;
+
+    protected static ?int $navigationSort = 99;
 
     protected static ?string $recordTitleAttribute = 'title';
 

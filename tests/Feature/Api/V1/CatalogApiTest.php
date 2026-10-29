@@ -58,7 +58,7 @@ class CatalogApiTest extends TestCase
             'sort_order' => 3,
         ]);
 
-        $response = $this->getJson('/api/v1/banners');
+        $response = $this->getJson('/api/v1/legacy-banners');
 
         $response->assertStatus(200)
             ->assertJson([

@@ -23,17 +23,19 @@ class HeroSliderResource extends Resource
 
     protected static ?string $model = HeroSlider::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPresentationChartBar;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedPhoto;
 
     protected static string|UnitEnum|null $navigationGroup = 'Konten & Promosi';
 
-    protected static ?string $navigationLabel = 'Hero Slider';
+    protected static ?string $navigationLabel = 'Banner';
 
-    protected static ?string $modelLabel = 'Hero Slider';
+    protected static ?string $modelLabel = 'Banner';
 
-    protected static ?string $pluralModelLabel = 'Daftar Hero Slider';
+    protected static ?string $pluralModelLabel = 'Daftar Banner';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?string $slug = 'banners';
+
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $recordTitleAttribute = 'title';
 

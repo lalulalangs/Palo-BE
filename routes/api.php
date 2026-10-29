@@ -82,23 +82,34 @@ Route::prefix('v1')->group(function (): void {
         // Brand & Settings
         Route::get('brand', [BrandController::class, 'index']);
 
+        // Legacy Banners (dinonaktifkan / arsip)
+        Route::get('legacy-banners', [BannerController::class, 'index']);
+
         // Public Catalog
-        Route::get('banners', [BannerController::class, 'index']);
         Route::get('categories', [CategoryController::class, 'index']);
         Route::get('collections', [CollectionController::class, 'index']);
         Route::get('collections/{slug}', [CollectionController::class, 'show']);
         Route::get('products', [ProductController::class, 'index']);
         Route::get('products/{slug}', [ProductController::class, 'show']);
 
-        // Hero Sliders
+        // Banners (Hero Sliders utama)
+        Route::get('banners', [PublicHeroSliderController::class, 'index']);
+        Route::get('banners/{heroSlider}', [PublicHeroSliderController::class, 'show']);
+        // Kompatibilitas mundur
         Route::get('hero-sliders', [PublicHeroSliderController::class, 'index']);
         Route::get('hero-sliders/{heroSlider}', [PublicHeroSliderController::class, 'show']);
     });
 
-    // Admin Hero Sliders — dilindungi Sanctum + gate AdminFeature::HeroSliders (remediasi audit S-01).
+    // Admin Banners / Hero Sliders — dilindungi Sanctum + gate AdminFeature::HeroSliders (remediasi audit S-01).
     Route::prefix('admin')
         ->middleware(['auth:sanctum', 'can:hero-sliders'])
         ->group(function (): void {
+            Route::get('banners', [AdminHeroSliderController::class, 'index']);
+            Route::post('banners', [AdminHeroSliderController::class, 'store']);
+            Route::get('banners/{heroSlider}', [AdminHeroSliderController::class, 'show']);
+            Route::match(['put', 'patch'], 'banners/{heroSlider}', [AdminHeroSliderController::class, 'update']);
+            Route::delete('banners/{heroSlider}', [AdminHeroSliderController::class, 'destroy']);
+
             Route::get('hero-sliders', [AdminHeroSliderController::class, 'index']);
             Route::post('hero-sliders', [AdminHeroSliderController::class, 'store']);
             Route::get('hero-sliders/{heroSlider}', [AdminHeroSliderController::class, 'show']);

@@ -98,6 +98,14 @@ class HeroSliderTest extends TestCase
             ->assertJsonPath('success', true)
             ->assertJsonCount(2, 'data')
             ->assertJsonPath('data.0.title', 'Slider A')
+            ->assertJsonPath('data.1.title', 'Slider B');
+
+        // Verifikasi rute baru /api/v1/banners mengembalikan data yang sama persis
+        $bannerResponse = $this->getJson('/api/v1/banners');
+        $bannerResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.0.title', 'Slider A')
             ->assertJsonPath('data.1.title', 'Slider B')
             ->assertJsonStructure([
                 'success',
