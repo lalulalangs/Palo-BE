@@ -16,8 +16,21 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $proxies = array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1,::1'))));
-        $middleware->trustProxies(at: $proxies);
+        $trustedProxies = env('TRUSTED_PROXIES');
+        $proxies = match (true) {
+            $trustedProxies === '*' || $trustedProxies === '**' => '*',
+            is_string($trustedProxies) && trim($trustedProxies) !== '' => array_values(array_filter(array_map('trim', explode(',', $trustedProxies)))),
+            default => ['127.0.0.1', '::1'],
+        };
+
+        $middleware->trustProxies(
+            at: $proxies,
+            headers: Request::HEADER_X_FORWARDED_FOR |
+                Request::HEADER_X_FORWARDED_HOST |
+                Request::HEADER_X_FORWARDED_PORT |
+                Request::HEADER_X_FORWARDED_PROTO |
+                Request::HEADER_X_FORWARDED_AWS_ELB,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

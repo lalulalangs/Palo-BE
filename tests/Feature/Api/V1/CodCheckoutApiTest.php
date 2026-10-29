@@ -216,6 +216,9 @@ class CodCheckoutApiTest extends TestCase
         $this->assertNull($order->stock_locked_until);
         $this->assertNull($order->shipping_courier);
         $this->assertSame(0.0, (float) $order->shipping_cost);
+        $this->assertNotNull($order->shipping_address_snapshot);
+        $this->assertSame('Pendaki Guest', $order->shipping_address_snapshot['recipient_name']);
+        $this->assertSame('Bayan', $order->shipping_address_snapshot['district']);
 
         // Verify item snapshot
         $this->assertCount(1, $order->items);

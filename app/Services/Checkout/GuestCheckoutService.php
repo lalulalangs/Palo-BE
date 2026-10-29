@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use RuntimeException;
 
 class GuestCheckoutService
 {
@@ -82,8 +83,20 @@ class GuestCheckoutService
 
             /** @var Sku|null $sku */
             $sku = $skus->get($skuId);
-            if (! $sku || ! $sku->is_active || ! $sku->product || ! $sku->product->is_active) {
-                continue;
+            if (! $sku) {
+                throw ValidationException::withMessages([
+                    'items' => ["SKU #{$skuId} tidak ditemukan di sistem."],
+                ]);
+            }
+
+            if (! $sku->is_active || ! $sku->product || ! $sku->product->is_active) {
+                $productName = $sku->product?->name ?? $sku->sku_code;
+                throw new InsufficientStockException(
+                    message: "Produk atau varian {$productName} saat ini tidak aktif atau tidak lagi tersedia.",
+                    skuCode: $sku->sku_code,
+                    available: 0,
+                    requested: $quantity
+                );
             }
 
             $productName = $sku->product?->name ?? 'Produk';
@@ -600,6 +613,8 @@ class GuestCheckoutService
                 'shipping_recipient_name' => $recipientName,
                 'shipping_phone' => $recipientPhone,
                 'shipping_full_address' => $fullAddress,
+                'shipping_destination_id' => ! empty($shippingAddress['destination_id']) ? (int) $shippingAddress['destination_id'] : null,
+                'shipping_address_snapshot' => ! empty($shippingAddress) ? $shippingAddress : null,
                 // Null agar CodWhatsAppService menulis "Ongkir: akan dikonfirmasi CS".
                 'shipping_courier' => null,
                 'shipping_service' => null,
@@ -692,28 +707,25 @@ class GuestCheckoutService
     }
 
     /**
-     * Nomor pesanan `PLR-YYYYMMDD-00001`, dengan sufiks acak bila bentrok.
+     * Nomor pesanan berbasis tanggal + entropi acak tanpa query count() yang
+     * rawan tabrakan saat checkout bersamaan.
      *
      * Satu sumber untuk kedua jalur tamu (COD dan WhatsApp) supaya formatnya
      * tidak bercabang.
      */
     private function generateOrderNumber(): string
     {
-        $today = date('Ymd');
-        $countToday = Order::query()->whereDate('created_at', now()->toDateString())->count() + 1;
-        $orderNumber = sprintf('%s-%s-%05d', Order::NUMBER_PREFIX, $today, $countToday);
+        $date = now()->format('Ymd');
 
-        while (Order::query()->where('order_number', $orderNumber)->exists()) {
-            $orderNumber = sprintf(
-                '%s-%s-%05d-%s',
-                Order::NUMBER_PREFIX,
-                $today,
-                $countToday,
-                strtoupper(Str::random(3))
-            );
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            $candidate = sprintf('%s-%s-%s', Order::NUMBER_PREFIX, $date, strtoupper(bin2hex(random_bytes(3))));
+
+            if (! Order::query()->where('order_number', $candidate)->exists()) {
+                return $candidate;
+            }
         }
 
-        return $orderNumber;
+        throw new RuntimeException('Gagal membuat nomor pesanan unik. Silakan coba lagi.');
     }
 
     /**

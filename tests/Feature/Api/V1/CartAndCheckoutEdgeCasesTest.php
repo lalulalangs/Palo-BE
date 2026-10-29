@@ -230,7 +230,7 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
     }
 
     /**
-     * Edge Case 6: Guest checkout ignores inactive or deleted products.
+     * Edge Case 6: Guest checkout rejects inactive or deleted products with InsufficientStockException.
      */
     public function test_guest_checkout_ignores_inactive_or_deleted_products(): void
     {
@@ -243,8 +243,8 @@ class CartAndCheckoutEdgeCasesTest extends TestCase
             'guest_name' => 'Ghost Buyer',
         ]);
 
-        $response->assertUnprocessable()
-            ->assertJsonValidationErrors(['items']);
+        $response->assertStatus(409)
+            ->assertJsonPath('error_code', 'stock_unavailable');
     }
 
     /**

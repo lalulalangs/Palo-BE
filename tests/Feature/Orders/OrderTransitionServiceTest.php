@@ -232,6 +232,26 @@ class OrderTransitionServiceTest extends TestCase
         ]);
     }
 
+    public function test_mark_as_completed_settles_whatsapp_order_payment(): void
+    {
+        $order = $this->createSampleOrder(Order::STATUS_SHIPPED, 1);
+        $order->update(['payment_method' => Order::PAYMENT_METHOD_WHATSAPP]);
+
+        Payment::create([
+            'order_id' => $order->id,
+            'gateway' => 'whatsapp',
+            'payment_method' => 'whatsapp',
+            'amount' => $order->total,
+            'status' => Payment::STATUS_PENDING,
+        ]);
+
+        $result = $this->service->markAsCompleted($order, $this->admin->id);
+
+        $this->assertEquals(OrderStatus::Completed, $result->status);
+        $this->assertSame(Payment::STATUS_SETTLEMENT, $result->payment?->status);
+        $this->assertNotNull($result->payment?->paid_at);
+    }
+
     public function test_cannot_mark_as_completed_if_not_shipped(): void
     {
         $order = $this->createSampleOrder(Order::STATUS_PROCESSING, 1);

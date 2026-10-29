@@ -298,21 +298,22 @@ class OrderTransitionService
                 'created_at' => now(),
             ]);
 
-            if ($lockedOrder->isCod()) {
+            if ($lockedOrder->isCod() || $lockedOrder->isWhatsAppOrder()) {
                 if ($lockedOrder->payment) {
                     $lockedOrder->payment->update([
                         'status' => Payment::STATUS_SETTLEMENT,
-                        'paid_at' => now(),
+                        'paid_at' => $lockedOrder->payment->paid_at ?? now(),
                     ]);
                 } else {
+                    $gateway = $lockedOrder->isCod() ? 'cod' : 'whatsapp';
                     Payment::create([
                         'order_id' => $lockedOrder->id,
-                        'gateway' => 'cod',
-                        'payment_method' => 'cod',
+                        'gateway' => $gateway,
+                        'payment_method' => $gateway,
                         'amount' => $lockedOrder->total,
                         'status' => Payment::STATUS_SETTLEMENT,
                         'paid_at' => now(),
-                        'raw_response' => ['note' => 'Pembayaran tunai COD diselesaikan saat pesanan selesai.'],
+                        'raw_response' => ['note' => $lockedOrder->isCod() ? 'Pembayaran tunai COD diselesaikan saat pesanan selesai.' : 'Pembayaran WhatsApp diselesaikan saat pesanan selesai.'],
                     ]);
                 }
             }
