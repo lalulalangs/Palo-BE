@@ -59,6 +59,9 @@ class ManageSocialMediaSettings extends Page
             'instagram_url' => null,
             'instagram_handle' => null,
             'facebook_url' => null,
+            'tiktok_url' => null,
+            'threads_url' => null,
+            'threads_handle' => null,
             'whatsapp_number' => null,
             'whatsapp_default_message' => null,
         ]);
@@ -98,7 +101,23 @@ class ManageSocialMediaSettings extends Page
                                     ->placeholder('https://facebook.com/palorinjani')
                                     ->helperText('Tautan langsung ke halaman Facebook resmi Palo Rinjani.')
                                     ->maxLength(255),
-                                // TODO: Implementasi field input tiktok_url (URL profil TikTok resmi Palo Rinjani)
+                                TextInput::make('tiktok_url')
+                                    ->label('URL Profil TikTok')
+                                    ->url()
+                                    ->placeholder('https://tiktok.com/@palorinjani')
+                                    ->helperText('Tautan langsung ke profil TikTok resmi Palo Rinjani.')
+                                    ->maxLength(255),
+                                TextInput::make('threads_url')
+                                    ->label('URL Profil Threads')
+                                    ->url()
+                                    ->placeholder('https://threads.net/@palorinjani')
+                                    ->helperText('Tautan langsung ke profil Threads resmi Palo Rinjani.')
+                                    ->maxLength(255),
+                                TextInput::make('threads_handle')
+                                    ->label('Handle Threads')
+                                    ->placeholder('@palorinjani')
+                                    ->helperText('Username/handle Threads untuk teks kontak (contoh: @palorinjani).')
+                                    ->maxLength(100),
                             ])
                             ->columns(1),
 
@@ -166,6 +185,9 @@ class ManageSocialMediaSettings extends Page
             'instagram_url' => $normalize($state['instagram_url'] ?? null),
             'instagram_handle' => $normalize($state['instagram_handle'] ?? null),
             'facebook_url' => $normalize($state['facebook_url'] ?? null),
+            'tiktok_url' => $normalize($state['tiktok_url'] ?? null),
+            'threads_url' => $normalize($state['threads_url'] ?? null),
+            'threads_handle' => $normalize($state['threads_handle'] ?? null),
             'whatsapp_number' => $normalize($state['whatsapp_number'] ?? null),
             'whatsapp_cs' => $normalize($state['whatsapp_number'] ?? null),
             'whatsapp_default_message' => $normalize($state['whatsapp_default_message'] ?? null),

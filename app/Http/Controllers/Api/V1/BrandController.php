@@ -22,8 +22,9 @@ class BrandController extends Controller
             'instagram_url' => null,
             'instagram_handle' => null,
             'facebook_url' => null,
-            // TODO: Implementasi integrasi dinamis tiktok_url dari form admin di masa mendatang
             'tiktok_url' => null,
+            'threads_url' => null,
+            'threads_handle' => null,
             'whatsapp_number' => null,
             'whatsapp_cs' => null,
             'whatsapp_default_message' => null,

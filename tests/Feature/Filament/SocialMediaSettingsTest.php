@@ -38,6 +38,9 @@ class SocialMediaSettingsTest extends TestCase
             ->assertFormFieldExists('instagram_url')
             ->assertFormFieldExists('instagram_handle')
             ->assertFormFieldExists('facebook_url')
+            ->assertFormFieldExists('tiktok_url')
+            ->assertFormFieldExists('threads_url')
+            ->assertFormFieldExists('threads_handle')
             ->assertFormFieldExists('whatsapp_number')
             ->assertFormFieldExists('whatsapp_default_message');
     }
@@ -50,6 +53,9 @@ class SocialMediaSettingsTest extends TestCase
                 'instagram_url' => 'https://instagram.com/palorinjani_official',
                 'instagram_handle' => '@palorinjani',
                 'facebook_url' => 'https://facebook.com/palorinjani',
+                'tiktok_url' => 'https://tiktok.com/@palorinjani',
+                'threads_url' => 'https://threads.net/@palorinjani',
+                'threads_handle' => '@palorinjani',
                 'whatsapp_number' => '081234567890',
                 'whatsapp_default_message' => 'Halo Admin Palo Mountain Goods, saya ingin bertanya...',
             ])
@@ -60,6 +66,9 @@ class SocialMediaSettingsTest extends TestCase
         $this->assertEquals('https://instagram.com/palorinjani_official', AppSetting::getValue('instagram_url'));
         $this->assertEquals('@palorinjani', AppSetting::getValue('instagram_handle'));
         $this->assertEquals('https://facebook.com/palorinjani', AppSetting::getValue('facebook_url'));
+        $this->assertEquals('https://tiktok.com/@palorinjani', AppSetting::getValue('tiktok_url'));
+        $this->assertEquals('https://threads.net/@palorinjani', AppSetting::getValue('threads_url'));
+        $this->assertEquals('@palorinjani', AppSetting::getValue('threads_handle'));
         $this->assertEquals('081234567890', AppSetting::getValue('whatsapp_number'));
         $this->assertEquals('081234567890', AppSetting::getValue('whatsapp_cs'));
         $this->assertEquals('Halo Admin Palo Mountain Goods, saya ingin bertanya...', AppSetting::getValue('whatsapp_default_message'));
@@ -71,6 +80,9 @@ class SocialMediaSettingsTest extends TestCase
             'instagram_url' => 'https://instagram.com/palorinjani',
             'instagram_handle' => '@palorinjani',
             'facebook_url' => 'https://facebook.com/palorinjani',
+            'tiktok_url' => 'https://tiktok.com/@palorinjani',
+            'threads_url' => 'https://threads.net/@palorinjani',
+            'threads_handle' => '@palorinjani',
             'whatsapp_number' => '6281999888777',
             'whatsapp_default_message' => 'Sapaan awal tes',
         ]);
@@ -81,6 +93,9 @@ class SocialMediaSettingsTest extends TestCase
                 'instagram_url' => 'https://instagram.com/palorinjani',
                 'instagram_handle' => '@palorinjani',
                 'facebook_url' => 'https://facebook.com/palorinjani',
+                'tiktok_url' => 'https://tiktok.com/@palorinjani',
+                'threads_url' => 'https://threads.net/@palorinjani',
+                'threads_handle' => '@palorinjani',
                 'whatsapp_number' => '6281999888777',
                 'whatsapp_default_message' => 'Sapaan awal tes',
             ]);
@@ -93,9 +108,11 @@ class SocialMediaSettingsTest extends TestCase
             ->fillForm([
                 'instagram_url' => 'javascript:alert(1)',
                 'facebook_url' => 'bukan-url-valid',
+                'tiktok_url' => 'invalid-tiktok-url',
+                'threads_url' => 'invalid-threads-url',
             ])
             ->call('save')
-            ->assertHasFormErrors(['instagram_url', 'facebook_url']);
+            ->assertHasFormErrors(['instagram_url', 'facebook_url', 'tiktok_url', 'threads_url']);
     }
 
     public function test_validation_rejects_invalid_whatsapp_number_format(): void
@@ -121,16 +138,25 @@ class SocialMediaSettingsTest extends TestCase
     public function test_saving_blank_fields_clears_settings_to_null(): void
     {
         AppSetting::setValue('instagram_url', 'https://instagram.com/old');
+        AppSetting::setValue('tiktok_url', 'https://tiktok.com/@old');
+        AppSetting::setValue('threads_url', 'https://threads.net/@old');
+        AppSetting::setValue('threads_handle', '@old');
 
         Livewire::actingAs($this->admin, 'admin')
             ->test(ManageSocialMediaSettings::class)
             ->fillForm([
                 'instagram_url' => '',
+                'tiktok_url' => '',
+                'threads_url' => '',
+                'threads_handle' => '',
             ])
             ->call('save')
             ->assertHasNoFormErrors();
 
         $this->assertNull(AppSetting::getValue('instagram_url'));
+        $this->assertNull(AppSetting::getValue('tiktok_url'));
+        $this->assertNull(AppSetting::getValue('threads_url'));
+        $this->assertNull(AppSetting::getValue('threads_handle'));
     }
 
     public function test_public_api_v1_brand_returns_saved_settings(): void
@@ -139,6 +165,9 @@ class SocialMediaSettingsTest extends TestCase
             'instagram_url' => 'https://instagram.com/palorinjani',
             'instagram_handle' => '@palorinjani',
             'facebook_url' => 'https://facebook.com/palorinjani',
+            'tiktok_url' => 'https://tiktok.com/@palorinjani',
+            'threads_url' => 'https://threads.net/@palorinjani',
+            'threads_handle' => '@palorinjani',
             'whatsapp_number' => '081234567890',
             'whatsapp_default_message' => 'Halo CS Palo Mountain Goods',
         ]);
@@ -149,6 +178,9 @@ class SocialMediaSettingsTest extends TestCase
             ->assertJsonPath('data.instagram_url', 'https://instagram.com/palorinjani')
             ->assertJsonPath('data.instagram_handle', '@palorinjani')
             ->assertJsonPath('data.facebook_url', 'https://facebook.com/palorinjani')
+            ->assertJsonPath('data.tiktok_url', 'https://tiktok.com/@palorinjani')
+            ->assertJsonPath('data.threads_url', 'https://threads.net/@palorinjani')
+            ->assertJsonPath('data.threads_handle', '@palorinjani')
             ->assertJsonPath('data.whatsapp_number', '081234567890')
             ->assertJsonPath('data.whatsapp_cs', '081234567890')
             ->assertJsonPath('data.whatsapp', '081234567890')
