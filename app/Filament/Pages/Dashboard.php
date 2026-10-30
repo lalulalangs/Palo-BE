@@ -16,18 +16,18 @@ use Filament\Schemas\Schema;
 /**
  * Layout Plan:
  * ===================================================================================
- * ROW 0: Header Filters Form (Rentang Tanggal & Filter Status Promo) - Superadmin Only
- *        [ Tanggal Mulai (DatePicker) ] [ Tanggal Selesai (DatePicker) ] [ Status Promo (Select) ]
+ * ROW 0: Header Filters Form - Superadmin Only
+ *        [ Tanggal Mulai - DatePicker ] [ Tanggal Selesai - DatePicker ] [ Status Promo - Select ]
  * ===================================================================================
- * ROW 1: KasBesarStatsOverview (Full Width - 4 Stat Cards)
- *        [ 1. Total Kas Besar (Rp & Fisik) ] [ 2. Arus Barang Masuk (Rp) ]
- *        [ 3. Kas Bersih Keluar (Rp) ]       [ 4. Beban Subsidi Promo (Rp & %) ]
+ * ROW 1: KasBesarStatsOverview - Full Width 4 Stat Cards
+ *        [ 1. Nilai Stok Gudang ]       [ 2. Nilai Belanja Barang ]
+ *        [ 3. Penerimaan Kas Bersih ]   [ 4. Potongan Diskon dan Promo ]
  * ===================================================================================
- * ROW 2: StockCashflowTrendChart (Full Width - Line Chart Tren Deret Waktu)
- *        Inbound Restock Value vs Gross Sales Potential vs Net Realized Cash
+ * ROW 2: StockCashflowTrendChart - Full Width Line Chart Tren Deret Waktu
+ *        Belanja Barang Masuk vs Omzet Penjualan Kotor vs Penerimaan Kas Bersih
  * ===================================================================================
- * ROW 3: PromoImpactTableWidget (Full Width - Ranking Table 10 Produk)
- *        SKU | Nama Produk | Varian | Qty Terjual | Nilai Gross | Subsidi Promo | Kas Bersih
+ * ROW 3: PromoImpactTableWidget - Full Width Ranking Table 10 Produk
+ *        Kode SKU | Nama Produk | Varian | Jumlah Terjual | Omzet Kotor | Potongan Promo | Kas Bersih Diterima
  * ===================================================================================
  */
 class Dashboard extends BaseDashboard
@@ -55,8 +55,8 @@ class Dashboard extends BaseDashboard
                         ->label('Status Promo')
                         ->options([
                             'all' => 'Semua Transaksi',
-                            'promo_only' => 'Hanya Transaksi Promo/Diskon',
-                            'non_promo' => 'Hanya Transaksi Normal',
+                            'promo_only' => 'Hanya Transaksi dengan Promo',
+                            'non_promo' => 'Hanya Transaksi Normal tanpa Promo',
                         ])
                         ->default('all'),
                 ])

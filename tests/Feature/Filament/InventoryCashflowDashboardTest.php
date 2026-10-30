@@ -142,10 +142,10 @@ class InventoryCashflowDashboardTest extends TestCase
         Livewire::actingAs($this->superAdmin, 'admin')
             ->test(KasBesarStatsOverview::class)
             ->assertSuccessful()
-            ->assertSee('Total Kas Besar')
-            ->assertSee('Arus Barang Masuk')
-            ->assertSee('Arus Barang Keluar Bersih')
-            ->assertSee('Total Subsidi Promo / Diskon')
+            ->assertSee('Nilai Stok Gudang')
+            ->assertSee('Nilai Belanja Barang')
+            ->assertSee('Penerimaan Kas Bersih')
+            ->assertSee('Potongan Diskon dan Promo')
             ->assertSee('Rp 850.000') // Net cash realized
             ->assertSee('Rp 150.000'); // Promo subsidy
     }
@@ -155,7 +155,7 @@ class InventoryCashflowDashboardTest extends TestCase
         Livewire::actingAs($this->superAdmin, 'admin')
             ->test(StockCashflowTrendChart::class)
             ->assertSuccessful()
-            ->assertSee('Tren Arus Kas & Nilai Mutasi Barang');
+            ->assertSee('Tren Arus Barang dan Penerimaan Kas');
     }
 
     public function test_promo_impact_table_widget_renders_top_discounted_products(): void
@@ -186,7 +186,7 @@ class InventoryCashflowDashboardTest extends TestCase
         Livewire::actingAs($this->superAdmin, 'admin')
             ->test(PromoImpactTableWidget::class)
             ->assertSuccessful()
-            ->assertSee('Ranking Produk Beban Subsidi Promo Terbesar')
+            ->assertSee('10 Produk dengan Beban Promo Tertinggi')
             ->assertSee('TND-RINJ-2P-GRN')
             ->assertSee('Tenda Rinjani Ultralight 2P')
             ->assertSee('Rp 100.000')

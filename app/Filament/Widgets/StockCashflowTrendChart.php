@@ -16,9 +16,9 @@ class StockCashflowTrendChart extends ChartWidget
 
     protected int | string | array $columnSpan = 'full';
 
-    protected ?string $heading = 'Tren Arus Kas & Nilai Mutasi Barang';
+    protected ?string $heading = 'Tren Arus Barang dan Penerimaan Kas';
 
-    protected ?string $description = 'Menampilkan perbandingan nilai restock, potensi omzet normal (gross), dan penerimaan kas bersih.';
+    protected ?string $description = 'Perbandingan harian nilai belanja barang masuk, omzet kotor, dan kas bersih yang diterima toko.';
 
     protected ?string $maxHeight = '320px';
 
@@ -55,7 +55,7 @@ class StockCashflowTrendChart extends ChartWidget
         return [
             'datasets' => [
                 [
-                    'label' => 'Nilai Barang Masuk (Restock)',
+                    'label' => 'Belanja Barang Masuk',
                     'data' => $trend['inbound_series'],
                     'borderColor' => '#2a6f97',
                     'backgroundColor' => 'rgba(42, 111, 151, 0.1)',
@@ -63,7 +63,7 @@ class StockCashflowTrendChart extends ChartWidget
                     'tension' => 0.3,
                 ],
                 [
-                    'label' => 'Potensi Penjualan (Gross)',
+                    'label' => 'Omzet Penjualan Kotor',
                     'data' => $trend['gross_sales_series'],
                     'borderColor' => '#d96b27',
                     'backgroundColor' => 'rgba(217, 107, 39, 0.05)',
@@ -71,10 +71,10 @@ class StockCashflowTrendChart extends ChartWidget
                     'tension' => 0.3,
                 ],
                 [
-                    'label' => 'Kas Riil Diterima (Net Cash In)',
+                    'label' => 'Penerimaan Kas Bersih',
                     'data' => $trend['net_cash_series'],
-                    'borderColor' => '#227c4b',
-                    'backgroundColor' => 'rgba(34, 124, 75, 0.15)',
+                    'borderColor' => '#16a34a',
+                    'backgroundColor' => 'rgba(22, 163, 74, 0.15)',
                     'fill' => true,
                     'tension' => 0.3,
                 ],

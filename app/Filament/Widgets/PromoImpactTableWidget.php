@@ -31,8 +31,8 @@ class PromoImpactTableWidget extends TableWidget
     public function table(Table $table): Table
     {
         return $table
-            ->heading('Ranking Produk Beban Subsidi Promo Terbesar')
-            ->description('10 produk dengan alokasi subsidi promo tertinggi pada periode terpilih')
+            ->heading('10 Produk dengan Beban Promo Tertinggi')
+            ->description('Daftar produk dengan akumulasi potongan diskon terbesar selama periode terpilih.')
             ->records(function () {
                 $start = filled($this->pageFilters['startDate'] ?? null)
                     ? Carbon::parse($this->pageFilters['startDate'])
@@ -53,39 +53,42 @@ class PromoImpactTableWidget extends TableWidget
             ->paginated(false)
             ->columns([
                 TextColumn::make('sku_code')
-                    ->label('SKU')
-                    ->searchable(false)
-                    ->sortable(false),
+                    ->label('Kode SKU')
+                    ->fontFamily('mono')
+                    ->color('gray'),
 
                 TextColumn::make('product_name')
                     ->label('Nama Produk')
-                    ->searchable(false)
-                    ->sortable(false),
+                    ->weight('semibold'),
 
                 TextColumn::make('variant_name')
                     ->label('Varian')
-                    ->placeholder('-'),
+                    ->placeholder('-')
+                    ->color('gray'),
 
                 TextColumn::make('units_sold')
-                    ->label('Qty Terjual')
+                    ->label('Jumlah Terjual')
                     ->numeric()
-                    ->alignEnd(),
+                    ->alignEnd()
+                    ->suffix(' unit'),
 
                 TextColumn::make('gross_sales_value')
-                    ->label('Nilai Normal (Gross)')
+                    ->label('Omzet Kotor')
                     ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.'))
                     ->alignEnd(),
 
                 TextColumn::make('total_promo_subsidy')
-                    ->label('Subsidi Promo (Rp)')
+                    ->label('Potongan Promo')
                     ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.'))
-                    ->color('danger')
+                    ->color('warning')
+                    ->weight('medium')
                     ->alignEnd(),
 
                 TextColumn::make('net_cash_realized')
-                    ->label('Kas Bersih Diterima (Net)')
+                    ->label('Kas Bersih Diterima')
                     ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.'))
                     ->color('success')
+                    ->weight('bold')
                     ->alignEnd(),
             ]);
     }
