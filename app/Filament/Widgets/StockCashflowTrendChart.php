@@ -16,6 +16,8 @@ class StockCashflowTrendChart extends ChartWidget
 
     protected int | string | array $columnSpan = 'full';
 
+    protected ?string $pollingInterval = null;
+
     protected ?string $heading = 'Tren Arus Barang dan Penerimaan Kas';
 
     protected ?string $description = 'Perbandingan harian nilai belanja barang masuk, omzet kotor, dan kas bersih yang diterima toko.';
@@ -36,6 +38,35 @@ class StockCashflowTrendChart extends ChartWidget
     protected function getType(): string
     {
         return 'line';
+    }
+
+    protected function getOptions(): array
+    {
+        return [
+            'plugins' => [
+                'legend' => [
+                    'display' => true,
+                    'position' => 'top',
+                    'labels' => [
+                        'usePointStyle' => true,
+                        'boxWidth' => 8,
+                    ],
+                ],
+            ],
+            'scales' => [
+                'y' => [
+                    'beginAtZero' => true,
+                    'grid' => [
+                        'color' => 'rgba(156, 163, 175, 0.15)',
+                    ],
+                ],
+                'x' => [
+                    'grid' => [
+                        'display' => false,
+                    ],
+                ],
+            ],
+        ];
     }
 
     protected function getData(): array

@@ -33,6 +33,8 @@ class PromoImpactTableWidget extends TableWidget
         return $table
             ->heading('10 Produk dengan Beban Promo Tertinggi')
             ->description('Daftar produk dengan akumulasi potongan diskon terbesar selama periode terpilih.')
+            ->emptyStateHeading('Tidak Ada Beban Promo')
+            ->emptyStateDescription('Tidak ada transaksi dengan potongan promo yang tercatat pada rentang waktu ini.')
             ->records(function () {
                 $start = filled($this->pageFilters['startDate'] ?? null)
                     ? Carbon::parse($this->pageFilters['startDate'])
@@ -69,12 +71,14 @@ class PromoImpactTableWidget extends TableWidget
                 TextColumn::make('units_sold')
                     ->label('Jumlah Terjual')
                     ->numeric()
+                    ->extraCellAttributes(['class' => 'tabular-nums'])
                     ->alignEnd()
                     ->suffix(' unit'),
 
                 TextColumn::make('gross_sales_value')
                     ->label('Omzet Kotor')
                     ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.'))
+                    ->extraCellAttributes(['class' => 'tabular-nums'])
                     ->alignEnd(),
 
                 TextColumn::make('total_promo_subsidy')
@@ -82,6 +86,7 @@ class PromoImpactTableWidget extends TableWidget
                     ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.'))
                     ->color('warning')
                     ->weight('medium')
+                    ->extraCellAttributes(['class' => 'tabular-nums'])
                     ->alignEnd(),
 
                 TextColumn::make('net_cash_realized')
@@ -89,6 +94,7 @@ class PromoImpactTableWidget extends TableWidget
                     ->formatStateUsing(fn ($state) => 'Rp ' . number_format((float) $state, 0, ',', '.'))
                     ->color('success')
                     ->weight('bold')
+                    ->extraCellAttributes(['class' => 'tabular-nums'])
                     ->alignEnd(),
             ]);
     }

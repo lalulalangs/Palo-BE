@@ -97,6 +97,7 @@ class InventoryCashflowDashboardTest extends TestCase
         $this->actingAs($this->superAdmin, 'admin')
             ->get('/admin')
             ->assertOk()
+            ->assertSee('Dasbor Kas Besar dan Inventaris')
             ->assertSee('KasBesarStatsOverview')
             ->assertSee('StockCashflowTrendChart')
             ->assertSee('PromoImpactTableWidget')
@@ -142,6 +143,8 @@ class InventoryCashflowDashboardTest extends TestCase
         Livewire::actingAs($this->superAdmin, 'admin')
             ->test(KasBesarStatsOverview::class)
             ->assertSuccessful()
+            ->assertSee('Ringkasan Kas dan Arus Barang')
+            ->assertSee('Pemantauan modal inventaris aktif dan mutasi perputaran dana toko.')
             ->assertSee('Nilai Stok Gudang')
             ->assertSee('Nilai Belanja Barang')
             ->assertSee('Penerimaan Kas Bersih')
@@ -191,6 +194,15 @@ class InventoryCashflowDashboardTest extends TestCase
             ->assertSee('Tenda Rinjani Ultralight 2P')
             ->assertSee('Rp 100.000')
             ->assertSee('Rp 400.000');
+    }
+
+    public function test_promo_impact_table_widget_empty_state_renders(): void
+    {
+        Livewire::actingAs($this->superAdmin, 'admin')
+            ->test(PromoImpactTableWidget::class)
+            ->assertSuccessful()
+            ->assertSee('Tidak Ada Beban Promo')
+            ->assertSee('Tidak ada transaksi dengan potongan promo yang tercatat pada rentang waktu ini.');
     }
 
     public function test_non_superadmin_staff_cannot_see_cashflow_widgets_or_filters(): void

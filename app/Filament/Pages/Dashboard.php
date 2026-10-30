@@ -16,10 +16,10 @@ use Filament\Schemas\Schema;
 /**
  * Layout Plan:
  * ===================================================================================
- * ROW 0: Header Filters Form - Superadmin Only
+ * ROW 0: Header Filters Form - Superadmin Only (Full Width)
  *        [ Tanggal Mulai - DatePicker ] [ Tanggal Selesai - DatePicker ] [ Status Promo - Select ]
  * ===================================================================================
- * ROW 1: KasBesarStatsOverview - Full Width 4 Stat Cards
+ * ROW 1: KasBesarStatsOverview - Full Width 4 Stat Cards dengan Sparkline
  *        [ 1. Nilai Stok Gudang ]       [ 2. Nilai Belanja Barang ]
  *        [ 3. Penerimaan Kas Bersih ]   [ 4. Potongan Diskon dan Promo ]
  * ===================================================================================
@@ -33,6 +33,10 @@ use Filament\Schemas\Schema;
 class Dashboard extends BaseDashboard
 {
     use HasFiltersForm;
+
+    protected static ?string $title = 'Dasbor Kas Besar dan Inventaris';
+
+    protected static ?string $navigationLabel = 'Dashboard';
 
     public function filtersForm(Schema $schema): Schema
     {
