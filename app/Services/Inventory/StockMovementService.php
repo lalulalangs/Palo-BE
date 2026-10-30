@@ -23,9 +23,10 @@ class StockMovementService
         string $type,
         ?int $userId = null,
         ?Model $reference = null,
-        ?string $notes = null
+        ?string $notes = null,
+        ?float $unitPriceSnapshot = null
     ): StockMovement {
-        return DB::transaction(function () use ($sku, $quantityChange, $type, $userId, $reference, $notes) {
+        return DB::transaction(function () use ($sku, $quantityChange, $type, $userId, $reference, $notes, $unitPriceSnapshot) {
             if ($quantityChange === 0) {
                 throw new InvalidArgumentException('Perubahan kuantitas stok tidak boleh bernilai nol (0).');
             }
@@ -52,11 +53,14 @@ class StockMovementService
                     $lockedSku->update(['stock' => $stockAfter]);
                 });
 
+                $effectivePrice = $unitPriceSnapshot ?? $lockedSku->effective_price;
+
                 return StockMovement::create([
                     'sku_id' => $lockedSku->id,
                     'user_id' => $userId,
                     'type' => $type,
                     'quantity_change' => $quantityChange,
+                    'unit_price_snapshot' => $effectivePrice,
                     'stock_before' => $stockBefore,
                     'stock_after' => $stockAfter,
                     'reference_type' => $reference ? $reference->getMorphClass() : null,
@@ -134,6 +138,8 @@ class StockMovementService
                 'completed_at' => now(),
                 'user_id' => $userId ?? $lockedOpname->user_id,
             ]);
+
+            \Illuminate\Support\Facades\Cache::forget('inventory:kas_besar_valuation');
         });
     }
 }

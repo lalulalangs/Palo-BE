@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Enums\AdminFeature;
 use App\Filament\Concerns\HasAdminFeatureAccess;
+use App\Filament\Widgets\ShippingQuotaWidget;
 use App\Models\AppSetting;
 use App\Services\Shipping\ShippingRateService;
 use BackedEnum;
@@ -99,6 +100,16 @@ class ManageShippingSettings extends Page
     public static function getAdminFeature(): AdminFeature
     {
         return AdminFeature::ShippingSettings;
+    }
+
+    /**
+     * @return array<class-string<\Filament\Widgets\Widget>>
+     */
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            ShippingQuotaWidget::class,
+        ];
     }
 
     public function mount(): void

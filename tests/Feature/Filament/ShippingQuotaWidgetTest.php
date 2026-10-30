@@ -57,12 +57,17 @@ class ShippingQuotaWidgetTest extends TestCase
             ->assertSee('Kuota hampir habis', escape: false);
     }
 
-    public function test_widget_is_registered_on_admin_dashboard(): void
+    public function test_widget_is_registered_on_shipping_settings_page_and_not_on_admin_dashboard(): void
     {
-        // Widget dashboard dirender lazy oleh Filament, jadi HTML awal hanya
-        // memuat penanda komponennya — bukan angka kuotanya.
+        // ShippingQuotaWidget tidak lagi muncul di Dashboard /admin
         $this->actingAs($this->admin, 'admin')
             ->get('/admin')
+            ->assertOk()
+            ->assertDontSee('ShippingQuotaWidget');
+
+        // ShippingQuotaWidget kini terdaftar sebagai header widget di halaman pengaturan ekspedisi
+        $this->actingAs($this->admin, 'admin')
+            ->get('/admin/pengaturan-ekspedisi')
             ->assertOk()
             ->assertSee('ShippingQuotaWidget');
     }

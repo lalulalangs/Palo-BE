@@ -28,6 +28,7 @@ class StockMovement extends Model
         'user_id',
         'type',
         'quantity_change',
+        'unit_price_snapshot',
         'stock_before',
         'stock_after',
         'reference_type',
@@ -39,6 +40,7 @@ class StockMovement extends Model
     {
         return [
             'quantity_change' => 'integer',
+            'unit_price_snapshot' => 'decimal:2',
             'stock_before' => 'integer',
             'stock_after' => 'integer',
         ];
