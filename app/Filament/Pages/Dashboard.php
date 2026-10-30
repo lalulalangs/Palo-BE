@@ -40,28 +40,35 @@ class Dashboard extends BaseDashboard
             return $schema->components([]);
         }
 
-        return $schema->components([
-            Section::make()
-                ->schema([
-                    DatePicker::make('startDate')
-                        ->label('Tanggal Mulai')
-                        ->default(now()->startOfMonth()),
+        return $schema
+            ->columns(1)
+            ->components([
+                Section::make()
+                    ->schema([
+                        DatePicker::make('startDate')
+                            ->label('Tanggal Mulai')
+                            ->default(now()->startOfMonth()),
 
-                    DatePicker::make('endDate')
-                        ->label('Tanggal Selesai')
-                        ->default(now()->endOfDay()),
+                        DatePicker::make('endDate')
+                            ->label('Tanggal Selesai')
+                            ->default(now()->endOfDay()),
 
-                    Select::make('promoStatus')
-                        ->label('Status Promo')
-                        ->options([
-                            'all' => 'Semua Transaksi',
-                            'promo_only' => 'Hanya Transaksi dengan Promo',
-                            'non_promo' => 'Hanya Transaksi Normal tanpa Promo',
-                        ])
-                        ->default('all'),
-                ])
-                ->columns(3),
-        ]);
+                        Select::make('promoStatus')
+                            ->label('Status Promo')
+                            ->options([
+                                'all' => 'Semua Transaksi',
+                                'promo_only' => 'Hanya Transaksi dengan Promo',
+                                'non_promo' => 'Hanya Transaksi Normal tanpa Promo',
+                            ])
+                            ->default('all'),
+                    ])
+                    ->columns([
+                        'default' => 1,
+                        'sm' => 2,
+                        'lg' => 3,
+                    ])
+                    ->columnSpanFull(),
+            ]);
     }
 
     public function getWidgets(): array
