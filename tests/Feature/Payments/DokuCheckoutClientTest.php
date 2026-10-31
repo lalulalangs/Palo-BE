@@ -312,6 +312,45 @@ class DokuCheckoutClientTest extends TestCase
         ]);
     }
 
+    public function test_create_payment_sanitizes_em_dash_and_special_characters(): void
+    {
+        Http::fake([
+            'https://api-sandbox.doku.com/checkout/v1/payment' => Http::response([
+                'message' => ['SUCCESS'],
+                'response' => [
+                    'order' => ['invoice_number' => 'TEST-EM-DASH'],
+                    'payment' => [
+                        'url' => 'https://checkout.doku.com/payment/page/test',
+                        'expired_date' => '20261020020000',
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $order = $this->makeOrder();
+        $order->items()->first()->update([
+            'product_name_snapshot' => 'PALO T-SHIRT — ROUTE SAGE GREEN BASIC',
+            'variant_name_snapshot' => 'Green Basic / Size S',
+        ]);
+        $order->update([
+            'shipping_full_address' => 'Jl. Pariwisata Senaru #12 — Pos 1',
+        ]);
+        $order = $order->fresh(['items', 'user']);
+
+        $client = app(DokuCheckoutClient::class);
+        $result = $client->createPayment($order);
+
+        $this->assertSame('https://checkout.doku.com/payment/page/test', $result['payment_url']);
+
+        Http::assertSent(function (ClientRequest $request) {
+            $lineItems = $request->data()['order']['line_items'] ?? [];
+            $itemName = $lineItems[0]['name'] ?? '';
+            // Must have converted em-dash to hyphen
+            return str_contains($itemName, 'PALO T-SHIRT - ROUTE SAGE GREEN BASIC - Green Basic / Size S')
+                && ! str_contains($itemName, '—');
+        });
+    }
+
     private function makeOrder(
         float $discountAmount = 0.0,
         float $total = 120000.0,

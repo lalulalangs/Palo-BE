@@ -327,6 +327,7 @@ class DokuCheckoutClient implements PaymentGatewayContract
                 'request_id' => $requestId,
                 'http_status' => $response->status(),
                 'errors' => $errors,
+                'response_body' => $response->body(),
             ]);
 
             throw PaymentGatewayException::rejected($invoiceNumber, $errors);
@@ -355,7 +356,7 @@ class DokuCheckoutClient implements PaymentGatewayContract
                 break;
             }
 
-            $name = trim(sprintf(
+            $name = $this->sanitizeDokuText(sprintf(
                 '%s - %s',
                 (string) ($item->product_name_snapshot ?? 'Produk'),
                 (string) ($item->variant_name_snapshot ?? 'Default'),
@@ -385,7 +386,7 @@ class DokuCheckoutClient implements PaymentGatewayContract
 
         if ($lineItems === [] || $lineTotal !== $amount) {
             return [[
-                'name' => Str::limit('Total pesanan '.$order->order_number, 255, ''),
+                'name' => Str::limit($this->sanitizeDokuText('Total pesanan '.$order->order_number), 255, ''),
                 'price' => $amount,
                 'quantity' => 1,
             ]];
@@ -404,15 +405,18 @@ class DokuCheckoutClient implements PaymentGatewayContract
         // DOKU membatasi `customer.name` ke karakter alfabet.
         $name = trim((string) preg_replace('/[^\p{L}\s.\'-]/u', ' ', $name));
 
+        $address = $order->shipping_full_address !== null
+            ? $this->sanitizeDokuText((string) $order->shipping_full_address)
+            : null;
+        $city = $this->sanitizeDokuText((string) ($order->shippingAddressData()['city'] ?? ''));
+
         $customer = [
             'id' => $user?->id !== null ? (string) $user->id : null,
             'name' => $name !== '' ? Str::limit($name, 255, '') : null,
             'email' => $user?->email,
             'phone' => $this->normalizePhone($order->shipping_phone ?: $user?->phone),
-            'address' => $order->shipping_full_address !== null
-                ? Str::limit((string) $order->shipping_full_address, 400, '')
-                : null,
-            'city' => $order->shippingAddressData()['city'],
+            'address' => $address !== '' ? Str::limit((string) $address, 400, '') : null,
+            'city' => $city !== '' ? $city : null,
             'country' => 'ID',
         ];
 
@@ -420,6 +424,23 @@ class DokuCheckoutClient implements PaymentGatewayContract
             $customer,
             static fn (mixed $value): bool => $value !== null && $value !== '',
         );
+    }
+
+    /**
+     * Bersihkan teks agar sesuai whitelist karakter DOKU Checkout:
+     * a-z A-Z 0-9 . - / + , = _ : ' @ % ( ) dan spasi.
+     * Mengganti karakter dash tipografis (— / –) menjadi hyphen (-) biasa.
+     */
+    private function sanitizeDokuText(string $text): string
+    {
+        // Ganti em-dash (—) dan en-dash (–) ke hyphen (-)
+        $converted = str_replace(["\u{2014}", "\u{2013}", '—', '–'], '-', $text);
+
+        // Hapus karakter apa pun yang di luar whitelist DOKU
+        $cleaned = preg_replace("/[^a-zA-Z0-9.\-\/+,\=_\:'@%() ]/u", ' ', $converted);
+
+        // Normalisasi spasi ganda
+        return trim((string) preg_replace('/\s+/', ' ', (string) $cleaned));
     }
 
     /**
