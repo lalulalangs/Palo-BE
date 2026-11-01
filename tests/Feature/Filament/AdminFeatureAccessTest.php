@@ -64,20 +64,12 @@ class AdminFeatureAccessTest extends TestCase
     {
         $superAdmin = AdminUser::factory()->superAdmin()->create();
 
-        $urls = [
-            '/admin/products',
-            '/admin/categories',
-            '/admin/collections',
-            '/admin/banners',
-            '/admin/legacy-banners',
-            '/admin/vouchers',
-            '/admin/orders',
-            '/admin/stock-opnames',
-            '/admin/stock-movements',
-            '/admin/pengaturan-media-sosial',
-            '/admin/roles',
-            '/admin/admin-users',
-        ];
+        // Ambil daftar URL dari data provider yang sama agar tidak ada modul
+        // yang terlewat saat modul baru ditambahkan.
+        $urls = array_map(
+            static fn (array $case): string => $case[0],
+            self::featureAccessProvider(),
+        );
 
         foreach ($urls as $url) {
             $this->actingAs($superAdmin, 'admin')

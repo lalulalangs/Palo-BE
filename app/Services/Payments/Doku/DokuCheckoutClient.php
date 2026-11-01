@@ -327,7 +327,6 @@ class DokuCheckoutClient implements PaymentGatewayContract
                 'request_id' => $requestId,
                 'http_status' => $response->status(),
                 'errors' => $errors,
-                'response_body' => $response->body(),
             ]);
 
             throw PaymentGatewayException::rejected($invoiceNumber, $errors);

@@ -137,6 +137,49 @@ class RegisteredCheckoutApiTest extends TestCase
             ->assertJsonPath('error_code', 'shipping_provider_invalid_response');
     }
 
+    public function test_checkout_fails_closed_with_503_when_only_stale_shipping_cache_is_available(): void
+    {
+        // Panaskan cache tarif ongkir (sumber API).
+        $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/shipping/quote', [
+                'destination_id' => 17596,
+                'items' => [
+                    ['sku_id' => $this->sku->id, 'quantity' => 1],
+                ],
+            ])
+            ->assertOk();
+
+        // Cache segar (24 jam) kedaluwarsa, cache basi (7 hari) masih ada, dan
+        // penyedia sedang gagal: tarif basi boleh tampil, tapi checkout harus
+        // menolak order (bukan memakai tarif 2 hari lalu).
+        $this->travel(2)->days();
+        $this->rajaOngkirOutage = true;
+
+        $response = $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', [
+                'shipping_address' => [
+                    'recipient_name' => 'Stale Rate',
+                    'phone' => '081234567890',
+                    'street' => 'Jl. Tes',
+                    'city' => 'Mataram',
+                    'province' => 'NTB',
+                    'destination_id' => 17596,
+                ],
+                'items' => [
+                    ['sku_id' => $this->sku->id, 'quantity' => 1],
+                ],
+                'shipping_courier' => 'JNE',
+                'shipping_service' => 'REG',
+                'shipping_cost' => 14000,
+                'payment_method' => 'qris',
+            ]);
+
+        $response->assertStatus(503)
+            ->assertJsonPath('error_code', 'shipping_provider_unreachable');
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
     public function test_registered_user_can_create_order_successfully(): void
     {
         // User puts item in cart
@@ -369,7 +412,58 @@ class RegisteredCheckoutApiTest extends TestCase
             ->postJson('/api/v1/checkout/orders', $payload);
 
         $response->assertStatus(409)
-            ->assertJsonPath('error_code', 'stock_unavailable');
+            ->assertJsonPath('error_code', 'stock_unavailable')
+            ->assertJsonPath('available_stock', 10)
+            ->assertJsonPath('requested_quantity', 50);
+
+        $this->assertDatabaseCount('orders', 0);
+    }
+
+    public function test_second_buyer_of_last_unit_is_rejected_with_409_while_first_order_is_pending(): void
+    {
+        // Hanya tersisa 1 unit. Pembeli pertama membuat order pending sehingga
+        // unit itu di-soft-lock (stock_locked_until) sebelum dibayar.
+        $this->sku->update(['stock' => 1]);
+
+        $secondBuyer = User::create([
+            'name' => 'Second Buyer',
+            'email' => 'second-buyer@example.test',
+            'password_hash' => Hash::make('Password123!'),
+        ]);
+
+        $payload = [
+            'shipping_address' => [
+                'recipient_name' => 'Handover Audit',
+                'phone' => '081234567890',
+                'street' => 'Jl. Tes',
+                'city' => 'Mataram',
+                'province' => 'NTB',
+            ],
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+            'shipping_cost' => 20000,
+            'payment_method' => 'qris',
+        ];
+
+        $this->actingAs($this->user, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload)
+            ->assertCreated();
+
+        $this->assertDatabaseCount('orders', 1);
+
+        $this->actingAs($secondBuyer, 'sanctum')
+            ->postJson('/api/v1/checkout/orders', $payload)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'stock_unavailable')
+            ->assertJsonPath('available_stock', 0)
+            ->assertJsonPath('requested_quantity', 1);
+
+        // Tidak ada overselling: tetap 1 order dan stok fisik belum terpotong.
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertEquals(1, $this->sku->fresh()->stock);
     }
 
     public function test_checkout_detects_price_change_and_returns_409_price_changed(): void
@@ -647,7 +741,7 @@ class RegisteredCheckoutApiTest extends TestCase
         $this->assertEquals(0, $voucher->fresh()->used_count);
     }
 
-    public function test_checkout_concurrency_race_condition_locks_and_prevents_quota_overuse(): void
+    public function test_second_checkout_with_last_voucher_quota_is_rejected_with_422(): void
     {
         // Only 1 remaining usage allowed (quota: 1, used_count: 0)
         $voucher = Voucher::create([
@@ -685,12 +779,16 @@ class RegisteredCheckoutApiTest extends TestCase
         $firstResponse->assertCreated();
         $this->assertEquals(1, $voucher->fresh()->used_count);
 
-        // Second checkout must fail because quota is exhausted
+        // Second checkout must fail because quota is exhausted. Catatan: ini uji
+        // sekuensial — bukan bukti paralelisme, lihat checklist §2.4.
         $secondResponse = $this->actingAs($this->user, 'sanctum')
             ->postJson('/api/v1/checkout/orders', $payload);
 
         $secondResponse->assertUnprocessable()
             ->assertJsonValidationErrors(['voucher_code']);
+
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertEquals(1, $voucher->fresh()->used_count);
     }
 
     public function test_user_can_view_order_history_and_details(): void
@@ -777,5 +875,6 @@ class RegisteredCheckoutApiTest extends TestCase
             ->getJson('/api/v1/orders/UJN-20261011-77777');
 
         $response->assertNotFound();
+        $this->assertStringNotContainsString('UJN-20261011-77777', $response->getContent());
     }
 }

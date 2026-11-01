@@ -6,6 +6,7 @@ use App\Contracts\PaymentGatewayContract;
 use App\Enums\OrderStatus;
 use App\Exceptions\InsufficientStockException;
 use App\Exceptions\PriceChangedException;
+use App\Exceptions\ShippingProviderException;
 use App\Models\Cart;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -213,6 +214,13 @@ class RegisteredCheckoutService
                     throw ValidationException::withMessages([
                         'shipping_courier' => ['Kombinasi kurir dan layanan pengiriman tidak tersedia. Silakan pilih dari daftar tarif resmi.'],
                     ]);
+                }
+
+                // Tarif dari cache basi hanya boleh dipakai untuk tampilan, bukan
+                // untuk membuat order. Checkout fail-closed agar customer tidak
+                // membayar ongkir berdasarkan tarif 7 hari yang lalu.
+                if (($shippingQuote['source'] ?? null) === ShippingRateService::SOURCE_STALE) {
+                    throw ShippingProviderException::unreachable('checkout_quote_stale');
                 }
 
                 $shippingCost = (float) $shippingQuote['cost'];
