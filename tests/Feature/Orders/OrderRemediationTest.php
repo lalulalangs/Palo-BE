@@ -130,7 +130,7 @@ class OrderRemediationTest extends TestCase
 
         $orderNumber = $response->json('data.order_number');
 
-        $this->assertMatchesRegularExpression('/^PLR-\d{8}-[A-F0-9]{6}$/', $orderNumber);
+        $this->assertMatchesRegularExpression('/^PRJ-\d{8}-[A-F0-9]{6}$/', $orderNumber);
     }
 
     public function test_cancel_order_never_makes_voucher_used_count_negative(): void
