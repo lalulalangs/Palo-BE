@@ -13,6 +13,7 @@ use App\Services\Cart\CartService;
 use App\Services\Checkout\GuestCheckoutService;
 use App\Services\Orders\OrderTransitionService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class GuestCheckoutController extends Controller
 {
@@ -84,6 +85,52 @@ class GuestCheckoutController extends Controller
     }
 
     /**
+     * Get real-time status and metadata of guest WhatsApp order.
+     */
+    public function showOrderStatus(Request $request, string $orderNumber): JsonResponse
+    {
+        $referenceCode = (string) $request->query('reference_code');
+
+        /** @var Order|null $order */
+        $order = Order::query()
+            ->where('order_number', $orderNumber)
+            ->first();
+
+        if (! $order) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pesanan tidak ditemukan.',
+            ], 404);
+        }
+
+        // Validasi kepemilikan kode referensi tamu
+        if ($referenceCode === '' || $order->guest_reference_code !== $referenceCode) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kode referensi pesanan tidak sesuai.',
+            ], 403);
+        }
+
+        $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
+        $canCancel = $statusValue === Order::STATUS_AWAITING_CONFIRMATION && $order->payment_method === Order::PAYMENT_METHOD_WHATSAPP;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'order_number' => $order->order_number,
+                'reference_code' => $order->guest_reference_code,
+                'status' => $statusValue,
+                'status_label' => OrderStatus::labelFor($order->status),
+                'can_cancel' => $canCancel,
+                'payment_method' => $order->payment_method,
+                'total' => (float) $order->total,
+                'created_at' => $order->created_at?->toIso8601String(),
+                'confirmed_at' => $order->confirmed_at?->toIso8601String(),
+            ],
+        ], 200);
+    }
+
+    /**
      * Cancel unconfirmed WhatsApp guest order upon buyer's request.
      */
     public function cancelOrder(GuestCancelOrderRequest $request): JsonResponse
@@ -104,6 +151,14 @@ class GuestCheckoutController extends Controller
             ], 404);
         }
 
+        // 1. Prioritas Otorisasi: Verifikasi kode referensi tamu SEBELUM cek status pesanan
+        if ($order->guest_reference_code !== $referenceCode) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Kode referensi pesanan tidak sesuai.',
+            ], 403);
+        }
+
         // Pastikan metode pesanan adalah WhatsApp
         if ($order->payment_method !== Order::PAYMENT_METHOD_WHATSAPP) {
             return response()->json([
@@ -112,21 +167,31 @@ class GuestCheckoutController extends Controller
             ], 422);
         }
 
-        // Pastikan status masih menunggu konfirmasi
-        $statusValue = $order->status instanceof OrderStatus ? $order->status->value : $order->status;
+        $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
+
+        // 2. Idempotensi: Jika sudah dalam keadaan dibatalkan sebelumnya
+        if ($statusValue === Order::STATUS_CANCELLED) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Pesanan sudah dalam keadaan dibatalkan sebelumnya.',
+                'data' => [
+                    'status' => 'cancelled',
+                    'can_cancel' => false,
+                ],
+            ], 200);
+        }
+
+        // 3. Status selain awaiting_confirmation (misal processing, shipped, completed)
         if ($statusValue !== Order::STATUS_AWAITING_CONFIRMATION) {
             return response()->json([
                 'success' => false,
+                'code' => 'ORDER_ALREADY_PROCESSED',
                 'message' => 'Pesanan tidak dalam status menunggu konfirmasi sehingga tidak dapat dibatalkan.',
+                'data' => [
+                    'status' => $statusValue,
+                    'can_cancel' => false,
+                ],
             ], 422);
-        }
-
-        // Verifikasi kode referensi (shared secret kepemilikan tamu)
-        if ($order->guest_reference_code !== $referenceCode) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Kode referensi pesanan tidak sesuai.',
-            ], 403);
         }
 
         // Eksekusi pembatalan status dan pemulihan pembayaran

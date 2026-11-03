@@ -50,6 +50,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:guest');
         Route::post('custom-inquiry', [GuestCheckoutController::class, 'customInquiry'])
             ->middleware('throttle:guest');
+        Route::get('orders/{orderNumber}', [GuestCheckoutController::class, 'showOrderStatus'])
+            ->middleware('throttle:guest');
     });
 
     // Notifikasi pembayaran DOKU (S-04).

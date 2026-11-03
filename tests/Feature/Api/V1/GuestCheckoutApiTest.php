@@ -404,4 +404,254 @@ class GuestCheckoutApiTest extends TestCase
             'shipping_destination_id' => 751,
         ]);
     }
+
+    public function test_guest_can_fetch_order_status_with_valid_reference_code(): void
+    {
+        $response = $this->postJson('/api/v1/guest/whatsapp-checkout', [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
+        ])->assertCreated();
+
+        $orderNumber = $response->json('data.order_number');
+        $referenceCode = $response->json('data.reference_code');
+
+        $statusResponse = $this->getJson("/api/v1/guest/orders/{$orderNumber}?reference_code={$referenceCode}");
+
+        $statusResponse->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.order_number', $orderNumber)
+            ->assertJsonPath('data.reference_code', $referenceCode)
+            ->assertJsonPath('data.status', 'awaiting_confirmation')
+            ->assertJsonPath('data.status_label', 'Menunggu Konfirmasi CS')
+            ->assertJsonPath('data.can_cancel', true)
+            ->assertJsonPath('data.payment_method', 'whatsapp')
+            ->assertJsonStructure([
+                'success',
+                'data' => [
+                    'order_number',
+                    'reference_code',
+                    'status',
+                    'status_label',
+                    'can_cancel',
+                    'payment_method',
+                    'total',
+                    'created_at',
+                    'confirmed_at',
+                ],
+            ]);
+
+        $this->assertEquals((float) $response->json('data.estimated_total'), (float) $statusResponse->json('data.total'));
+        $this->assertNull($statusResponse->json('data.confirmed_at'));
+    }
+
+    public function test_guest_fetch_order_status_returns_404_when_order_not_found(): void
+    {
+        $response = $this->getJson('/api/v1/guest/orders/PRJ-NONEXISTENT?reference_code=GC-20261103-XXXX');
+
+        $response->assertNotFound()
+            ->assertJson([
+                'success' => false,
+                'message' => 'Pesanan tidak ditemukan.',
+            ]);
+    }
+
+    public function test_guest_fetch_order_status_returns_403_when_reference_code_mismatches(): void
+    {
+        $checkout = $this->postJson('/api/v1/guest/whatsapp-checkout', [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
+        ])->assertCreated();
+
+        $orderNumber = $checkout->json('data.order_number');
+
+        $response = $this->getJson("/api/v1/guest/orders/{$orderNumber}?reference_code=WRONG-REF-CODE");
+
+        $response->assertForbidden()
+            ->assertJson([
+                'success' => false,
+                'message' => 'Kode referensi pesanan tidak sesuai.',
+            ]);
+    }
+
+    public function test_guest_fetch_order_status_indicates_cannot_cancel_when_confirmed_or_processing(): void
+    {
+        $checkout = $this->postJson('/api/v1/guest/whatsapp-checkout', [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
+        ])->assertCreated();
+
+        $orderNumber = $checkout->json('data.order_number');
+        $referenceCode = $checkout->json('data.reference_code');
+
+        Order::query()
+            ->where('order_number', $orderNumber)
+            ->update([
+                'status' => \App\Enums\OrderStatus::Processing->value,
+                'confirmed_at' => now(),
+            ]);
+
+        $response = $this->getJson("/api/v1/guest/orders/{$orderNumber}?reference_code={$referenceCode}");
+
+        $response->assertOk()
+            ->assertJsonPath('data.status', 'processing')
+            ->assertJsonPath('data.status_label', 'Diproses')
+            ->assertJsonPath('data.can_cancel', false);
+
+        $this->assertNotNull($response->json('data.confirmed_at'));
+    }
+
+    public function test_guest_can_cancel_unconfirmed_whatsapp_order(): void
+    {
+        $checkout = $this->postJson('/api/v1/guest/whatsapp-checkout', [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
+        ])->assertCreated();
+
+        $orderNumber = $checkout->json('data.order_number');
+        $referenceCode = $checkout->json('data.reference_code');
+
+        $response = $this->postJson('/api/v1/guest/cancel-order', [
+            'order_number' => $orderNumber,
+            'reference_code' => $referenceCode,
+            'reason' => 'Ingin ganti varian barang',
+        ]);
+
+        $response->assertOk()
+            ->assertJson([
+                'success' => true,
+                'message' => 'Pesanan berhasil dibatalkan.',
+            ]);
+
+        $order = Order::query()->where('order_number', $orderNumber)->firstOrFail();
+        $this->assertSame(\App\Enums\OrderStatus::Cancelled, $order->status);
+        $this->assertSame('Ingin ganti varian barang', $order->cancelled_reason);
+    }
+
+    public function test_guest_cancel_order_is_idempotent_when_already_cancelled(): void
+    {
+        $checkout = $this->postJson('/api/v1/guest/whatsapp-checkout', [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
+        ])->assertCreated();
+
+        $orderNumber = $checkout->json('data.order_number');
+        $referenceCode = $checkout->json('data.reference_code');
+
+        // Pembatalan pertama
+        $this->postJson('/api/v1/guest/cancel-order', [
+            'order_number' => $orderNumber,
+            'reference_code' => $referenceCode,
+        ])->assertOk();
+
+        // Pemanggilan kedua (idempoten)
+        $second = $this->postJson('/api/v1/guest/cancel-order', [
+            'order_number' => $orderNumber,
+            'reference_code' => $referenceCode,
+        ]);
+
+        $second->assertOk()
+            ->assertJson([
+                'success' => true,
+                'message' => 'Pesanan sudah dalam keadaan dibatalkan sebelumnya.',
+                'data' => [
+                    'status' => 'cancelled',
+                    'can_cancel' => false,
+                ],
+            ]);
+    }
+
+    public function test_guest_cancel_order_authorizes_reference_code_before_status_check(): void
+    {
+        $checkout = $this->postJson('/api/v1/guest/whatsapp-checkout', [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
+        ])->assertCreated();
+
+        $orderNumber = $checkout->json('data.order_number');
+
+        // Status pesanan dinaikkan ke Processing
+        Order::query()
+            ->where('order_number', $orderNumber)
+            ->update(['status' => \App\Enums\OrderStatus::Processing->value]);
+
+        // Pembatalan dengan reference_code yang salah
+        $response = $this->postJson('/api/v1/guest/cancel-order', [
+            'order_number' => $orderNumber,
+            'reference_code' => 'WRONG-REFERENCE-CODE',
+        ]);
+
+        // Wajib return 403 Forbidden (cek otorisasi dahulu), BUKAN 422
+        $response->assertForbidden()
+            ->assertJson([
+                'success' => false,
+                'message' => 'Kode referensi pesanan tidak sesuai.',
+            ]);
+    }
+
+    public function test_guest_cancel_order_fails_with_structured_error_when_already_processed(): void
+    {
+        $checkout = $this->postJson('/api/v1/guest/whatsapp-checkout', [
+            'items' => [
+                ['sku_id' => $this->sku->id, 'quantity' => 1],
+            ],
+            'guest_name' => 'Budi Santoso',
+            'guest_phone' => '081234567890',
+        ])->assertCreated();
+
+        $orderNumber = $checkout->json('data.order_number');
+        $referenceCode = $checkout->json('data.reference_code');
+
+        // Status pesanan dinaikkan ke Processing
+        Order::query()
+            ->where('order_number', $orderNumber)
+            ->update(['status' => \App\Enums\OrderStatus::Processing->value]);
+
+        $response = $this->postJson('/api/v1/guest/cancel-order', [
+            'order_number' => $orderNumber,
+            'reference_code' => $referenceCode,
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJson([
+                'success' => false,
+                'code' => 'ORDER_ALREADY_PROCESSED',
+                'message' => 'Pesanan tidak dalam status menunggu konfirmasi sehingga tidak dapat dibatalkan.',
+                'data' => [
+                    'status' => 'processing',
+                    'can_cancel' => false,
+                ],
+            ]);
+    }
+
+    public function test_guest_cancel_order_returns_404_when_order_not_found(): void
+    {
+        $response = $this->postJson('/api/v1/guest/cancel-order', [
+            'order_number' => 'PRJ-NONEXISTENT',
+            'reference_code' => 'GC-20261103-XXXX',
+        ]);
+
+        $response->assertNotFound()
+            ->assertJson([
+                'success' => false,
+                'message' => 'Pesanan tidak ditemukan.',
+            ]);
+    }
 }
