@@ -94,6 +94,7 @@ class GuestCheckoutController extends Controller
         /** @var Order|null $order */
         $order = Order::query()
             ->where('order_number', $orderNumber)
+            ->whereNotNull('guest_reference_code')
             ->first();
 
         if (! $order) {
@@ -103,8 +104,8 @@ class GuestCheckoutController extends Controller
             ], 404);
         }
 
-        // Validasi kepemilikan kode referensi tamu
-        if ($referenceCode === '' || $order->guest_reference_code !== $referenceCode) {
+        // Validasi kepemilikan kode referensi tamu (constant-time comparison)
+        if ($referenceCode === '' || ! hash_equals((string) $order->guest_reference_code, $referenceCode)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kode referensi pesanan tidak sesuai.',
@@ -142,6 +143,7 @@ class GuestCheckoutController extends Controller
         /** @var Order|null $order */
         $order = Order::query()
             ->where('order_number', $orderNumber)
+            ->whereNotNull('guest_reference_code')
             ->first();
 
         if (! $order) {
@@ -151,8 +153,8 @@ class GuestCheckoutController extends Controller
             ], 404);
         }
 
-        // 1. Prioritas Otorisasi: Verifikasi kode referensi tamu SEBELUM cek status pesanan
-        if ($order->guest_reference_code !== $referenceCode) {
+        // 1. Prioritas Otorisasi: Verifikasi kode referensi tamu SEBELUM cek status pesanan (constant-time comparison)
+        if ($referenceCode === '' || ! hash_equals((string) $order->guest_reference_code, $referenceCode)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Kode referensi pesanan tidak sesuai.',
@@ -186,6 +188,7 @@ class GuestCheckoutController extends Controller
             return response()->json([
                 'success' => false,
                 'code' => 'ORDER_ALREADY_PROCESSED',
+                'error_code' => 'ORDER_ALREADY_PROCESSED',
                 'message' => 'Pesanan tidak dalam status menunggu konfirmasi sehingga tidak dapat dibatalkan.',
                 'data' => [
                     'status' => $statusValue,
