@@ -20,6 +20,16 @@ class GuestCodCheckoutRequest extends FormRequest
             $merge['note'] = trim($this->note);
         }
 
+        if ($this->has('courier') && is_string($this->courier)) {
+            $merge['courier'] = trim($this->courier);
+        }
+
+        if ($this->has('shipping_address') && is_array($this->shipping_address) && ! isset($this->shipping_address['destination_id']) && $this->filled('destination_id')) {
+            $shippingAddress = $this->shipping_address;
+            $shippingAddress['destination_id'] = $this->input('destination_id');
+            $merge['shipping_address'] = $shippingAddress;
+        }
+
         if ($merge !== []) {
             $this->merge($merge);
         }
@@ -41,14 +51,17 @@ class GuestCodCheckoutRequest extends FormRequest
             'shipping_address.subdistrict' => ['nullable', 'string', 'max:100'],
             'shipping_address.postal_code' => ['nullable', 'string', 'max:20'],
             'shipping_address.notes' => ['nullable', 'string', 'max:255'],
+            'shipping_address.destination_id' => ['nullable', 'integer'],
+            'shipping_address.courier' => ['nullable', 'string', 'in:jne,jnt'],
+
+            'courier' => ['nullable', 'string', 'in:jne,jnt'],
+            'destination_id' => ['nullable', 'integer'],
 
             'items' => ['nullable', 'array', 'max:50'],
             'items.*.sku_id' => ['required_with:items', 'integer', 'exists:skus,id'],
             'items.*.quantity' => ['required_with:items', 'integer', 'min:1', 'max:100'],
             'items.*.price_seen' => ['nullable', 'numeric', 'min:0'],
 
-            // Ongkir sengaja tidak divalidasi: guest COD adalah serah-terima
-            // lead ke CS via WhatsApp, dan nilai dari client tidak dipakai.
             'note' => ['nullable', 'string', 'max:500'],
         ];
     }

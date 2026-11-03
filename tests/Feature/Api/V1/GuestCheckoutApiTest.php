@@ -399,7 +399,8 @@ class GuestCheckoutApiTest extends TestCase
         $this->assertDatabaseHas('orders', [
             'order_number' => $orderNumber,
             'shipping_full_address' => 'Jl. Pariwisata Senaru No. 12, Senaru, Bayan, Lombok Utara, NTB, 83354',
-            'shipping_courier' => 'jne',
+            'shipping_courier' => 'JNE',
+            'shipping_courier_code' => 'jne',
             'shipping_destination_id' => 751,
         ]);
     }

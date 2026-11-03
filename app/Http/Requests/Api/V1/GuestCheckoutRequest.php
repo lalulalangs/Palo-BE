@@ -43,6 +43,12 @@ class GuestCheckoutRequest extends FormRequest
             ], fn ($val) => $val !== null && $val !== '');
         }
 
+        if ($this->has('shipping_address') && is_array($this->shipping_address) && ! isset($this->shipping_address['destination_id']) && $this->filled('destination_id')) {
+            $shippingAddress = $this->shipping_address;
+            $shippingAddress['destination_id'] = $this->input('destination_id');
+            $merge['shipping_address'] = $shippingAddress;
+        }
+
         if ($merge !== []) {
             $this->merge($merge);
         }
@@ -69,6 +75,7 @@ class GuestCheckoutRequest extends FormRequest
             'shipping_address.subdistrict' => ['nullable', 'string', 'max:100'],
             'shipping_address.province' => ['nullable', 'string', 'max:100'],
             'shipping_address.postal_code' => ['nullable', 'string', 'max:20'],
+            'shipping_address.courier' => ['nullable', 'string', 'max:50'],
             'street' => ['nullable', 'string', 'max:500'],
             'destination_id' => ['nullable', 'integer'],
             'city' => ['nullable', 'string', 'max:100'],

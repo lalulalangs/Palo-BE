@@ -11,7 +11,9 @@ use App\Models\OrderStatusHistory;
 use App\Models\Payment;
 use App\Models\Sku;
 use App\Services\Cart\CartService;
+use App\Services\Shipping\ShippingRateService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -21,17 +23,13 @@ class GuestCheckoutService
 {
     public function __construct(
         protected CartService $cartService,
-        protected CodWhatsAppService $codWhatsAppService
+        protected CodWhatsAppService $codWhatsAppService,
+        protected ShippingRateService $shippingRateService
     ) {}
 
     /**
      * Process Guest WhatsApp checkout: buat PESANAN, catat audit log, dan
-     * siapkan tautan wa.me.
-     *
-     * Sejak 25-10-2026 alur ini membuat `Order` sungguhan berstatus
-     * `awaiting_confirmation` (bukan sekadar log), supaya pesanan masuk daftar
-     * pesanan admin dan bisa dikonfirmasi CS setelah pembayaran VA/QRIS
-     * diverifikasi. Ongkir tetap menyusul konfirmasi CS, jadi `total` = subtotal.
+     * siapkan tautan wa.me dengan auto-quote tarif ongkir server-side.
      *
      * @param  array<int, array{sku_id: int, quantity: int, price_seen?: float|null}>|null  $itemsInput
      * @return array{reference_code: string, order_number: string, wa_url: string, message: string, estimated_total: float, estimated_total_display: string, notice: string}
@@ -126,8 +124,6 @@ class GuestCheckoutService
 
         $estimatedTotal = round($estimatedTotal, 2);
 
-        $formattedTotal = Number::currency($estimatedTotal, 'IDR', 'id');
-
         // Batas waktu yang sama dipakai untuk mengenali order lama yang layak
         // dipakai ulang dan oleh command `orders:expire-unconfirmed-cod`.
         $timeoutHours = (int) (AppSetting::getValue('cod_confirmation_timeout_hours', '24') ?: 24);
@@ -145,11 +141,34 @@ class GuestCheckoutService
             ])), ', ');
         }
 
+        $courier = $courier ?? $shippingAddress['courier'] ?? null;
+        $destinationId = ! empty($shippingAddress['destination_id']) ? (int) $shippingAddress['destination_id'] : null;
+        $cityLabel = $shippingAddress['city'] ?? null;
+
+        // Auto-quote tarif ongkir server-side
+        $autoQuote = null;
+        if ($destinationId && filled($courier)) {
+            $autoQuote = $this->resolveAutoShippingQuote(
+                courier: $courier,
+                destinationId: $destinationId,
+                rawItems: $rawItems,
+                destinationLabel: $cityLabel
+            );
+        }
+
+        $shippingCost = $autoQuote ? (float) $autoQuote['cost'] : 0.0;
+        $shippingCourier = $autoQuote ? ($autoQuote['courier'] ?? strtoupper($courier)) : (filled($courier) ? strtoupper($courier) : null);
+        $shippingService = $autoQuote ? $autoQuote['service'] : null;
+        $shippingQuoteSnapshot = $autoQuote;
+        $shippingWeightGrams = $autoQuote ? (int) $autoQuote['weight_grams'] : null;
+        $finalTotal = round($estimatedTotal + $shippingCost, 2);
+
         return DB::transaction(function () use (
             $snapshot,
             $lines,
             $estimatedTotal,
-            $formattedTotal,
+            $shippingCost,
+            $finalTotal,
             $guestName,
             $guestPhone,
             $note,
@@ -157,45 +176,55 @@ class GuestCheckoutService
             $csNumber,
             $timeoutHours,
             $shippingAddress,
+            $destinationId,
             $courier,
+            $shippingCourier,
+            $shippingService,
+            $shippingQuoteSnapshot,
+            $shippingWeightGrams,
             $fullAddress,
+            $autoQuote,
         ) {
             /*
-             * DEDUPE. Menekan tombol dua kali (atau mengulang setelah jeda)
-             * tidak boleh membuat dua pesanan: pembeli akan bingung dan admin
-             * harus membatalkan salah satunya. Kalau sesi ini masih punya
-             * pesanan WhatsApp yang menunggu konfirmasi, pesanan ITU yang
-             * dipakai ulang — isinya disegarkan dari keranjang terbaru, kode
-             * referensi dan nomor pesanannya tetap.
+             * DEDUPE: Jika sesi ini masih punya pesanan WhatsApp yang menunggu
+             * konfirmasi, pesanan ITU yang dipakai ulang dan disegarkan isinya.
              */
             $order = $this->findReusableWhatsAppOrder($sessionId, $timeoutHours, $guestPhone);
             $reused = $order !== null;
 
             $referenceCode = $order?->guest_reference_code
                 ?? 'GC-'.date('Ymd').'-'.strtoupper(Str::random(4));
+
             $messageText = $this->composeWhatsAppMessage(
-                $lines,
-                $formattedTotal,
-                $guestName,
-                $guestPhone,
-                $note,
-                $referenceCode,
-                $fullAddress,
-                $courier,
+                lines: $lines,
+                subtotal: $estimatedTotal,
+                shippingCost: $shippingCost,
+                total: $finalTotal,
+                guestName: $guestName,
+                guestPhone: $guestPhone,
+                note: $note,
+                referenceCode: $referenceCode,
+                fullAddress: $fullAddress,
+                courier: $shippingCourier ?? $courier,
+                service: $shippingService,
             );
+
             $waUrl = "https://wa.me/{$csNumber}?text=".rawurlencode($messageText);
 
             $attributes = [
                 'subtotal' => $estimatedTotal,
                 'discount_amount' => 0.0,
-                // Ongkir belum diketahui: CS mengonfirmasinya di WhatsApp.
-                'shipping_cost' => 0.0,
-                'total' => $estimatedTotal,
+                'shipping_cost' => $shippingCost,
+                'total' => $finalTotal,
                 'shipping_recipient_name' => filled($guestName) ? $guestName : 'Tamu',
                 'shipping_phone' => filled($guestPhone) ? $guestPhone : null,
                 'shipping_full_address' => filled($fullAddress) ? $fullAddress : null,
-                'shipping_courier' => filled($courier) ? $courier : null,
-                'shipping_destination_id' => ! empty($shippingAddress['destination_id']) ? (int) $shippingAddress['destination_id'] : null,
+                'shipping_courier' => $shippingCourier,
+                'shipping_courier_code' => $autoQuote['courier_code'] ?? (filled($courier) ? strtolower($courier) : null),
+                'shipping_service' => $shippingService,
+                'shipping_quote_snapshot' => $shippingQuoteSnapshot,
+                'shipping_weight_grams' => $shippingWeightGrams,
+                'shipping_destination_id' => $destinationId,
                 'shipping_address_snapshot' => ! empty($shippingAddress) ? $shippingAddress : null,
             ];
 
@@ -210,15 +239,11 @@ class GuestCheckoutService
                     'status' => Order::STATUS_AWAITING_CONFIRMATION,
                     'payment_method' => Order::PAYMENT_METHOD_WHATSAPP,
                     'guest_reference_code' => $referenceCode,
-                    'shipping_service' => null,
-                    // Tidak ada reservasi stok: stok dipotong saat admin konfirmasi.
                     'stock_locked_until' => null,
                 ]);
             }
 
-            // Item selalu ditulis ulang: isi keranjang bisa berubah di antara
-            // dua submissions. Snapshot lama dihapus supaya tidak ada baris
-            // hantu dari keranjang sebelumnya.
+            // Snapshot item selalu ditulis ulang agar tidak ada data residu
             OrderItem::where('order_id', $order->id)->delete();
 
             foreach ($snapshot as $line) {
@@ -235,7 +260,7 @@ class GuestCheckoutService
             }
 
             $paymentPayload = [
-                'amount' => $estimatedTotal,
+                'amount' => $finalTotal,
                 'raw_response' => [
                     'method' => 'whatsapp',
                     'guest_reference_code' => $referenceCode,
@@ -247,8 +272,6 @@ class GuestCheckoutService
             ];
 
             if ($reused) {
-                // Tenggat TIDAK diperpanjang: memperpanjang setiap submit
-                // membuat pesanan yang sama bisa digantung selamanya.
                 $order->payment?->update($paymentPayload);
             } else {
                 Payment::create($paymentPayload + [
@@ -271,11 +294,9 @@ class GuestCheckoutService
                 ]);
             }
 
-            // Satu log per order: submission ulang memperbarui isi log yang
-            // sama, bukan menumpuk baris audit untuk keranjang yang identik.
             $logAttributes = [
                 'cart_snapshot' => $snapshot,
-                'estimated_total' => $estimatedTotal,
+                'estimated_total' => $finalTotal,
                 'wa_message_text' => $messageText,
                 'wa_cs_number_used' => $csNumber,
             ];
@@ -298,19 +319,94 @@ class GuestCheckoutService
                 'order_number' => $order->order_number,
                 'wa_url' => $waUrl,
                 'message' => $messageText,
-                'estimated_total' => $estimatedTotal,
-                'estimated_total_display' => $formattedTotal,
-                'notice' => 'Harga dan stok final dikonfirmasi Customer Service.',
+                'estimated_total' => (float) $order->total,
+                'estimated_total_display' => Number::currency($order->total, 'IDR', 'id'),
+                'notice' => $order->shipping_cost > 0
+                    ? 'Pesanan dan ongkir berhasil dihitung. Silakan lanjutkan konfirmasi pembayaran via WhatsApp.'
+                    : 'Harga dan stok final dikonfirmasi Customer Service.',
             ];
         });
     }
 
     /**
-     * Pesanan WhatsApp milik sesi ini atau nomor telepon ini yang masih boleh dipakai ulang.
+     * Auto-quote layanan ekspedisi reguler / termurah untuk tamu dengan graceful fallback.
      *
-     * Syaratnya sama dengan batas kedaluwarsa: status menunggu konfirmasi,
-     * metode WhatsApp, dan dibuat dalam jendela timeout. Dicocokkan berdasarkan
-     * session_id di guest_checkout_logs ATAU shipping_phone di tabel orders.
+     * @param  array<int, array{sku_id: int, quantity: int}>  $rawItems
+     * @return array{courier: string, courier_code: string, service: string, description: string, cost: int, etd: string, source: string, origin_id: int, destination_id: int, destination_label: string|null, weight_grams: int, quoted_at: string}|null
+     */
+    protected function resolveAutoShippingQuote(
+        ?string $courier,
+        ?int $destinationId,
+        array $rawItems,
+        ?string $destinationLabel = null
+    ): ?array {
+        if (! $destinationId || $destinationId <= 0 || empty($rawItems)) {
+            return null;
+        }
+
+        try {
+            $quote = $this->shippingRateService->quote(
+                destinationId: $destinationId,
+                items: $rawItems,
+                destinationLabel: $destinationLabel
+            );
+
+            $services = $quote['services'] ?? [];
+            if (empty($services)) {
+                return null;
+            }
+
+            $normalizedCourier = strtolower(trim((string) $courier));
+
+            $filtered = $services;
+            if (in_array($normalizedCourier, ['jne', 'jnt'], true)) {
+                $filtered = array_values(array_filter($services, function (array $s) use ($normalizedCourier): bool {
+                    $code = strtolower((string) ($s['courier_code'] ?? ''));
+                    $brand = strtolower((string) ($s['courier'] ?? ''));
+
+                    if ($normalizedCourier === 'jne') {
+                        return $code === 'jne' || str_contains($brand, 'jne');
+                    }
+
+                    if ($normalizedCourier === 'jnt') {
+                        return $code === 'jnt' || str_contains($brand, 'j&t') || str_contains($brand, 'jnt');
+                    }
+
+                    return false;
+                }));
+            }
+
+            // Jika kurir terpilih tidak memiliki layanan ke destinasi tersebut, kembalikan null
+            if (empty($filtered)) {
+                return null;
+            }
+
+            // Pilih paket standar/reguler termurah (cost ascending)
+            usort($filtered, fn (array $a, array $b): int => ($a['cost'] ?? 0) <=> ($b['cost'] ?? 0));
+
+            $cheapest = $filtered[0];
+
+            return $cheapest + [
+                'source' => $quote['source'] ?? 'api',
+                'origin_id' => $quote['origin']['id'] ?? 0,
+                'destination_id' => $quote['destination']['id'] ?? $destinationId,
+                'destination_label' => $quote['destination']['label'] ?? $destinationLabel,
+                'weight_grams' => $quote['weight_grams'] ?? 0,
+                'quoted_at' => $quote['quoted_at'] ?? now()->toIso8601String(),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('Guest auto-shipping quote failed gracefully: '.$e->getMessage(), [
+                'destination_id' => $destinationId,
+                'courier' => $courier,
+                'exception' => get_class($e),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Pesanan WhatsApp milik sesi ini atau nomor telepon ini yang masih boleh dipakai ulang.
      */
     private function findReusableWhatsAppOrder(string $sessionId, int $timeoutHours, ?string $guestPhone = null): ?Order
     {
@@ -340,26 +436,50 @@ class GuestCheckoutService
     }
 
     /**
-     * Susun teks pesan WhatsApp. Dipakai jalur buat-baru maupun pakai-ulang,
-     * supaya isi pesan selalu cocok dengan isi pesanan.
+     * Susun teks pesan WhatsApp dengan format jelas:
+     * - Jika ongkir > 0: Subtotal, Ongkir (Kurir - Layanan), dan Total pasti.
+     * - Jika ongkir <= 0: Subtotal, Ongkir akan dikonfirmasi CS, dan Estimasi Total.
      *
      * @param  array<int, string>  $lines
      */
     private function composeWhatsAppMessage(
         array $lines,
-        string $formattedTotal,
+        float $subtotal,
+        float $shippingCost,
+        float $total,
         ?string $guestName,
         ?string $guestPhone,
         ?string $note,
         string $referenceCode,
         ?string $fullAddress = null,
         ?string $courier = null,
+        ?string $service = null,
     ): string {
         $msgParts = [];
         $msgParts[] = 'Halo Palo Mountain Goods, saya ingin memesan:';
         $msgParts[] = implode("\n", $lines);
         $msgParts[] = '';
-        $msgParts[] = "Estimasi Total: {$formattedTotal}";
+
+        $subtotalFormatted = Number::currency($subtotal, 'IDR', 'id');
+        $totalFormatted = Number::currency($total, 'IDR', 'id');
+
+        if ($shippingCost > 0) {
+            $shippingCostFormatted = Number::currency($shippingCost, 'IDR', 'id');
+            $courierLabel = match (strtolower((string) $courier)) {
+                'jne' => 'JNE',
+                'jnt' => 'J&T Express',
+                'cs_recommendation' => 'Rekomendasi CS',
+                default => strtoupper((string) $courier),
+            };
+            $courierDetail = trim("{$courierLabel}".(filled($service) ? " - {$service}" : ''));
+            $msgParts[] = "Subtotal: {$subtotalFormatted}";
+            $msgParts[] = "Ongkir: {$shippingCostFormatted}".($courierDetail ? " ({$courierDetail})" : '');
+            $msgParts[] = "Total: {$totalFormatted}";
+        } else {
+            $msgParts[] = "Subtotal: {$subtotalFormatted}";
+            $msgParts[] = 'Ongkir: akan dikonfirmasi CS';
+            $msgParts[] = "Estimasi Total: {$totalFormatted}";
+        }
 
         if (filled($guestName)) {
             $msgParts[] = "Nama: {$guestName}";
@@ -370,7 +490,7 @@ class GuestCheckoutService
         if (filled($fullAddress)) {
             $msgParts[] = "Alamat Pengiriman: {$fullAddress}";
         }
-        if (filled($courier)) {
+        if (filled($courier) && $shippingCost <= 0) {
             $courierLabel = match (strtolower((string) $courier)) {
                 'jne' => 'JNE (Reguler/YES)',
                 'jnt' => 'J&T Express',
@@ -444,12 +564,7 @@ class GuestCheckoutService
 
     /**
      * Process formal COD checkout for Guest user, creating order (user_id=null), snapshots, and WA link.
-     *
-     * Ongkir TIDAK dihitung di sini. Guest COD adalah serah-terima lead ke CS
-     * lewat WhatsApp (order berstatus `awaiting_confirmation`), sehingga
-     * `shipping_cost` disimpan 0 dan CS mengonfirmasi ongkir saat chat —
-     * lihat `CodWhatsAppService::buildMessage()`. Nilai ongkir dari client
-     * tidak pernah dipercaya.
+     * Menggunakan auto-quote server-side jika destination_id tersedia.
      *
      * @param  array<string, mixed>  $shippingAddress
      * @param  array<int, array{sku_id: int, quantity: int, price_seen?: float|null}>|null  $itemsInput
@@ -459,7 +574,8 @@ class GuestCheckoutService
         array $shippingAddress,
         ?array $itemsInput,
         ?string $note,
-        string $sessionId
+        string $sessionId,
+        ?string $courier = null
     ): array {
         if (! $this->codWhatsAppService->isCodEnabled()) {
             throw ValidationException::withMessages([
@@ -505,7 +621,8 @@ class GuestCheckoutService
             $shippingAddress,
             $rawItems,
             $note,
-            $sessionId
+            $sessionId,
+            $courier
         ) {
             $snapshot = [];
             $preparedLines = [];
@@ -579,24 +696,52 @@ class GuestCheckoutService
                 ];
             }
 
-            // Ongkir belum diketahui saat guest checkout: CS mengonfirmasinya
-            // via WhatsApp, jadi total order = subtotal saja.
-            $grandTotal = max(0.0, $subtotal);
+            $effectiveCourier = $courier ?? $shippingAddress['courier'] ?? 'jne';
+            $destinationId = ! empty($shippingAddress['destination_id']) ? (int) $shippingAddress['destination_id'] : null;
+            $cityLabel = $shippingAddress['city'] ?? null;
+
+            // Auto-quote tarif ongkir COD server-side
+            $autoQuote = null;
+            if ($destinationId) {
+                $autoQuote = $this->resolveAutoShippingQuote(
+                    courier: $effectiveCourier,
+                    destinationId: $destinationId,
+                    rawItems: $rawItems,
+                    destinationLabel: $cityLabel
+                );
+            }
+
+            if ($autoQuote) {
+                $shippingCost = (float) $autoQuote['cost'];
+                $shippingCourier = $autoQuote['courier'] ?? strtoupper($effectiveCourier);
+                $shippingCourierCode = $autoQuote['courier_code'] ?? strtolower($effectiveCourier);
+                $shippingService = $autoQuote['service'];
+                $shippingQuoteSnapshot = $autoQuote;
+                $shippingWeightGrams = (int) ($autoQuote['weight_grams'] ?? 0);
+                $grandTotal = round($subtotal + $shippingCost, 2);
+            } else {
+                $shippingCost = 0.0;
+                $shippingCourier = null;
+                $shippingCourierCode = null;
+                $shippingService = null;
+                $shippingQuoteSnapshot = null;
+                $shippingWeightGrams = null;
+                $grandTotal = max(0.0, $subtotal);
+            }
 
             $orderNumber = $this->generateOrderNumber();
-
             $codReferenceCode = $this->codWhatsAppService->generateReferenceCode();
 
             $recipientName = $shippingAddress['recipient_name'] ?? 'Tamu';
             $recipientPhone = $shippingAddress['phone'] ?? '';
-            $fullAddress = trim(sprintf(
-                '%s, %s, %s, %s %s',
+            $fullAddress = trim(implode(', ', array_filter([
                 $shippingAddress['street'] ?? '',
+                $shippingAddress['subdistrict'] ?? '',
                 $shippingAddress['district'] ?? '',
                 $shippingAddress['city'] ?? '',
                 $shippingAddress['province'] ?? '',
-                $shippingAddress['postal_code'] ?? ''
-            ), ', ');
+                $shippingAddress['postal_code'] ?? '',
+            ])), ', ');
 
             /** @var Order $order */
             $order = Order::create([
@@ -608,16 +753,18 @@ class GuestCheckoutService
                 'cod_reference_code' => $codReferenceCode,
                 'subtotal' => $subtotal,
                 'discount_amount' => 0.0,
-                'shipping_cost' => 0.0,
+                'shipping_cost' => $shippingCost,
                 'total' => $grandTotal,
                 'shipping_recipient_name' => $recipientName,
                 'shipping_phone' => $recipientPhone,
                 'shipping_full_address' => $fullAddress,
-                'shipping_destination_id' => ! empty($shippingAddress['destination_id']) ? (int) $shippingAddress['destination_id'] : null,
+                'shipping_destination_id' => $destinationId,
                 'shipping_address_snapshot' => ! empty($shippingAddress) ? $shippingAddress : null,
-                // Null agar CodWhatsAppService menulis "Ongkir: akan dikonfirmasi CS".
-                'shipping_courier' => null,
-                'shipping_service' => null,
+                'shipping_courier' => $shippingCourier,
+                'shipping_courier_code' => $shippingCourierCode,
+                'shipping_service' => $shippingService,
+                'shipping_quote_snapshot' => $shippingQuoteSnapshot,
+                'shipping_weight_grams' => $shippingWeightGrams,
                 'stock_locked_until' => null,
             ]);
 
@@ -707,11 +854,7 @@ class GuestCheckoutService
     }
 
     /**
-     * Nomor pesanan berbasis tanggal + entropi acak tanpa query count() yang
-     * rawan tabrakan saat checkout bersamaan.
-     *
-     * Satu sumber untuk kedua jalur tamu (COD dan WhatsApp) supaya formatnya
-     * tidak bercabang.
+     * Nomor pesanan berbasis tanggal + entropi acak.
      */
     private function generateOrderNumber(): string
     {

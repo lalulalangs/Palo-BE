@@ -33,7 +33,8 @@ class GuestCheckoutController extends Controller
             shippingAddress: (array) $request->input('shipping_address'),
             itemsInput: $request->input('items'),
             note: $request->input('note'),
-            sessionId: $sessionId
+            sessionId: $sessionId,
+            courier: $request->input('courier')
         );
 
         return response()->json([

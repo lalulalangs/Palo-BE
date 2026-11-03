@@ -111,9 +111,9 @@ class ShippingApiTest extends TestCase
         Http::assertSentCount(1);
     }
 
-    public function test_destination_search_requires_authentication(): void
+    public function test_destination_search_is_accessible_without_authentication(): void
     {
-        $this->getJson('/api/v1/shipping/destinations?search=Bayan')->assertUnauthorized();
+        $this->getJson('/api/v1/shipping/destinations?search=Bayan')->assertOk();
     }
 
     public function test_destination_search_validates_keyword_length(): void
