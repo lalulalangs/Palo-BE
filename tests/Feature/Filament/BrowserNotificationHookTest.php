@@ -28,5 +28,11 @@ class BrowserNotificationHookTest extends TestCase
         $response->assertSee('FilamentNotification', false);
         $response->assertSee('Notification.requestPermission', false);
         $response->assertSee('palorinjani_admin_alerts_enabled', false);
+
+        // Livewire v4 menyuntikkan script-nya setelah render hook BODY_END,
+        // jadi hook harus menunggu 'livewire:init' dan tetap punya fallback scan.
+        $response->assertSee('waitForLivewire', false);
+        $response->assertSee('livewire:init', false);
+        $response->assertSee('setInterval(processIncomingNotifications, 15000)', false);
     }
 }

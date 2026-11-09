@@ -337,26 +337,47 @@
     }
 
     function registerLivewireHook() {
-        if (!window.Livewire || window.__palorinjaniAlertsLivewireHooked) {
-            return;
+        if (window.__palorinjaniAlertsLivewireHooked) {
+            return true;
+        }
+
+        // Livewire v4 menyuntikkan script-nya sendiri di akhir <body>, yaitu
+        // SETELAH render hook BODY_END. Jadi window.Livewire bisa belum ada
+        // saat skrip ini dieksekusi; jangan menyerah, tunggu.
+        if (!window.Livewire || typeof window.Livewire.hook !== 'function') {
+            return false;
         }
 
         window.__palorinjaniAlertsLivewireHooked = true;
 
         window.Livewire.hook('commit', ({ component, succeed }) => {
             succeed(() => {
-                if (component.name === 'database-notifications') {
+                if (component?.name === 'database-notifications') {
                     setTimeout(processIncomingNotifications, 150);
                 }
             });
         });
+
+        return true;
+    }
+
+    function waitForLivewire(attempt = 0) {
+        if (registerLivewireHook() || attempt >= 40) {
+            return;
+        }
+
+        setTimeout(() => waitForLivewire(attempt + 1), 250);
     }
 
     function init() {
-        registerLivewireHook();
+        waitForLivewire();
         showBannerIfNeeded();
 
         setTimeout(processIncomingNotifications, 800);
+
+        // Jaring pengaman: bila hook 'commit' Livewire tidak tersedia/gagal,
+        // DOM tetap dipindai tiap 15 detik (sama dengan interval polling server).
+        setInterval(processIncomingNotifications, 15000);
     }
 
     if (window.__palorinjaniAlertsInit) {
@@ -364,6 +385,11 @@
     }
 
     window.__palorinjaniAlertsInit = true;
+
+    // Livewire v4 biasanya dimuat setelah skrip ini; daftarkan hook begitu siap.
+    document.addEventListener('livewire:init', () => {
+        waitForLivewire();
+    });
 
     document.addEventListener('livewire:navigate', () => {
         isSpaNavigating = true;
