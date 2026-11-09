@@ -19,6 +19,7 @@ use App\Models\Role;
 use App\Models\Sku;
 use App\Models\User;
 use App\Services\Orders\OrderTransitionService;
+use Illuminate\Events\CallQueuedListener;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -30,10 +31,15 @@ class OrderNotificationTest extends TestCase
     use RefreshDatabase;
 
     protected AdminUser $superAdmin;
+
     protected AdminUser $orderAdmin;
+
     protected AdminUser $inactiveOrderAdmin;
+
     protected AdminUser $contentAdmin;
+
     protected Order $sampleOrder;
+
     protected Sku $sku;
 
     protected function setUp(): void
@@ -201,6 +207,71 @@ class OrderNotificationTest extends TestCase
         Event::assertDispatched(OrderAwaitingConfirmation::class, function ($event) use ($codOrder) {
             return $event->order->id === $codOrder->id;
         });
+    }
+
+    /**
+     * @test
+     * Event OrderPaid harus mengantrekan listener, bukan menjalankannya secara synchronous.
+     */
+    public function test_listener_is_queued_when_order_paid_event_is_dispatched(): void
+    {
+        Queue::fake();
+
+        OrderPaid::dispatch($this->sampleOrder);
+
+        Queue::assertPushed(
+            CallQueuedListener::class,
+            fn (CallQueuedListener $job, ?string $queue): bool => $job->class === SendNewOrderAdminNotification::class && $queue === null,
+        );
+    }
+
+    /**
+     * @test
+     * Event konfirmasi yang salah dikirim untuk order online pending tidak boleh menotifikasi admin.
+     */
+    public function test_pending_online_order_is_silent_at_listener_level(): void
+    {
+        $listener = app(SendNewOrderAdminNotification::class);
+        $listener->handle(new OrderAwaitingConfirmation($this->sampleOrder));
+
+        $this->assertDatabaseEmpty('notifications');
+    }
+
+    /**
+     * @test
+     * Order COD yang menunggu konfirmasi menghasilkan notifikasi COD dengan aksi verifikasi.
+     */
+    public function test_cod_order_creates_awaiting_confirmation_notification(): void
+    {
+        $codOrder = Order::create([
+            'order_number' => 'PRJ-COD-20261109-00003',
+            'user_id' => null,
+            'status' => OrderStatus::AwaitingConfirmation,
+            'payment_method' => Order::PAYMENT_METHOD_COD,
+            'subtotal' => 200000,
+            'shipping_cost' => 20000,
+            'total' => 220000,
+            'shipping_recipient_name' => 'Budi Santoso',
+            'shipping_phone' => '087712345678',
+            'shipping_full_address' => 'Mataram, NTB',
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+        ]);
+
+        $listener = app(SendNewOrderAdminNotification::class);
+        $listener->handle(new OrderAwaitingConfirmation($codOrder));
+
+        $record = DB::table('notifications')
+            ->where('notifiable_type', AdminUser::class)
+            ->where('notifiable_id', $this->orderAdmin->id)
+            ->first();
+
+        $this->assertNotNull($record);
+
+        $data = json_decode($record->data, true);
+
+        $this->assertStringContainsString('COD', $data['title']);
+        $this->assertNotNull(collect($data['actions'])->firstWhere('name', 'verify_order'));
     }
 
     /**
