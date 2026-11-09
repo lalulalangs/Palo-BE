@@ -174,10 +174,10 @@ composer dev
 
 # atau terpisah
 php artisan serve
-php artisan queue:work --queue=default --tries=3 --timeout=60
+php artisan queue:work --queue=default --tries=4 --timeout=60
 ```
 
-Produksi/staging memakai supervisor (`queue:work --queue=default --tries=3
+Produksi/staging memakai supervisor (`queue:work --queue=default --tries=4
 --timeout=60 --max-time=3600`). `--timeout` harus lebih kecil dari
 `DB_QUEUE_RETRY_AFTER` (default 90 detik). Setelah setiap deploy jalankan
 `php artisan queue:restart` agar worker memuat kode terbaru.
@@ -191,6 +191,11 @@ Health check:
 php artisan queue:monitor default --max=100
 php artisan queue:failed        # harus kosong; listener menulis Log::critical bila habis retry
 ```
+
+Catatan: listener mendeklarasikan `tries=4`; nilai `--tries` CLI tidak menimpa
+properti job. Hook browser memakai `<script>` inline — bila nginx mengaktifkan
+CSP `script-src`, pindahkan skrip ke asset Vite/nonce sebelum CSP dinyalakan,
+kalau tidak alert admin mati diam-diam.
 
 Detail konfigurasi supervisor dan troubleshooting juga tersedia di server
 (`docs/RUNBOOK-DEPLOYMENT.md`, folder docs tidak di-commit oleh repo ini).
@@ -217,7 +222,7 @@ Role & pengguna panel admin dikelola dari menu **Role & Pengguna** oleh superadm
 
 ## Pengujian Otomatis & Standar Kode
 
-### Menjalankan Test Suite (631 Test Cases per 9 Nov 2026)
+### Menjalankan Test Suite (633 Test Cases per 9 Nov 2026)
 Seluruh fitur dilindungi oleh pengujian integrasi otomatis (PHPUnit / Pest):
 ```bash
 php artisan test

@@ -22,8 +22,9 @@ use App\Services\Orders\OrderTransitionService;
 use Illuminate\Events\CallQueuedListener;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use RuntimeException;
 use Tests\TestCase;
 
 class OrderNotificationTest extends TestCase
@@ -241,6 +242,44 @@ class OrderNotificationTest extends TestCase
             CallQueuedListener::class,
             fn (CallQueuedListener $job): bool => $job->class === SendNewOrderAdminNotification::class,
         );
+    }
+
+    /**
+     * @test
+     * CallQueuedListener memanggil failed(event, exception). Signature yang salah
+     * menutupi log permanen dengan TypeError.
+     */
+    public function test_failed_handler_logs_critical_with_order_context(): void
+    {
+        Log::spy();
+
+        app(SendNewOrderAdminNotification::class)
+            ->failed(new OrderPaid($this->sampleOrder), new RuntimeException('boom'));
+
+        Log::shouldHaveReceived('critical')->withArgs(
+            fn (string $message, array $context): bool => $message === 'admin_order_notification.permanently_failed'
+                && $context['order_number'] === $this->sampleOrder->order_number
+                && $context['exception'] === RuntimeException::class
+                && $context['tries'] === 4
+        );
+    }
+
+    /**
+     * @test
+     * Drift event/status harus terekam, tetapi tidak memblokir notifikasi.
+     */
+    public function test_event_status_mismatch_is_logged_without_blocking(): void
+    {
+        Log::spy();
+
+        app(SendNewOrderAdminNotification::class)->handle(new OrderPaid($this->sampleOrder));
+
+        Log::shouldHaveReceived('warning')->withArgs(
+            fn (string $message, array $context): bool => $message === 'admin_order_notification.event_status_mismatch'
+                && $context['order_number'] === $this->sampleOrder->order_number
+        );
+
+        $this->assertDatabaseCount('notifications', AdminUser::getOrderNotificationRecipients()->count());
     }
 
     /**

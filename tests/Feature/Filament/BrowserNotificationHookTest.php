@@ -40,6 +40,10 @@ class BrowserNotificationHookTest extends TestCase
         $response->assertSee('livewire:init', false);
         $response->assertSee('setInterval(processIncomingNotifications, 15000)', false);
 
+        // Nama komponen Livewire bisa alias atau FQCN; fast-path harus mengenali
+        // keduanya, kalau tidak alert hanya bergantung pada fallback 15 detik.
+        $response->assertSee('DatabaseNotifications', false);
+
         // Chime tidak boleh membuat AudioContext sebelum ada user gesture
         // (Chrome menolak dan mencatat warning di console).
         $response->assertSee('hasUserGesture', false);

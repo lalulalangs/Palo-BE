@@ -63,7 +63,7 @@
     }
 
     async function resumeAudio() {
-        if (!hasUserGesture) {
+        if (!alertsEnabled() || !hasUserGesture) {
             return;
         }
 
@@ -378,7 +378,13 @@
 
         window.Livewire.hook('commit', ({ component, succeed }) => {
             succeed(() => {
-                if (component?.name === 'database-notifications') {
+                // Nama bisa berupa alias ('database-notifications') atau FQCN
+                // (Filament\Livewire\DatabaseNotifications), tergantung versi.
+                const componentName = component?.name ?? '';
+                const isNotificationsComponent = componentName === 'database-notifications'
+                    || componentName.endsWith('\\DatabaseNotifications');
+
+                if (isNotificationsComponent) {
                     setTimeout(processIncomingNotifications, 150);
                 }
             });

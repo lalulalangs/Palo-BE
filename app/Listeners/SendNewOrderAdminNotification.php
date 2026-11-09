@@ -170,13 +170,20 @@ class SendNewOrderAdminNotification implements ShouldQueue
 
     /**
      * Dipanggil setelah semua retry habis; satu-satunya jejak permanen.
+     *
+     * Signature mengikuti CallQueuedListener: argumen event dulu, exception
+     * kedua. Instance ini baru (tanpa job), jadi attempt count diambil dari
+     * `$tries`, bukan `$this->job->attempts()`.
      */
-    public function failed(?Throwable $exception): void
+    public function failed(OrderPaid|OrderAwaitingConfirmation $event, ?Throwable $exception = null): void
     {
         Log::critical('admin_order_notification.permanently_failed', [
+            'order_number' => $event->order?->order_number,
+            'order_id' => $event->order?->id,
+            'event' => $event::class,
             'exception' => $exception ? $exception::class : null,
             'error' => $exception?->getMessage(),
-            'attempts' => $this->job ? $this->job->attempts() : null,
+            'tries' => $this->tries,
         ]);
     }
 
