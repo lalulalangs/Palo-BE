@@ -29,9 +29,10 @@ class SendNewOrderAdminNotification implements ShouldQueue
     public bool $afterCommit = true;
 
     /**
-     * Antrean khusus untuk notifikasi agar tidak memblokir queue operasional lainnya.
+     * Antrean default agar worker standar di VPS/staging (php artisan queue:work)
+     * dapat langsung memproses notifikasi pesanan tanpa argumen antrean khusus.
      */
-    public string $queue = 'notifications';
+    public string $queue = 'default';
 
     public function handle(mixed $event): void
     {
@@ -73,15 +74,60 @@ class SendNewOrderAdminNotification implements ShouldQueue
             return;
         }
 
-        // 4. Inisialisasi Panel Admin untuk konteks worker CLI
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        // 4. Resolving URL Filament Panel secara defensif untuk konteks worker CLI
+        try {
+            Filament::setCurrentPanel(Filament::getPanel('admin'));
+            $orderUrl = OrderResource::getUrl('view', ['record' => $order]);
+        } catch (\Throwable $e) {
+            Log::warning("Could not generate Filament OrderResource view URL: {$e->getMessage()}");
+            $orderUrl = url('/admin/orders/'.$order->id);
+        }
 
-        $orderUrl = OrderResource::getUrl('view', ['record' => $order]);
         $customerName = $order->shipping_recipient_name ?? $order->user?->name ?? 'Pelanggan';
         $formattedTotal = Number::currency((float) $order->total, 'IDR', 'id');
         $waUrl = $this->buildWhatsAppUrl($order);
 
-        if ($event instanceof OrderAwaitingConfirmation || $order->isCod() || $statusValue === 'awaiting_confirmation') {
+        // 5. Prioritaskan pesanan yang sudah lunas (OrderPaid) terlebih dahulu
+        if ($event instanceof OrderPaid || $statusValue === OrderStatus::Paid->value || $statusValue === 'paid') {
+            $itemCount = $order->items()->count();
+
+            $actions = [
+                Action::make('view_order')
+                    ->label('Buka Pesanan')
+                    ->button()
+                    ->color('success')
+                    ->url($orderUrl)
+                    ->markAsRead(),
+            ];
+
+            if ($waUrl !== null) {
+                $actions[] = Action::make('chat_whatsapp')
+                    ->label('Chat WhatsApp')
+                    ->link()
+                    ->icon('heroicon-o-chat-bubble-left-ellipsis')
+                    ->color('success')
+                    ->url($waUrl)
+                    ->openUrlInNewTab()
+                    ->markAsRead(false);
+            }
+
+            Notification::make()
+                ->title("Pesanan Baru Dibayar! #{$order->order_number}")
+                ->body("{$customerName} • {$formattedTotal} • {$itemCount} item")
+                ->icon('heroicon-o-check-circle')
+                ->iconColor('success')
+                ->actions($actions)
+                ->viewData([
+                    'order_id' => $order->id,
+                    'event_type' => $eventClass,
+                ])
+                ->sendToDatabase($recipients, isEventDispatched: true);
+
+            return;
+        }
+
+        // 6. Tangani pesanan COD atau WhatsApp yang menunggu konfirmasi
+        if ($event instanceof OrderAwaitingConfirmation || $order->isCod() || $statusValue === 'awaiting_confirmation' || $statusValue === OrderStatus::AwaitingConfirmation->value) {
             $city = $order->shippingAddressData()['city'] ?? ($order->shipping_address_snapshot['city'] ?? 'Alamat Belum Tertera');
             $isCod = $order->isCod();
             $titlePrefix = $isCod ? 'Pesanan Baru COD' : 'Pesanan Baru WhatsApp';
@@ -116,45 +162,7 @@ class SendNewOrderAdminNotification implements ShouldQueue
                     'order_id' => $order->id,
                     'event_type' => $eventClass,
                 ])
-                ->sendToDatabase($recipients);
-
-            return;
-        }
-
-        if ($event instanceof OrderPaid || $statusValue === 'paid') {
-            $itemCount = $order->items()->count();
-
-            $actions = [
-                Action::make('view_order')
-                    ->label('Buka Pesanan')
-                    ->button()
-                    ->color('success')
-                    ->url($orderUrl)
-                    ->markAsRead(),
-            ];
-
-            if ($waUrl !== null) {
-                $actions[] = Action::make('chat_whatsapp')
-                    ->label('Chat WhatsApp')
-                    ->link()
-                    ->icon('heroicon-o-chat-bubble-left-ellipsis')
-                    ->color('success')
-                    ->url($waUrl)
-                    ->openUrlInNewTab()
-                    ->markAsRead(false);
-            }
-
-            Notification::make()
-                ->title("Pesanan Baru Dibayar! #{$order->order_number}")
-                ->body("{$customerName} • {$formattedTotal} • {$itemCount} item")
-                ->icon('heroicon-o-check-circle')
-                ->iconColor('success')
-                ->actions($actions)
-                ->viewData([
-                    'order_id' => $order->id,
-                    'event_type' => $eventClass,
-                ])
-                ->sendToDatabase($recipients);
+                ->sendToDatabase($recipients, isEventDispatched: true);
         }
     }
 

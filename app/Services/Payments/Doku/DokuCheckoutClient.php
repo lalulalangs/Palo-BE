@@ -462,7 +462,7 @@ class DokuCheckoutClient implements PaymentGatewayContract
             return null;
         }
 
-        return $frontendUrl.'/orders/'.$order->order_number;
+        return $frontendUrl.'/checkout/berhasil?order='.rawurlencode($order->order_number);
     }
 
     private function normalizePhone(?string $phone): ?string
