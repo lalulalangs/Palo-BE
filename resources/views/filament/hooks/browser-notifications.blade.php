@@ -8,7 +8,6 @@
     let isInitialized = false;
     let isSpaNavigating = false;
     let audioContext = null;
-    let audioUnlocked = false;
 
     function alertsEnabled() {
         try {
@@ -73,12 +72,10 @@
                 return;
             }
         }
-
-        audioUnlocked = context.state === 'running';
     }
 
     async function playNotificationChime() {
-        if (!audioUnlocked) {
+        if (!alertsEnabled()) {
             return;
         }
 
@@ -202,8 +199,6 @@
                 // Browser tetap bisa memblokir audio sampai interaksi berikutnya.
             }
         }
-
-        audioUnlocked = !!context && context.state === 'running';
 
         try {
             await permissionPromise;
@@ -408,11 +403,21 @@
         setTimeout(processIncomingNotifications, 500);
     });
 
-    document.addEventListener('pointerdown', () => {
+    const resumeOnGesture = () => {
         if (alertsEnabled()) {
             resumeAudio();
         }
-    }, { once: true, capture: true });
+    };
+
+    // Jangan { once: true }: Chrome bisa men-suspend AudioContext setelah idle
+    // atau pindah tab, dan resume butuh gesture pengguna. Listener ini murah.
+    document.addEventListener('pointerdown', resumeOnGesture, { capture: true });
+    document.addEventListener('keydown', resumeOnGesture, { capture: true });
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            resumeOnGesture();
+        }
+    });
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init, { once: true });
