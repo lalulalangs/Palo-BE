@@ -3,7 +3,9 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Services\Checkout\CodWhatsAppService;
+use App\Services\Shipping\ShippingRateService;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class GuestCodCheckoutRequest extends FormRequest
 {
@@ -36,10 +38,13 @@ class GuestCodCheckoutRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
+        $enabledCouriers = app(ShippingRateService::class)->getEnabledCourierCodes();
+        $courierRule = ['nullable', 'string', Rule::in($enabledCouriers)];
+
         return [
             'shipping_address' => ['required', 'array'],
             'shipping_address.recipient_name' => ['required', 'string', 'max:100'],
@@ -52,9 +57,9 @@ class GuestCodCheckoutRequest extends FormRequest
             'shipping_address.postal_code' => ['nullable', 'string', 'max:20'],
             'shipping_address.notes' => ['nullable', 'string', 'max:255'],
             'shipping_address.destination_id' => ['nullable', 'integer'],
-            'shipping_address.courier' => ['nullable', 'string', 'in:jne,jnt'],
+            'shipping_address.courier' => $courierRule,
 
-            'courier' => ['nullable', 'string', 'in:jne,jnt'],
+            'courier' => $courierRule,
             'destination_id' => ['nullable', 'integer'],
 
             'items' => ['nullable', 'array', 'max:50'],

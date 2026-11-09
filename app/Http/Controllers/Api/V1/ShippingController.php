@@ -54,6 +54,15 @@ class ShippingController extends Controller
     }
 
     /**
+     * Daftar kurir domestik yang sedang diaktifkan oleh admin toko.
+     * Menggunakan cache AppSetting lokal (Zero-HIT ke RajaOngkir).
+     */
+    public function couriers(): JsonResponse
+    {
+        return $this->respond($this->shippingRateService->getEnabledCouriers());
+    }
+
+    /**
      * Item eksplisit dari request, atau isi keranjang user yang sedang login.
      *
      * @return array<int, array{sku_id: int, quantity: int}>

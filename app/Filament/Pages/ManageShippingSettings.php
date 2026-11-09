@@ -73,6 +73,22 @@ class ManageShippingSettings extends Page
         'dse' => 'DSE',
     ];
 
+    /**
+     * Daftar pilihan kurir yang diambil dari kamus config('shipping.couriers').
+     *
+     * @return array<string, string>
+     */
+    public static function courierOptions(): array
+    {
+        $catalog = config('shipping.couriers', []);
+
+        if (! empty($catalog)) {
+            return array_map(fn (array $c): string => $c['name'], $catalog);
+        }
+
+        return self::COURIER_OPTIONS;
+    }
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTruck;
 
     protected static string|UnitEnum|null $navigationGroup = 'Pengaturan';
@@ -180,7 +196,7 @@ class ManageShippingSettings extends Page
                     ->schema([
                         CheckboxList::make('shipping_enabled_couriers')
                             ->label('Kurir')
-                            ->options(self::COURIER_OPTIONS)
+                            ->options(static::courierOptions())
                             ->columns(3)
                             ->required()
                             ->minItems(1)

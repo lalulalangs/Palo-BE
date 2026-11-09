@@ -60,9 +60,61 @@ class ShippingRateService
     private const COURIER_BRANDS = [
         'jne' => 'JNE',
         'jnt' => 'J&T',
+        'pos' => 'POS Indonesia',
+        'sicepat' => 'SiCepat',
+        'anteraja' => 'AnterAja',
+        'ninja' => 'Ninja Xpress',
+        'lion' => 'Lion Parcel',
+        'tiki' => 'TIKI',
+        'ide' => 'IDExpress',
+        'sap' => 'SAP Express',
+        'wahana' => 'Wahana',
     ];
 
     public function __construct(private readonly RajaOngkirClient $client) {}
+
+    /**
+     * Mengembalikan daftar kode kurir yang aktif di konfigurasi admin.
+     *
+     * @return array<int, string>
+     */
+    public function getEnabledCourierCodes(): array
+    {
+        $raw = (string) AppSetting::getValue('shipping_enabled_couriers', 'jne:jnt');
+        $codes = array_values(array_filter(array_map(
+            fn (string $code): string => strtolower(trim($code)),
+            explode(':', $raw)
+        )));
+
+        return ! empty($codes) ? $codes : ['jne', 'jnt'];
+    }
+
+    /**
+     * Mengembalikan daftar kurir aktif beserta metadata tampilan untuk frontend.
+     *
+     * @return array<int, array{id: string, name: string, label: string, desc: string}>
+     */
+    public function getEnabledCouriers(): array
+    {
+        $codes = $this->getEnabledCourierCodes();
+        $courierCatalog = config('shipping.couriers', []);
+
+        $result = [];
+        foreach ($codes as $code) {
+            $meta = $courierCatalog[$code] ?? null;
+            $name = $meta['name'] ?? self::COURIER_BRANDS[$code] ?? strtoupper($code);
+            $desc = $meta['desc'] ?? 'Reguler';
+
+            $result[] = [
+                'id' => $code,
+                'name' => $name,
+                'label' => $name,
+                'desc' => $desc,
+            ];
+        }
+
+        return $result;
+    }
 
     /**
      * Tarif untuk satu kombinasi kurir & layanan. `null` = tidak tersedia,

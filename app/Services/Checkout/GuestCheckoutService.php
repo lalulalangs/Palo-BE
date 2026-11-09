@@ -359,20 +359,28 @@ class GuestCheckoutService
             $normalizedCourier = strtolower(trim((string) $courier));
 
             $filtered = $services;
-            if (in_array($normalizedCourier, ['jne', 'jnt'], true)) {
+            if (filled($normalizedCourier) && $normalizedCourier !== 'cs_recommendation') {
                 $filtered = array_values(array_filter($services, function (array $s) use ($normalizedCourier): bool {
-                    $code = strtolower((string) ($s['courier_code'] ?? ''));
-                    $brand = strtolower((string) ($s['courier'] ?? ''));
+                    $code = strtolower(trim((string) ($s['courier_code'] ?? '')));
+                    $brand = strtolower(trim((string) ($s['courier'] ?? '')));
+
+                    if ($code === $normalizedCourier) {
+                        return true;
+                    }
 
                     if ($normalizedCourier === 'jne') {
                         return $code === 'jne' || str_contains($brand, 'jne');
                     }
 
-                    if ($normalizedCourier === 'jnt') {
+                    if ($normalizedCourier === 'jnt' || $normalizedCourier === 'jt') {
                         return $code === 'jnt' || str_contains($brand, 'j&t') || str_contains($brand, 'jnt');
                     }
 
-                    return false;
+                    if ($normalizedCourier === 'pos') {
+                        return $code === 'pos' || str_contains($brand, 'pos');
+                    }
+
+                    return str_contains($brand, $normalizedCourier) || str_contains($code, $normalizedCourier);
                 }));
             }
 
@@ -465,12 +473,18 @@ class GuestCheckoutService
 
         if ($shippingCost > 0) {
             $shippingCostFormatted = Number::currency($shippingCost, 'IDR', 'id');
-            $courierLabel = match (strtolower((string) $courier)) {
-                'jne' => 'JNE',
-                'jnt' => 'J&T Express',
-                'cs_recommendation' => 'Rekomendasi CS',
-                default => strtoupper((string) $courier),
-            };
+            $courierKey = strtolower((string) $courier);
+            if ($courierKey === 'cs_recommendation') {
+                $courierLabel = 'Rekomendasi CS';
+            } elseif ($meta = config("shipping.couriers.{$courierKey}")) {
+                $courierLabel = $meta['name'];
+            } else {
+                $courierLabel = match ($courierKey) {
+                    'jne' => 'JNE',
+                    'jnt' => 'J&T Express',
+                    default => filled($courier) ? (string) $courier : strtoupper($courierKey),
+                };
+            }
             $courierDetail = trim("{$courierLabel}".(filled($service) ? " - {$service}" : ''));
             $msgParts[] = "Subtotal: {$subtotalFormatted}";
             $msgParts[] = "Ongkir: {$shippingCostFormatted}".($courierDetail ? " ({$courierDetail})" : '');
@@ -491,12 +505,20 @@ class GuestCheckoutService
             $msgParts[] = "Alamat Pengiriman: {$fullAddress}";
         }
         if (filled($courier) && $shippingCost <= 0) {
-            $courierLabel = match (strtolower((string) $courier)) {
-                'jne' => 'JNE (Reguler/YES)',
-                'jnt' => 'J&T Express',
-                'cs_recommendation' => 'Rekomendasi CS (Paling Hemat)',
-                default => strtoupper((string) $courier),
-            };
+            $courierKey = strtolower((string) $courier);
+            if ($courierKey === 'cs_recommendation') {
+                $courierLabel = 'Rekomendasi CS (Paling Hemat)';
+            } elseif ($courierKey === 'jne') {
+                $courierLabel = 'JNE (Reguler/YES)';
+            } elseif ($meta = config("shipping.couriers.{$courierKey}")) {
+                $courierLabel = "{$meta['name']} ({$meta['desc']})";
+            } else {
+                $courierLabel = match ($courierKey) {
+                    'jne' => 'JNE (Reguler/YES)',
+                    'jnt' => 'J&T Express',
+                    default => strtoupper((string) $courier),
+                };
+            }
             $msgParts[] = "Pilihan Ekspedisi: {$courierLabel}";
         }
         if (filled($note)) {
@@ -696,7 +718,8 @@ class GuestCheckoutService
                 ];
             }
 
-            $effectiveCourier = $courier ?? $shippingAddress['courier'] ?? 'jne';
+            $defaultCourier = $this->shippingRateService->getEnabledCourierCodes()[0] ?? 'jne';
+            $effectiveCourier = $courier ?? $shippingAddress['courier'] ?? $defaultCourier;
             $destinationId = ! empty($shippingAddress['destination_id']) ? (int) $shippingAddress['destination_id'] : null;
             $cityLabel = $shippingAddress['city'] ?? null;
 

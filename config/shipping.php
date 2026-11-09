@@ -49,4 +49,27 @@ return [
     */
     'max_weight_grams' => (int) env('SHIPPING_MAX_WEIGHT_GRAMS', 50000),
 
+    /*
+    | Master katalog kurir domestik yang didukung sistem beserta label layanan.
+    */
+    'couriers' => [
+        'jne' => ['name' => 'JNE', 'desc' => 'Reguler / YES'],
+        'jnt' => ['name' => 'J&T Express', 'desc' => 'Reguler / EZ'],
+        'pos' => ['name' => 'POS Indonesia', 'desc' => 'Kilat Khusus'],
+        'sicepat' => ['name' => 'SiCepat', 'desc' => 'Reguler / SIUNTUNG'],
+        'anteraja' => ['name' => 'AnterAja', 'desc' => 'Reguler / Next Day'],
+        'ninja' => ['name' => 'Ninja Xpress', 'desc' => 'Reguler'],
+        'lion' => ['name' => 'Lion Parcel', 'desc' => 'REGPACK / ONEPACK'],
+        'tiki' => ['name' => 'TIKI', 'desc' => 'REG / ONS'],
+        'ide' => ['name' => 'IDExpress', 'desc' => 'Reguler'],
+        'sap' => ['name' => 'SAP Express', 'desc' => 'Reguler'],
+        'wahana' => ['name' => 'Wahana', 'desc' => 'Ekspres'],
+        'ncs' => ['name' => 'NCS', 'desc' => 'Nusantara Card Semesta'],
+        'rex' => ['name' => 'REX', 'desc' => 'Royal Express Indonesia'],
+        'rpx' => ['name' => 'RPX', 'desc' => 'RPX Holding'],
+        'sentral' => ['name' => 'Sentral Cargo', 'desc' => 'Kargo / Reguler'],
+        'star' => ['name' => 'Star Cargo', 'desc' => 'Kargo / Reguler'],
+        'dse' => ['name' => 'DSE', 'desc' => '21 Express'],
+    ],
+
 ];
