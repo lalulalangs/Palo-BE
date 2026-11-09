@@ -34,9 +34,9 @@ class SendNewOrderAdminNotification implements ShouldQueue
 
     /**
      * Retry untuk kegagalan transien (lock timeout, deadlock, DB blip).
-     * Tanpa ini, satu exception membuat notifikasi hilang permanen.
+     * `tries=4` memberi 3 kesempatan retry memakai ketiga nilai backoff.
      */
-    public int $tries = 3;
+    public int $tries = 4;
 
     /**
      * @var array<int, int>
@@ -71,6 +71,21 @@ class SendNewOrderAdminNotification implements ShouldQueue
 
         if (! $isPaidEvent && ! $isAwaitingEvent) {
             return;
+        }
+
+        // Drift deteksi: event paid untuk order yang statusnya bukan lunas/diproses
+        // menandakan ada jalur dispatch baru yang belum melunasi order. Jangan
+        // blokir notifikasi, tapi tinggalkan jejak untuk investigasi.
+        if ($isPaidEvent && ! in_array($statusValue, [
+            OrderStatus::Paid->value,
+            OrderStatus::Processing->value,
+            OrderStatus::Shipped->value,
+            OrderStatus::Completed->value,
+        ], true)) {
+            Log::warning('admin_order_notification.event_status_mismatch', [
+                'order_number' => $order->order_number,
+                'status' => $statusValue,
+            ]);
         }
 
         // Jangan kabari pesanan yang sudah mati.
@@ -136,6 +151,7 @@ class SendNewOrderAdminNotification implements ShouldQueue
                 'order_number' => $order->order_number,
                 'event' => $eventClass,
                 'exception' => $e::class,
+                'attempts' => $this->job ? $this->job->attempts() : null,
             ]);
 
             throw $e;
@@ -145,10 +161,23 @@ class SendNewOrderAdminNotification implements ShouldQueue
                 'event' => $eventClass,
                 'exception' => $e::class,
                 'error' => $e->getMessage() !== '' ? $e->getMessage() : '(empty message)',
+                'attempts' => $this->job ? $this->job->attempts() : null,
             ]);
 
             throw $e;
         }
+    }
+
+    /**
+     * Dipanggil setelah semua retry habis; satu-satunya jejak permanen.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        Log::critical('admin_order_notification.permanently_failed', [
+            'exception' => $exception ? $exception::class : null,
+            'error' => $exception?->getMessage(),
+            'attempts' => $this->job ? $this->job->attempts() : null,
+        ]);
     }
 
     /**

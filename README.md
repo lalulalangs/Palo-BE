@@ -183,8 +183,23 @@ Produksi/staging memakai supervisor (`queue:work --queue=default --tries=3
 `php artisan queue:restart` agar worker memuat kode terbaru.
 
 Sisa job dari queue lama `notifications` boleh dibersihkan (destruktif):
-`php artisan queue:clear --queue=notifications --force`. Detail lengkap ada di
-`docs/RUNBOOK-DEPLOYMENT.md` (lokal, tidak di-commit).
+`php artisan queue:clear --queue=notifications --force`.
+
+Health check:
+
+```bash
+php artisan queue:monitor default --max=100
+php artisan queue:failed        # harus kosong; listener menulis Log::critical bila habis retry
+```
+
+Detail konfigurasi supervisor dan troubleshooting juga tersedia di server
+(`docs/RUNBOOK-DEPLOYMENT.md`, folder docs tidak di-commit oleh repo ini).
+
+> **Migrasi `notifications` (destruktif).** Migrasi
+> `2026_11_09_000001_create_notifications_table` men-*drop* tabel lama bila
+> kolom `data` belum ada. Sebelum `migrate --force` di staging/produksi:
+> backup tabel `notifications`, cek `php artisan migrate:status`, dan catat
+> bahwa notifikasi legacy akan hilang.
 
 ---
 
@@ -202,7 +217,7 @@ Role & pengguna panel admin dikelola dari menu **Role & Pengguna** oleh superadm
 
 ## Pengujian Otomatis & Standar Kode
 
-### Menjalankan Test Suite (30 Test Cases)
+### Menjalankan Test Suite (631 Test Cases per 9 Nov 2026)
 Seluruh fitur dilindungi oleh pengujian integrasi otomatis (PHPUnit / Pest):
 ```bash
 php artisan test

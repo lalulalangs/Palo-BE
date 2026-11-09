@@ -164,7 +164,9 @@ class OrderNotificationTest extends TestCase
             CallQueuedListener::class,
             fn (CallQueuedListener $job, ?string $queue): bool => $job->class === SendNewOrderAdminNotification::class
                 && $queue === null
-                && $job->afterCommit === true,
+                && $job->afterCommit === true
+                && $job->tries === 4
+                && $job->backoff === [5, 30, 60],
         );
     }
 
@@ -199,16 +201,46 @@ class OrderNotificationTest extends TestCase
 
     /**
      * @test
-     * Kebijakan retry harus dideklarasikan agar satu kegagalan transien tidak
-     * menghilangkan notifikasi permanen.
      */
-    public function test_listener_declares_retry_policy(): void
+    public function test_paid_event_for_cancelled_order_is_ignored(): void
     {
-        $listener = app(SendNewOrderAdminNotification::class);
+        $this->sampleOrder->update(['status' => OrderStatus::Cancelled]);
 
-        $this->assertSame(3, $listener->tries);
-        $this->assertSame([5, 30, 60], $listener->backoff);
-        $this->assertTrue($listener->afterCommit);
+        app(SendNewOrderAdminNotification::class)->handle(new OrderPaid($this->sampleOrder));
+
+        $this->assertDatabaseEmpty('notifications');
+    }
+
+    /**
+     * @test
+     * Registrasi Event::listen untuk OrderAwaitingConfirmation (jalur COD/WA)
+     * harus tetap tersambung ke listener yang sama.
+     */
+    public function test_awaiting_confirmation_event_queues_registered_listener(): void
+    {
+        Queue::fake();
+
+        $codOrder = Order::create([
+            'order_number' => 'PRJ-COD-20261109-00004',
+            'user_id' => null,
+            'status' => OrderStatus::AwaitingConfirmation,
+            'payment_method' => Order::PAYMENT_METHOD_COD,
+            'subtotal' => 200000,
+            'shipping_cost' => 20000,
+            'total' => 220000,
+            'shipping_recipient_name' => 'Budi Santoso',
+            'shipping_phone' => '087712345678',
+            'shipping_full_address' => 'Mataram, NTB',
+            'shipping_courier' => 'JNE',
+            'shipping_service' => 'REG',
+        ]);
+
+        OrderAwaitingConfirmation::dispatch($codOrder);
+
+        Queue::assertPushed(
+            CallQueuedListener::class,
+            fn (CallQueuedListener $job): bool => $job->class === SendNewOrderAdminNotification::class,
+        );
     }
 
     /**

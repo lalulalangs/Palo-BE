@@ -436,11 +436,14 @@
 
     const resumeOnGesture = () => {
         hasUserGesture = true;
-        hideBanner();
 
-        if (alertsEnabled()) {
-            resumeAudio();
+        if (!alertsEnabled()) {
+            // Jangan hapus banner: klik harus sampai ke tombol "Aktifkan".
+            return;
         }
+
+        hideBanner();
+        resumeAudio();
     };
 
     // Jangan { once: true }: Chrome bisa men-suspend AudioContext setelah idle

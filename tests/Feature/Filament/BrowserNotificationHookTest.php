@@ -47,6 +47,19 @@ class BrowserNotificationHookTest extends TestCase
 
     /**
      * @test
+     * Halaman login (tamu) tidak boleh memuat banner/alert admin.
+     */
+    public function test_hook_is_not_rendered_on_login_page(): void
+    {
+        $response = $this->get('/admin/login');
+
+        $response->assertSuccessful();
+        $response->assertDontSee('palorinjaniAlertsInit', false);
+        $response->assertDontSee('palorinjani_admin_alerts_enabled', false);
+    }
+
+    /**
+     * @test
      * Selector JS hook harus benar-benar ada pada markup notification Filament
      * yang terpasang, bukan hanya ada sebagai string di blade.
      */
@@ -77,6 +90,7 @@ class BrowserNotificationHookTest extends TestCase
 
         Livewire::actingAs($admin, 'admin')
             ->test(DatabaseNotifications::class)
+            ->assertSeeHtml('id="database-notifications"')
             ->assertSeeHtml('fi-no-notification-unread-ctn')
             ->assertSeeHtml('.database-notifications.ctn');
     }

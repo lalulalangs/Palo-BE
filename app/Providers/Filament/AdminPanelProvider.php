@@ -37,7 +37,10 @@ class AdminPanelProvider extends PanelProvider
             ->databaseNotificationsPolling('15s')
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn (): string => view('filament.hooks.browser-notifications')->render(),
+                // Jangan tampilkan banner/alert untuk tamu di halaman login.
+                fn (): string => auth('admin')->check()
+                    ? view('filament.hooks.browser-notifications')->render()
+                    : '',
             )
             ->navigationGroups([
                 NavigationGroup::make('Katalog Produk')
