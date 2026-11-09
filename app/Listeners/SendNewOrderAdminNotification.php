@@ -11,42 +11,31 @@ use App\Models\Order;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Number;
+use Throwable;
 
-class SendNewOrderAdminNotification implements ShouldQueue
+class SendNewOrderAdminNotification
 {
-    use InteractsWithQueue, SerializesModels;
-
     /**
-     * Pastikan job hanya dikirim ke queue setelah transaksi database selesai commit 100%.
-     * Mencegah "ghost notification" jika terjadi database rollback.
+     * Eksekusi notifikasi secara synchronous (in-process) langsung ke database lokal.
+     * Tidak membutuhkan worker latar belakang di VPS (zero-dependency & anti-overengineering).
      */
-    public bool $afterCommit = true;
-
-    /**
-     * Antrean default agar worker standar di VPS/staging (php artisan queue:work)
-     * dapat langsung memproses notifikasi pesanan tanpa argumen antrean khusus.
-     */
-    public string $queue = 'default';
-
     public function handle(mixed $event): void
     {
-        if (! isset($event->order) || ! $event->order instanceof Order) {
-            return;
-        }
+        try {
+            if (! isset($event->order) || ! $event->order instanceof Order) {
+                return;
+            }
 
-        $order = $event->order->fresh();
+            $order = $event->order->fresh();
 
-        if (! $order) {
-            return;
-        }
+            if (! $order) {
+                return;
+            }
 
-        $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
+            $statusValue = $order->status instanceof OrderStatus ? $order->status->value : (string) $order->status;
 
         // 1. Silent Guard: Jangan pernah kirim notifikasi untuk pesanan online yang masih pending
         if (! ($event instanceof OrderPaid) && $statusValue === 'pending' && ! $order->isCod() && ! $order->isWhatsAppOrder()) {
@@ -163,6 +152,11 @@ class SendNewOrderAdminNotification implements ShouldQueue
                     'event_type' => $eventClass,
                 ])
                 ->sendToDatabase($recipients, isEventDispatched: true);
+        }
+        } catch (Throwable $e) {
+            Log::error("Failed to process SendNewOrderAdminNotification synchronously: {$e->getMessage()}", [
+                'exception' => $e,
+            ]);
         }
     }
 
