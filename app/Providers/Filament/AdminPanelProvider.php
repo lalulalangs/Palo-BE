@@ -12,7 +12,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
-use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -35,10 +34,6 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                fn (): string => view('filament.hooks.browser-notifications')->render(),
-            )
             ->navigationGroups([
                 NavigationGroup::make('Katalog Produk')
                     ->icon(Heroicon::OutlinedSquare2Stack),
