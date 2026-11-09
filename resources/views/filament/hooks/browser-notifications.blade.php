@@ -12,6 +12,7 @@
     // pengguna sejak halaman dimuat. Tanpa flag ini, chime memicu warning
     // "AudioContext was prevented from starting automatically".
     let hasUserGesture = false;
+    let warnedMissingToastApi = false;
 
     function alertsEnabled() {
         try {
@@ -239,39 +240,52 @@
 
     function showToast(title, body, targetUrl) {
         if (!window.FilamentNotification) {
-            return;
+            if (!warnedMissingToastApi) {
+                warnedMissingToastApi = true;
+                console.warn('FilamentNotification tidak tersedia; toast notifikasi admin tidak tampil.');
+            }
+
+            return false;
         }
 
-        const toast = new window.FilamentNotification()
-            .title(title)
-            .body(body)
-            .duration(10000);
+        try {
+            const toast = new window.FilamentNotification()
+                .title(title)
+                .body(body)
+                .duration(10000);
 
-        if (/cod|konfirmasi/i.test(title)) {
-            toast.warning();
-        } else {
-            toast.success();
+            if (/cod|konfirmasi/i.test(title)) {
+                toast.warning();
+            } else {
+                toast.success();
+            }
+
+            if (targetUrl && window.FilamentNotificationAction) {
+                toast.actions([
+                    new window.FilamentNotificationAction('view')
+                        .label('Buka')
+                        .button()
+                        .url(targetUrl),
+                ]);
+            }
+
+            toast.send();
+
+            return true;
+        } catch (error) {
+            console.warn('Gagal menampilkan toast notifikasi:', error);
+
+            return false;
         }
-
-        if (targetUrl && window.FilamentNotificationAction) {
-            toast.actions([
-                new window.FilamentNotificationAction('view')
-                    .label('Buka')
-                    .button()
-                    .url(targetUrl),
-            ]);
-        }
-
-        toast.send();
     }
 
     function showDesktopNotification(title, body, notificationId, targetUrl) {
         if (!document.hidden || !alertsEnabled()) {
-            return;
+            return false;
         }
 
         if (!('Notification' in window) || Notification.permission !== 'granted') {
-            return;
+            return false;
         }
 
         try {
@@ -290,8 +304,12 @@
 
                 desktopNotification.close();
             };
+
+            return true;
         } catch (error) {
             console.warn('Gagal memunculkan notifikasi desktop:', error);
+
+            return false;
         }
     }
 
@@ -317,6 +335,9 @@
         }
 
         let hasNewNotification = false;
+        // Chime hanya boleh bunyi bila ada alert yang benar-benar tampil
+        // (toast saat tab aktif, atau desktop notification saat tab hidden).
+        let hasVisibleNotification = false;
 
         unreadContainers.forEach((container) => {
             const wireKey = container.getAttribute('wire:key') || '';
@@ -348,16 +369,17 @@
             const targetUrl = actionLink?.getAttribute('href') || null;
 
             if (!document.hidden) {
-                showToast(title, body, targetUrl);
+                hasVisibleNotification = showToast(title, body, targetUrl) || hasVisibleNotification;
             }
 
-            showDesktopNotification(title, body, notificationId, targetUrl);
+            hasVisibleNotification = showDesktopNotification(title, body, notificationId, targetUrl)
+                || hasVisibleNotification;
         });
 
         saveSeenIds(seenIds);
         isInitialized = true;
 
-        if (hasNewNotification && alertsEnabled()) {
+        if (hasNewNotification && hasVisibleNotification && alertsEnabled()) {
             playNotificationChime();
         }
     }
