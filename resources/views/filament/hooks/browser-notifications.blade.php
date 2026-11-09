@@ -89,9 +89,14 @@
     // 4. Deteksi & proses notifikasi unread yang baru masuk
     function processIncomingNotifications() {
         const unreadContainers = document.querySelectorAll('.fi-no-notification-unread-ctn');
-        if (!unreadContainers || unreadContainers.length === 0) return;
-
         const seenIds = getSeenIds();
+
+        // Fix initial load empty state bug: pastikan isInitialized selalu true meski belum ada unread notifikasi
+        if (!unreadContainers || unreadContainers.length === 0) {
+            isInitialized = true;
+            return;
+        }
+
         let newOrdersFound = false;
 
         unreadContainers.forEach((container) => {
@@ -183,44 +188,37 @@
         setTimeout(processIncomingNotifications, 800);
     });
 
-    // Hook Livewire v3 saat request polling commit selesai
-    document.addEventListener('livewire:init', () => {
-        if (window.Livewire) {
-            window.Livewire.hook('commit', ({ component, succeed }) => {
-                succeed(() => {
-                    if (component.name === 'filament.notifications.database-notifications') {
-                        setTimeout(processIncomingNotifications, 150);
-                    }
-                });
+    // Registrasi Hook Livewire v3 secara eager & event-based
+    function registerLivewireHook() {
+        if (!window.Livewire) return;
+        window.Livewire.hook('commit', ({ component, succeed }) => {
+            succeed(() => {
+                if (component.name === 'database-notifications' || component.name === 'filament.livewire.database-notifications') {
+                    setTimeout(processIncomingNotifications, 150);
+                }
             });
-        }
-    });
+        });
+    }
 
-    // MutationObserver cadangan jika DOM di-update di luar hook Livewire
-    const observer = new MutationObserver((mutations) => {
-        let hasRelevantMutation = false;
-        for (const mutation of mutations) {
-            if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                hasRelevantMutation = true;
-                break;
+    if (window.Livewire) {
+        registerLivewireHook();
+    } else {
+        document.addEventListener('livewire:init', registerLivewireHook);
+    }
+
+    // Fallback polling timer sisi klien setiap 30 detik memanggil $refresh()
+    if (window.__palorinjaniNotifTimer) {
+        clearInterval(window.__palorinjaniNotifTimer);
+    }
+    window.__palorinjaniNotifTimer = setInterval(() => {
+        const btn = document.querySelector('.fi-topbar-database-notifications-btn');
+        const wireEl = btn?.closest('[wire\\:id]') || document.querySelector('.fi-no-database[wire\\:id]');
+        if (wireEl && window.Livewire) {
+            const comp = window.Livewire.find(wireEl.getAttribute('wire:id'));
+            if (comp && typeof comp.$refresh === 'function') {
+                comp.$refresh();
             }
         }
-        if (hasRelevantMutation) {
-            processIncomingNotifications();
-        }
-    });
-
-    const setupObserver = () => {
-        const target = document.getElementById('database-notifications') || document.body;
-        if (target) {
-            observer.observe(target, { childList: true, subtree: true });
-        }
-    };
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', setupObserver);
-    } else {
-        setupObserver();
-    }
+    }, 30000);
 })();
 </script>
