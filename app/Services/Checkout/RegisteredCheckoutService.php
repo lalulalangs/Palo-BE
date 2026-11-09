@@ -4,6 +4,7 @@ namespace App\Services\Checkout;
 
 use App\Contracts\PaymentGatewayContract;
 use App\Enums\OrderStatus;
+use App\Events\Orders\OrderAwaitingConfirmation;
 use App\Exceptions\InsufficientStockException;
 use App\Exceptions\PriceChangedException;
 use App\Exceptions\ShippingProviderException;
@@ -410,7 +411,13 @@ class RegisteredCheckoutService
                 // Clear registered user cart
                 $this->cartService->clearCart($user);
 
-                return $order->fresh(['items', 'payment', 'voucher', 'statusHistories']);
+                $freshOrder = $order->fresh(['items', 'payment', 'voucher', 'statusHistories']);
+
+                if ($isCod) {
+                    OrderAwaitingConfirmation::dispatch($freshOrder);
+                }
+
+                return $freshOrder;
             });
         } catch (Throwable $e) {
             Log::warning('checkout.failed', [

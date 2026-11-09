@@ -32,6 +32,8 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->authGuard('admin')
             ->sidebarCollapsibleOnDesktop()
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->navigationGroups([
                 NavigationGroup::make('Katalog Produk')
                     ->icon(Heroicon::OutlinedSquare2Stack),

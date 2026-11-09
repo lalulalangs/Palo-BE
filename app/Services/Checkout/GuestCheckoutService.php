@@ -2,6 +2,7 @@
 
 namespace App\Services\Checkout;
 
+use App\Events\Orders\OrderAwaitingConfirmation;
 use App\Exceptions\InsufficientStockException;
 use App\Models\AppSetting;
 use App\Models\GuestCheckoutLog;
@@ -292,6 +293,8 @@ class GuestCheckoutService
                     'note' => 'Pesanan WhatsApp tamu dibuat, menunggu pembayaran & konfirmasi CS.',
                     'created_at' => now(),
                 ]);
+
+                OrderAwaitingConfirmation::dispatch($order);
             }
 
             $logAttributes = [
@@ -849,6 +852,8 @@ class GuestCheckoutService
 
             // Clear guest cart
             $this->cartService->clearCart(null, $sessionId);
+
+            OrderAwaitingConfirmation::dispatch($order);
 
             return [
                 'order_number' => $order->order_number,
