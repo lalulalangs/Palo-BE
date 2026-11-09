@@ -8,6 +8,10 @@
     let isInitialized = false;
     let isSpaNavigating = false;
     let audioContext = null;
+    // Chrome hanya mengizinkan AudioContext dibuat/di-resume setelah gesture
+    // pengguna sejak halaman dimuat. Tanpa flag ini, chime memicu warning
+    // "AudioContext was prevented from starting automatically".
+    let hasUserGesture = false;
 
     function alertsEnabled() {
         try {
@@ -59,6 +63,10 @@
     }
 
     async function resumeAudio() {
+        if (!hasUserGesture) {
+            return;
+        }
+
         const context = getAudioContext();
 
         if (!context) {
@@ -75,7 +83,7 @@
     }
 
     async function playNotificationChime() {
-        if (!alertsEnabled()) {
+        if (!alertsEnabled() || !hasUserGesture) {
             return;
         }
 
@@ -184,6 +192,7 @@
     }
 
     async function enableAlerts() {
+        hasUserGesture = true;
         setAlertsEnabled();
         hideBanner();
 
@@ -404,6 +413,8 @@
     });
 
     const resumeOnGesture = () => {
+        hasUserGesture = true;
+
         if (alertsEnabled()) {
             resumeAudio();
         }
@@ -415,7 +426,9 @@
     document.addEventListener('keydown', resumeOnGesture, { capture: true });
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-            resumeOnGesture();
+            // Fokus tab bukan "user activation"; resume hanya berhasil bila
+            // sebelumnya sudah ada gesture (dijaga di resumeAudio()).
+            resumeAudio();
         }
     });
 

@@ -34,5 +34,9 @@ class BrowserNotificationHookTest extends TestCase
         $response->assertSee('waitForLivewire', false);
         $response->assertSee('livewire:init', false);
         $response->assertSee('setInterval(processIncomingNotifications, 15000)', false);
+
+        // Chime tidak boleh membuat AudioContext sebelum ada user gesture
+        // (Chrome menolak dan mencatat warning di console).
+        $response->assertSee('hasUserGesture', false);
     }
 }
