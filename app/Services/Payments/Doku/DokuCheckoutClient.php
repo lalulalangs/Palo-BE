@@ -95,12 +95,15 @@ class DokuCheckoutClient implements PaymentGatewayContract
             throw PaymentGatewayException::invalidAmount();
         }
 
+        $callbackUrl = $this->callbackUrl($order);
+
         $payload = [
             'order' => array_filter([
                 'amount' => $amount,
                 'invoice_number' => $order->order_number,
                 'currency' => 'IDR',
-                'callback_url' => $this->callbackUrl($order),
+                'callback_url' => $callbackUrl,
+                'callback_url_result' => $callbackUrl,
                 'auto_redirect' => true,
                 'line_items' => $this->buildLineItems($order, $amount),
             ], static fn (mixed $value): bool => $value !== null),
