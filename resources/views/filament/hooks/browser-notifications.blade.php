@@ -134,19 +134,18 @@
         document.getElementById(BANNER_ID)?.remove();
     }
 
-    function showBannerIfNeeded() {
-        if (alertsEnabled()) {
-            hideBanner();
+    function renderBanner(messageText, withButton, mode) {
+        const existing = document.getElementById(BANNER_ID);
 
+        if (existing?.dataset.mode === mode) {
             return;
         }
 
-        if (document.getElementById(BANNER_ID)) {
-            return;
-        }
+        existing?.remove();
 
         const banner = document.createElement('div');
         banner.id = BANNER_ID;
+        banner.dataset.mode = mode;
         banner.setAttribute('role', 'region');
         banner.setAttribute('aria-label', 'Aktifkan notifikasi pesanan');
         banner.style.cssText = [
@@ -167,28 +166,48 @@
         ].join(';');
 
         const message = document.createElement('span');
-        message.textContent = 'Aktifkan audio bel & notifikasi pesanan masuk';
+        message.textContent = messageText;
         message.style.cssText = 'font-size:0.8125rem;line-height:1.35;color:#292524;';
         banner.appendChild(message);
 
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.textContent = 'Aktifkan';
-        button.style.cssText = [
-            'flex-shrink:0',
-            'border:0',
-            'border-radius:0.5rem',
-            'background:#1e5e3e',
-            'color:#ffffff',
-            'padding:0.5rem 0.75rem',
-            'font-size:0.8125rem',
-            'font-weight:600',
-            'cursor:pointer',
-        ].join(';');
-        button.addEventListener('click', enableAlerts);
-        banner.appendChild(button);
+        if (withButton) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = 'Aktifkan';
+            button.style.cssText = [
+                'flex-shrink:0',
+                'border:0',
+                'border-radius:0.5rem',
+                'background:#1e5e3e',
+                'color:#ffffff',
+                'padding:0.5rem 0.75rem',
+                'font-size:0.8125rem',
+                'font-weight:600',
+                'cursor:pointer',
+            ].join(';');
+            button.addEventListener('click', enableAlerts);
+            banner.appendChild(button);
+        }
 
         document.body.appendChild(banner);
+    }
+
+    function showBannerIfNeeded() {
+        if (!alertsEnabled()) {
+            renderBanner('Aktifkan audio bel & notifikasi pesanan masuk', true, 'enable');
+
+            return;
+        }
+
+        if (hasUserGesture) {
+            hideBanner();
+
+            return;
+        }
+
+        // Alerts sudah aktif, tetapi Chrome butuh satu interaksi sejak reload
+        // untuk membuka AudioContext. Beri petunjuk agar tidak terkesan rusak.
+        renderBanner('Klik di mana saja untuk mengaktifkan suara notifikasi', false, 'hint');
     }
 
     async function enableAlerts() {
@@ -277,7 +296,10 @@
     }
 
     function isDatabaseNotificationsComponentLoaded() {
-        return document.querySelector('.fi-no-database') !== null;
+        // Root `.fi-no-database` ada di DOM server-render SEBELUM Alpine
+        // men-teleport modal ke <body>. ID modal hanya ada setelah teleport,
+        // jadi dipakai sebagai sinyal bahwa DOM notifikasi benar-benar siap.
+        return document.getElementById('database-notifications') !== null;
     }
 
     function processIncomingNotifications() {
@@ -414,6 +436,7 @@
 
     const resumeOnGesture = () => {
         hasUserGesture = true;
+        hideBanner();
 
         if (alertsEnabled()) {
             resumeAudio();

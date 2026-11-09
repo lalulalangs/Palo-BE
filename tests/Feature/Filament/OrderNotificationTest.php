@@ -148,81 +148,67 @@ class OrderNotificationTest extends TestCase
 
     /**
      * @test
-     * Order Online berstatus pending WAJIB 100% silent (tidak ada event/notifikasi).
+     * markAsPaid harus mengantrekan listener (bukan menjalankannya synchronous)
+     * pada queue default koneksi.
      */
-    public function test_online_order_pending_is_strictly_silent(): void
+    public function test_mark_as_paid_queues_listener_on_default_queue(): void
     {
-        Event::fake([OrderPaid::class, OrderAwaitingConfirmation::class]);
-
-        $this->assertSame(OrderStatus::Pending, $this->sampleOrder->status);
-
-        Event::assertNotDispatched(OrderPaid::class);
-        Event::assertNotDispatched(OrderAwaitingConfirmation::class);
-        $this->assertDatabaseEmpty('notifications');
-    }
-
-    /**
-     * @test
-     * OrderPaid ter-dispatch saat markAsPaid dijalankan dan memicu listener terdaftar.
-     */
-    public function test_order_paid_event_triggers_queued_listener(): void
-    {
-        Event::fake([OrderPaid::class]);
+        Queue::fake();
 
         $transitionService = app(OrderTransitionService::class);
         $transitionService->markAsPaid($this->sampleOrder, null, 'DOKU settlement test');
 
         $this->assertSame(OrderStatus::Paid, $this->sampleOrder->fresh()->status);
 
-        Event::assertDispatched(OrderPaid::class, function ($event) {
-            return $event->order->id === $this->sampleOrder->id;
-        });
-    }
-
-    /**
-     * @test
-     * OrderAwaitingConfirmation ter-dispatch saat order COD dibuat.
-     */
-    public function test_order_awaiting_confirmation_event_dispatched(): void
-    {
-        Event::fake([OrderAwaitingConfirmation::class]);
-
-        $codOrder = Order::create([
-            'order_number' => 'PRJ-COD-20261109-00002',
-            'user_id' => null,
-            'status' => OrderStatus::AwaitingConfirmation,
-            'payment_method' => Order::PAYMENT_METHOD_COD,
-            'subtotal' => 200000,
-            'shipping_cost' => 20000,
-            'total' => 220000,
-            'shipping_recipient_name' => 'Budi Santoso',
-            'shipping_phone' => '087712345678',
-            'shipping_full_address' => 'Mataram, NTB',
-            'shipping_courier' => 'JNE',
-            'shipping_service' => 'REG',
-        ]);
-
-        OrderAwaitingConfirmation::dispatch($codOrder);
-
-        Event::assertDispatched(OrderAwaitingConfirmation::class, function ($event) use ($codOrder) {
-            return $event->order->id === $codOrder->id;
-        });
-    }
-
-    /**
-     * @test
-     * Event OrderPaid harus mengantrekan listener, bukan menjalankannya secara synchronous.
-     */
-    public function test_listener_is_queued_when_order_paid_event_is_dispatched(): void
-    {
-        Queue::fake();
-
-        OrderPaid::dispatch($this->sampleOrder);
-
         Queue::assertPushed(
             CallQueuedListener::class,
-            fn (CallQueuedListener $job, ?string $queue): bool => $job->class === SendNewOrderAdminNotification::class && $queue === null,
+            fn (CallQueuedListener $job, ?string $queue): bool => $job->class === SendNewOrderAdminNotification::class
+                && $queue === null
+                && $job->afterCommit === true,
         );
+    }
+
+    /**
+     * @test
+     * Event konfirmasi yang telat diproses setelah order lunas tidak boleh
+     * mengirim notifikasi "(Menunggu Konfirmasi)" yang menyesatkan.
+     */
+    public function test_stale_awaiting_event_for_paid_order_is_ignored(): void
+    {
+        $this->sampleOrder->update(['status' => OrderStatus::Paid]);
+
+        app(SendNewOrderAdminNotification::class)
+            ->handle(new OrderAwaitingConfirmation($this->sampleOrder));
+
+        $this->assertDatabaseEmpty('notifications');
+    }
+
+    /**
+     * @test
+     * Order yang sudah expired/cancelled tidak boleh dinotifikasi walau event
+     * paid telat masuk.
+     */
+    public function test_paid_event_for_expired_order_is_ignored(): void
+    {
+        $this->sampleOrder->update(['status' => OrderStatus::Expired]);
+
+        app(SendNewOrderAdminNotification::class)->handle(new OrderPaid($this->sampleOrder));
+
+        $this->assertDatabaseEmpty('notifications');
+    }
+
+    /**
+     * @test
+     * Kebijakan retry harus dideklarasikan agar satu kegagalan transien tidak
+     * menghilangkan notifikasi permanen.
+     */
+    public function test_listener_declares_retry_policy(): void
+    {
+        $listener = app(SendNewOrderAdminNotification::class);
+
+        $this->assertSame(3, $listener->tries);
+        $this->assertSame([5, 30, 60], $listener->backoff);
+        $this->assertTrue($listener->afterCommit);
     }
 
     /**

@@ -3,7 +3,12 @@
 namespace Tests\Feature\Filament;
 
 use App\Models\AdminUser;
+use Filament\Facades\Filament;
+use Filament\Notifications\Livewire\DatabaseNotifications;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class BrowserNotificationHookTest extends TestCase
@@ -38,5 +43,41 @@ class BrowserNotificationHookTest extends TestCase
         // Chime tidak boleh membuat AudioContext sebelum ada user gesture
         // (Chrome menolak dan mencatat warning di console).
         $response->assertSee('hasUserGesture', false);
+    }
+
+    /**
+     * @test
+     * Selector JS hook harus benar-benar ada pada markup notification Filament
+     * yang terpasang, bukan hanya ada sebagai string di blade.
+     */
+    public function test_unread_notification_markup_matches_hook_selectors(): void
+    {
+        $admin = AdminUser::factory()->superAdmin()->create([
+            'is_active' => true,
+        ]);
+
+        DB::table('notifications')->insert([
+            'id' => (string) Str::uuid(),
+            'type' => 'Filament\Notifications\DatabaseNotification',
+            'notifiable_type' => AdminUser::class,
+            'notifiable_id' => $admin->id,
+            'data' => json_encode([
+                'format' => 'filament',
+                'title' => 'Pesanan Baru COD (Menunggu Konfirmasi)',
+                'body' => 'Uji selector',
+                'status' => 'warning',
+                'actions' => [],
+            ]),
+            'read_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::actingAs($admin, 'admin')
+            ->test(DatabaseNotifications::class)
+            ->assertSeeHtml('fi-no-notification-unread-ctn')
+            ->assertSeeHtml('.database-notifications.ctn');
     }
 }

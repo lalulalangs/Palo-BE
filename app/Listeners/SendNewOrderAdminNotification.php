@@ -11,6 +11,7 @@ use App\Models\Order;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
@@ -30,6 +31,17 @@ class SendNewOrderAdminNotification implements ShouldQueue
      * Mencegah "ghost notification" jika terjadi rollback.
      */
     public bool $afterCommit = true;
+
+    /**
+     * Retry untuk kegagalan transien (lock timeout, deadlock, DB blip).
+     * Tanpa ini, satu exception membuat notifikasi hilang permanen.
+     */
+    public int $tries = 3;
+
+    /**
+     * @var array<int, int>
+     */
+    public array $backoff = [5, 30, 60];
 
     /**
      * Sengaja tidak mendeklarasikan $queue. Job mengikuti queue default
@@ -52,18 +64,34 @@ class SendNewOrderAdminNotification implements ShouldQueue
             ? $order->status->value
             : (string) $order->status;
 
-        $isPaidEvent = $event instanceof OrderPaid
-            || $statusValue === OrderStatus::Paid->value;
-
-        $isAwaitingEvent = $event instanceof OrderAwaitingConfirmation
-            || $statusValue === OrderStatus::AwaitingConfirmation->value;
+        // Event adalah sumber kebenaran. Status DB hanya dipakai untuk menahan
+        // notifikasi basi (event telat diproses setelah order berubah status).
+        $isPaidEvent = $event instanceof OrderPaid;
+        $isAwaitingEvent = $event instanceof OrderAwaitingConfirmation;
 
         if (! $isPaidEvent && ! $isAwaitingEvent) {
             return;
         }
 
-        // Silent guard: pesanan online yang belum lunas tidak pernah menotifikasi admin.
-        if (! $isPaidEvent && $statusValue === OrderStatus::Pending->value) {
+        // Jangan kabari pesanan yang sudah mati.
+        if (in_array($statusValue, [OrderStatus::Cancelled->value, OrderStatus::Expired->value], true)) {
+            return;
+        }
+
+        // Event konfirmasi yang telat datang setelah order sudah dibayar/diproses
+        // tidak relevan lagi; label "(Menunggu Konfirmasi)" akan menyesatkan.
+        if ($isAwaitingEvent && in_array($statusValue, [
+            OrderStatus::Paid->value,
+            OrderStatus::Processing->value,
+            OrderStatus::Shipped->value,
+            OrderStatus::Completed->value,
+        ], true)) {
+            return;
+        }
+
+        // Silent guard: event konfirmasi untuk pesanan online yang masih pending
+        // tidak pernah menotifikasi admin.
+        if ($isAwaitingEvent && $statusValue === OrderStatus::Pending->value) {
             return;
         }
 
@@ -101,11 +129,22 @@ class SendNewOrderAdminNotification implements ShouldQueue
 
                     $this->sendNotification($order, $pendingRecipients, $isPaidEvent, $eventClass);
                 });
-        } catch (Throwable $e) {
-            Log::warning('admin_order_notification.failed', [
+        } catch (LockTimeoutException $e) {
+            // LockTimeoutException sering tidak punya message; tanpa kelas
+            // exception, log sulit didiagnosis.
+            Log::error('admin_order_notification.lock_timeout', [
                 'order_number' => $order->order_number,
                 'event' => $eventClass,
-                'error' => $e->getMessage(),
+                'exception' => $e::class,
+            ]);
+
+            throw $e;
+        } catch (Throwable $e) {
+            Log::error('admin_order_notification.failed', [
+                'order_number' => $order->order_number,
+                'event' => $eventClass,
+                'exception' => $e::class,
+                'error' => $e->getMessage() !== '' ? $e->getMessage() : '(empty message)',
             ]);
 
             throw $e;

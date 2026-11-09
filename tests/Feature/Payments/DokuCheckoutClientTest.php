@@ -148,6 +148,29 @@ class DokuCheckoutClientTest extends TestCase
         });
     }
 
+    public function test_callback_url_points_to_frontend_order_page_not_webhook(): void
+    {
+        $this->fakeCheckoutSuccess();
+
+        config(['app.frontend_url' => 'https://staging.palorinjani.com/']);
+
+        $order = $this->makeOrder();
+
+        app(DokuCheckoutClient::class)->createPayment($order, 'online');
+
+        Http::assertSent(function (ClientRequest $request) use ($order): bool {
+            $payload = json_decode($request->body(), true);
+
+            $this->assertSame(
+                'https://staging.palorinjani.com/orders/'.$order->order_number,
+                $payload['order']['callback_url'],
+            );
+            $this->assertStringNotContainsString('/payments/webhook/doku', (string) $payload['order']['callback_url']);
+
+            return true;
+        });
+    }
+
     public function test_sends_integer_amount_matching_line_items(): void
     {
         $this->fakeCheckoutSuccess();
@@ -345,6 +368,7 @@ class DokuCheckoutClientTest extends TestCase
         Http::assertSent(function (ClientRequest $request) {
             $lineItems = $request->data()['order']['line_items'] ?? [];
             $itemName = $lineItems[0]['name'] ?? '';
+
             // Must have converted em-dash to hyphen
             return str_contains($itemName, 'PALO T-SHIRT - ROUTE SAGE GREEN BASIC - Green Basic / Size S')
                 && ! str_contains($itemName, '—');

@@ -162,6 +162,30 @@ Akses aplikasi melalui browser:
 * **Halaman Admin Filament:** `http://127.0.0.1:8000/admin`
 * **Public REST API:** `http://127.0.0.1:8000/api/v1/products`
 
+### 6. Queue Worker (wajib untuk notifikasi admin)
+
+Notifikasi pesanan admin dikirim sebagai job `ShouldQueue` ke queue **default**.
+Tanpa worker, pesanan tetap masuk tetapi notifikasi tidak pernah muncul — tanpa
+error yang terlihat.
+
+```bash
+# dev: satu perintah untuk semua proses (serve + queue:listen + vite + pail)
+composer dev
+
+# atau terpisah
+php artisan serve
+php artisan queue:work --queue=default --tries=3 --timeout=60
+```
+
+Produksi/staging memakai supervisor (`queue:work --queue=default --tries=3
+--timeout=60 --max-time=3600`). `--timeout` harus lebih kecil dari
+`DB_QUEUE_RETRY_AFTER` (default 90 detik). Setelah setiap deploy jalankan
+`php artisan queue:restart` agar worker memuat kode terbaru.
+
+Sisa job dari queue lama `notifications` boleh dibersihkan (destruktif):
+`php artisan queue:clear --queue=notifications --force`. Detail lengkap ada di
+`docs/RUNBOOK-DEPLOYMENT.md` (lokal, tidak di-commit).
+
 ---
 
 ## Kredensial Default Admin
