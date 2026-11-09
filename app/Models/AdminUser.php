@@ -6,10 +6,12 @@ use App\Enums\AdminFeature;
 use Database\Factories\AdminUserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
 class AdminUser extends Authenticatable implements FilamentUser
@@ -18,6 +20,7 @@ class AdminUser extends Authenticatable implements FilamentUser
     use HasApiTokens;
 
     use HasFactory;
+    use Notifiable;
 
     /**
      * Gating fitur (`hasFeatureAccess`) membaca role untuk setiap resource saat
@@ -80,6 +83,19 @@ class AdminUser extends Authenticatable implements FilamentUser
         $directPermissions = $this->permissions ?? [];
 
         return in_array($feature->value, array_merge($rolePermissions, $directPermissions), true);
+    }
+
+    /**
+     * Dapatkan koleksi AdminUser aktif yang berhak menerima notifikasi operasional pesanan.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, AdminUser>
+     */
+    public static function getOrderNotificationRecipients(): Collection
+    {
+        return static::query()
+            ->where('is_active', true)
+            ->get()
+            ->filter(fn (AdminUser $admin) => $admin->isSuperAdmin() || $admin->hasFeatureAccess(AdminFeature::Orders));
     }
 
     public function role(): BelongsTo

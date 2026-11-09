@@ -4,6 +4,9 @@ namespace App\Providers;
 
 use App\Contracts\PaymentGatewayContract;
 use App\Enums\AdminFeature;
+use App\Events\Orders\OrderAwaitingConfirmation;
+use App\Events\Orders\OrderPaid;
+use App\Listeners\SendNewOrderAdminNotification;
 use App\Models\AdminUser;
 use App\Models\Order;
 use App\Models\Sku;
@@ -14,6 +17,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -55,6 +59,10 @@ class AppServiceProvider extends ServiceProvider
         // Audit trail aksi admin (harga/stok SKU dan status/resi pesanan).
         Sku::observe(SkuAuditObserver::class);
         Order::observe(OrderAuditObserver::class);
+
+        // Notifikasi In-App Pesanan Masuk untuk Dashboard Filament
+        Event::listen(OrderPaid::class, SendNewOrderAdminNotification::class);
+        Event::listen(OrderAwaitingConfirmation::class, SendNewOrderAdminNotification::class);
 
         DatePicker::configureUsing(function (DatePicker $picker): void {
             $picker->displayFormat('d/m/Y')

@@ -3,6 +3,7 @@
 namespace App\Services\Orders;
 
 use App\Enums\OrderStatus;
+use App\Events\Orders\OrderPaid;
 use App\Exceptions\StockLockExpiredException;
 use App\Models\Order;
 use App\Models\OrderStatusHistory;
@@ -86,7 +87,11 @@ class OrderTransitionService
                     ]);
                 }
 
-                return $lockedOrder->fresh(['items', 'statusHistories', 'payment']);
+                $freshOrder = $lockedOrder->fresh(['items', 'statusHistories', 'payment']);
+
+                OrderPaid::dispatch($freshOrder, $freshOrder->payment);
+
+                return $freshOrder;
             });
         } catch (Throwable $e) {
             Log::warning('order.transition.failed', [
