@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Products\Schemas;
 
 use App\Filament\Components\ImageFileUpload;
+use App\Models\Collection;
 use App\Models\Product;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -27,15 +28,18 @@ class ProductForm
                     ->schema([
                         Select::make('category_id')
                             ->label('Kategori')
-                            ->relationship('category', 'name')
-                            // Tanpa preload(): opsi dicari ke database saat
-                            // diketik, bukan memuat semua kategori ke payload.
-                            ->searchable(),
+                            ->relationship('category', 'name'),
                         Select::make('collections')
                             ->label('Koleksi / Series (Opsional)')
                             ->relationship('collections', 'name')
+                            ->options(fn (): array => Collection::query()
+                                ->orderBy('sort_order')
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->all())
                             ->multiple()
                             ->searchable()
+                            ->preload()
                             ->helperText('Pilih satu atau lebih koleksi yang menaungi produk ini.'),
                         TextInput::make('name')
                             ->label('Nama Produk')
