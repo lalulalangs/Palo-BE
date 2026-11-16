@@ -146,4 +146,33 @@ class VariantMatrixTest extends TestCase
         $this->assertSame(3, ProductVariant::where('product_id', $this->product->id)->count());
         $this->assertSame(3, Sku::count());
     }
+
+    public function test_opsi_all_size_tidak_tersedia_dan_ditolak(): void
+    {
+        $this->assertSame(['S', 'M', 'L', 'XL', 'XXL'], CreateVariantMatrix::SIZES);
+        $this->assertNotContains('All Size', CreateVariantMatrix::SIZES);
+
+        $this->expectException(ValidationException::class);
+
+        app(CreateVariantMatrix::class)->execute($this->product, [
+            ['color' => 'Hitam', 'sizes' => ['All Size'], 'stock' => 5, 'price_override' => null, 'is_active' => true],
+        ]);
+    }
+
+    public function test_semua_ukuran_standar_berfungsi_normal(): void
+    {
+        $created = app(CreateVariantMatrix::class)->execute($this->product, [
+            [
+                'color' => 'Navy',
+                'sizes' => ['S', 'M', 'L', 'XL', 'XXL'],
+                'stock' => 3,
+                'price_override' => null,
+                'is_active' => true,
+            ],
+        ]);
+
+        $this->assertCount(5, $created);
+        $this->assertSame(5, ProductVariant::where('product_id', $this->product->id)->count());
+        $this->assertSame(5, Sku::count());
+    }
 }

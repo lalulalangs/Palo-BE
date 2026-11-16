@@ -18,7 +18,7 @@ use Illuminate\Validation\ValidationException;
  */
 class CreateVariantMatrix
 {
-    public const SIZES = ['S', 'M', 'L', 'XL', 'XXL', 'All Size'];
+    public const SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 
     /**
      * @param  array<int, array{color?: string, sizes?: array<int, string>, stock?: int, price_override?: float|null, is_active?: bool}>  $groups
