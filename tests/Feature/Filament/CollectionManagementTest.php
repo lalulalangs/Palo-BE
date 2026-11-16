@@ -64,7 +64,11 @@ class CollectionManagementTest extends TestCase
             ->assertFormFieldExists('slug')
             ->assertFormFieldExists('tagline')
             ->assertFormFieldExists('badge_label')
-            ->assertFormFieldExists('is_active');
+            ->assertFormFieldExists('is_active')
+            ->assertFormFieldDoesNotExist('seo_meta.meta_title')
+            ->assertFormFieldDoesNotExist('seo_meta.meta_description')
+            ->assertDontSee('Optimasi Mesin Pencari (SEO)')
+            ->assertDontSee('Gambar otomatis dikompres dan dikonversi ke WebP.');
     }
 
     public function test_can_create_collection(): void
@@ -104,7 +108,20 @@ class CollectionManagementTest extends TestCase
                 'record' => $collection->getRouteKey(),
             ])
             ->assertSuccessful()
-            ->assertSchemaComponentExists('name');
+            ->assertSchemaComponentExists('name')
+            ->assertFormFieldDoesNotExist('seo_meta.meta_title')
+            ->assertFormFieldDoesNotExist('seo_meta.meta_description')
+            ->assertDontSee('Gambar otomatis dikompres dan dikonversi ke WebP.')
+            ->fillForm([
+                'name' => 'DECADE Collection Updated',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('collections', [
+            'id' => $collection->id,
+            'name' => 'DECADE Collection Updated',
+        ]);
     }
 
     public function test_can_manage_products_in_collection_via_relation_manager(): void

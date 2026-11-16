@@ -80,12 +80,12 @@ class CollectionForm
                             ->label('Banner Desktop')
                             ->disk('public')
                             ->directory('collections')
-                            ->helperText('Disarankan rasio lebar (16:9 / 21:9) resolusi tinggi, maksimal 5MB. Gambar otomatis dikompres dan dikonversi ke WebP.'),
+                            ->helperText('Disarankan rasio lebar (16:9 / 21:9) resolusi tinggi, maksimal 5MB.'),
                         ImageFileUpload::make('banner_mobile')
                             ->label('Banner Mobile (Opsional)')
                             ->disk('public')
                             ->directory('collections')
-                            ->helperText('Banner vertikal optimal untuk tampilan layar handphone, maksimal 5MB. Gambar otomatis dikompres dan dikonversi ke WebP.'),
+                            ->helperText('Banner vertikal optimal untuk tampilan layar handphone, maksimal 5MB.'),
                     ])
                     ->columns(2),
 
@@ -124,23 +124,6 @@ class CollectionForm
                             ->helperText('Angka lebih kecil tampil lebih awal pada daftar koleksi.'),
                     ])
                     ->columns(2),
-
-                Section::make('Optimasi Mesin Pencari (SEO)')
-                    ->description('Metadata untuk pencarian Google dan pratinjau media sosial (Open Graph).')
-                    ->collapsed()
-                    ->schema([
-                        TextInput::make('seo_meta.meta_title')
-                            ->label('Meta Title')
-                            ->placeholder('Judul di hasil pencarian Google')
-                            ->maxLength(70),
-                        Textarea::make('seo_meta.meta_description')
-                            ->label('Meta Description')
-                            ->placeholder('Ringkasan deskripsi yang menarik untuk Google...')
-                            ->rows(2)
-                            ->maxLength(160)
-                            ->columnSpanFull(),
-                    ])
-                    ->columns(1),
             ]);
     }
 }
