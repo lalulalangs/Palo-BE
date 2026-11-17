@@ -27,12 +27,15 @@ class HeroSliderForm
                             ->placeholder('SENARU / 600 MDPL')
                             ->maxLength(255),
                         TextInput::make('badge')
+                            ->label('Badge / Label')
                             ->placeholder('KOLEKSI BUSANA & CENDERAMATA')
                             ->maxLength(255),
                         TextInput::make('title')
+                            ->label('Judul')
                             ->required()
                             ->maxLength(255),
                         Textarea::make('description')
+                            ->label('Deskripsi')
                             ->rows(4)
                             ->columnSpanFull(),
                         TextInput::make('image_alt')
@@ -60,17 +63,21 @@ class HeroSliderForm
                 Section::make('Tombol Aksi & Tampilan')
                     ->schema([
                         TextInput::make('primary_btn_label')
+                            ->label('Teks Tombol Utama')
                             ->default('LIHAT KATALOG')
                             ->maxLength(50),
                         TextInput::make('primary_btn_url')
+                            ->label('URL Tombol Utama')
                             ->required()
                             ->placeholder('/katalog/rinjani-series')
                             ->maxLength(255)
                             ->rules([new SafeLinkUrl]),
                         TextInput::make('secondary_btn_label')
+                            ->label('Teks Tombol Sekunder')
                             ->default('CERITA SENARU')
                             ->maxLength(50),
                         TextInput::make('secondary_btn_url')
+                            ->label('URL Tombol Sekunder')
                             ->placeholder('/cerita/senaru')
                             ->maxLength(255)
                             ->rules([new SafeLinkUrl]),

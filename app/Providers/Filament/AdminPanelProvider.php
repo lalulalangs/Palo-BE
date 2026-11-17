@@ -71,7 +71,7 @@ class AdminPanelProvider extends PanelProvider
                     950 => '#040f09',
                 ],
                 'gray' => Color::Stone,
-                'warning' => Color::hex('#d96b27'),
+                'warning' => Color::hex('#b45309'),
                 'danger' => Color::hex('#c43232'),
                 'success' => Color::hex('#227c4b'),
                 'info' => Color::hex('#2a6f97'),

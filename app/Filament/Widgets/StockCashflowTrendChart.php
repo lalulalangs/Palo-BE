@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use App\Services\Inventory\InventoryCashflowService;
 use Carbon\Carbon;
 use Filament\Facades\Filament;
+use Filament\Support\RawJs;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 
@@ -14,7 +15,7 @@ class StockCashflowTrendChart extends ChartWidget
 
     protected static ?int $sort = 2;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected ?string $pollingInterval = null;
 
@@ -52,12 +53,20 @@ class StockCashflowTrendChart extends ChartWidget
                         'boxWidth' => 8,
                     ],
                 ],
+                'tooltip' => [
+                    'callbacks' => [
+                        'label' => RawJs::make("function(context) { return context.dataset.label + ': Rp ' + Number(context.parsed.y || 0).toLocaleString('id-ID'); }"),
+                    ],
+                ],
             ],
             'scales' => [
                 'y' => [
                     'beginAtZero' => true,
                     'grid' => [
                         'color' => 'rgba(156, 163, 175, 0.15)',
+                    ],
+                    'ticks' => [
+                        'callback' => RawJs::make("function(value) { return 'Rp ' + Number(value).toLocaleString('id-ID'); }"),
                     ],
                 ],
                 'x' => [
@@ -104,8 +113,8 @@ class StockCashflowTrendChart extends ChartWidget
                 [
                     'label' => 'Penerimaan Kas Bersih',
                     'data' => $trend['net_cash_series'],
-                    'borderColor' => '#16a34a',
-                    'backgroundColor' => 'rgba(22, 163, 74, 0.15)',
+                    'borderColor' => '#227c4b',
+                    'backgroundColor' => 'rgba(34, 124, 75, 0.15)',
                     'fill' => true,
                     'tension' => 0.3,
                 ],

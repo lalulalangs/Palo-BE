@@ -30,14 +30,14 @@ enum OrderStatus: string
     public function color(): string
     {
         return match ($this) {
-            self::Pending => 'warning',
+            self::Pending => 'gray',
             self::AwaitingConfirmation => 'warning',
             self::Paid => 'info',
             self::Processing => 'primary',
-            self::Shipped => 'info',
+            self::Shipped => 'primary',
             self::Completed => 'success',
             self::Cancelled => 'danger',
-            self::Expired => 'gray',
+            self::Expired => 'danger',
         };
     }
 

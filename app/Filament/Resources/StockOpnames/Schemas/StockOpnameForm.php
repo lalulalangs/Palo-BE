@@ -138,7 +138,7 @@ class StockOpnameForm
                                     ->placeholder('Misal: Reject di rak B / Hilang 1')
                                     ->columnSpanFull(),
                             ])
-                            ->columns(5)
+                            ->columns(['default' => 1, 'sm' => 2, 'lg' => 5])
                             ->columnSpanFull(),
                     ]),
             ]);

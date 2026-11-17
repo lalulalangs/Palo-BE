@@ -28,6 +28,7 @@ class RoleForm
                     ->description('Klik tombol fitur untuk memberikan atau mencabut hak akses role ini.')
                     ->schema([
                         ToggleButtons::make('permissions')
+                            ->label('Hak Akses Fitur')
                             ->hiddenLabel()
                             ->multiple()
                             ->options(AdminFeature::options())

@@ -43,6 +43,7 @@ class CategoryForm
                     ->dehydrateStateUsing(fn (?string $state): ?string => $state ? Str::slug($state) : null)
                     ->suffixAction(
                         Action::make('regenerateSlug')
+                            ->label('Generate ulang slug')
                             ->icon('heroicon-m-arrow-path')
                             ->tooltip('Generate ulang slug dari nama')
                             ->action(function (Set $set, Get $get): void {

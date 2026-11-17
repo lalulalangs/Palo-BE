@@ -25,6 +25,10 @@ class StockMovementResource extends Resource
 
     protected static ?string $navigationLabel = 'Riwayat Mutasi Stok';
 
+    protected static ?string $modelLabel = 'Mutasi Stok';
+
+    protected static ?string $pluralModelLabel = 'Daftar Mutasi Stok';
+
     protected static ?int $navigationSort = 1;
 
     public static function getAdminFeature(): AdminFeature

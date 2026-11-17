@@ -10,6 +10,8 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 
@@ -32,7 +34,8 @@ class ProductsTable
                     ->searchable(),
                 TextColumn::make('slug')
                     ->label('Slug')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('base_price')
                     ->label('Harga Dasar')
                     ->money('IDR', locale: 'id')
@@ -43,28 +46,39 @@ class ProductsTable
                     ->trueIcon('heroicon-m-star')
                     ->falseIcon('heroicon-m-minus')
                     ->trueColor('warning')
-                    ->falseColor('gray'),
+                    ->falseColor('gray')
+                    ->tooltip(fn (bool $state): string => $state ? 'Produk Unggulan' : 'Bukan Produk Unggulan'),
                 IconColumn::make('is_active')
                     ->label('Status Toko')
                     ->boolean()
                     ->trueIcon('heroicon-m-eye')
                     ->falseIcon('heroicon-m-eye-slash')
                     ->trueColor('success')
-                    ->falseColor('danger'),
+                    ->falseColor('danger')
+                    ->tooltip(fn (bool $state): string => $state ? 'Aktif di Toko' : 'Disembunyikan / Draf'),
                 TextColumn::make('deleted_at')
-                    ->dateTime()
+                    ->label('Dihapus')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Dibuat')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Diperbarui')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('updated_at', 'desc')
             ->filters([
+                SelectFilter::make('category_id')
+                    ->label('Kategori')
+                    ->relationship('category', 'name'),
+                TernaryFilter::make('is_active')
+                    ->label('Status Toko'),
                 TrashedFilter::make(),
             ])
             ->recordActions([

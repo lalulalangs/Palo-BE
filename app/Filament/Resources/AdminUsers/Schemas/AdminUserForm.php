@@ -78,6 +78,7 @@ class AdminUserForm
                     ->description('Opsional. Fitur di sini bersifat tambahan di luar hak akses role yang dipilih.')
                     ->schema([
                         ToggleButtons::make('permissions')
+                            ->label('Hak Akses Fitur')
                             ->hiddenLabel()
                             ->multiple()
                             ->options(AdminFeature::options())

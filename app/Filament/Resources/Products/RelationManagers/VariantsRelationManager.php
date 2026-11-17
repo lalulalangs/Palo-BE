@@ -145,7 +145,8 @@ class VariantsRelationManager extends RelationManager
                     ->placeholder(fn ($record) => $record->product ? Number::currency($record->product->base_price, 'IDR', 'id') : '-'),
                 IconColumn::make('sku.is_active')
                     ->label('Aktif')
-                    ->boolean(),
+                    ->boolean()
+                    ->tooltip(fn (?bool $state): string => $state ? 'SKU Aktif' : 'SKU Nonaktif'),
             ])
             ->filters([
                 //

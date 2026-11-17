@@ -34,7 +34,8 @@ class StockOpnamesTable
                 TextColumn::make('auditor.name')
                     ->label('Petugas Pemeriksa')
                     ->placeholder('-')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('items_count')
                     ->counts('items')
                     ->label('Total SKU')
@@ -57,7 +58,8 @@ class StockOpnamesTable
                     ->label('Waktu Selesai')
                     ->dateTime('d/m/Y H:i')
                     ->placeholder('-')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
             ->recordActions([

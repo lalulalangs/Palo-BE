@@ -26,7 +26,12 @@ class OrderInfolist
                 Section::make('Ringkasan Transaksi')
                     ->columnSpanFull()
                     ->schema([
-                        Grid::make(5)
+                        Grid::make([
+                            'default' => 1,
+                            'sm' => 2,
+                            'lg' => 3,
+                            'xl' => 6,
+                        ])
                             ->schema([
                                 TextEntry::make('order_number')
                                     ->label('Nomor Pesanan')
@@ -39,6 +44,16 @@ class OrderInfolist
                                     ->badge()
                                     ->formatStateUsing(fn (OrderStatus|string $state): string => OrderStatus::labelFor($state))
                                     ->color(fn (OrderStatus|string $state): string => OrderStatus::colorFor($state)),
+
+                                TextEntry::make('total')
+                                    ->label('Grand Total')
+                                    ->money('IDR', locale: 'id')
+                                    ->weight('bold')
+                                    ->color('primary'),
+
+                                TextEntry::make('shipping_recipient_name')
+                                    ->label('Penerima')
+                                    ->formatStateUsing(fn (Order $record): string => trim(($record->shipping_recipient_name ?? '-').($record->shipping_phone ? " ({$record->shipping_phone})" : ''))),
 
                                 TextEntry::make('payment_method')
                                     ->label('Metode Bayar')
@@ -56,7 +71,7 @@ class OrderInfolist
 
                                 TextEntry::make('created_at')
                                     ->label('Waktu Checkout')
-                                    ->dateTime('d/m/Y H:i:s'),
+                                    ->dateTime('d/m/Y H:i'),
 
                                 TextEntry::make('user.name')
                                     ->label('Akun Pembeli')
@@ -118,7 +133,8 @@ class OrderInfolist
                                     ->description('Data snapshot produk saat transaksi terjadi — tidak terpengaruh jika katalog produk berubah.')
                                     ->schema([
                                         RepeatableEntry::make('items')
-                                            ->label('')
+                                            ->label('Daftar Item Pesanan')
+                                            ->hiddenLabel()
                                             ->schema([
                                                 ImageEntry::make('thumbnail_url')
                                                     ->label('Foto')
@@ -153,7 +169,12 @@ class OrderInfolist
                                                     ->money('IDR', locale: 'id')
                                                     ->weight('bold'),
                                             ])
-                                            ->columns(7),
+                                            ->columns([
+                                                'default' => 1,
+                                                'sm' => 2,
+                                                'md' => 4,
+                                                'xl' => 7,
+                                            ]),
                                     ]),
                             ]),
 
@@ -197,6 +218,22 @@ class OrderInfolist
                                                 TextEntry::make('payment.status')
                                                     ->label('Status Transaksi Gateway')
                                                     ->badge()
+                                                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                                                        'pending' => 'Menunggu Pembayaran',
+                                                        'settlement', 'capture', 'paid', 'success' => 'Berhasil / Lunas',
+                                                        'deny', 'failed' => 'Ditolak / Gagal',
+                                                        'cancel' => 'Dibatalkan',
+                                                        'expire' => 'Kedaluwarsa',
+                                                        'refund' => 'Dikembalikan (Refund)',
+                                                        default => $state ? ucfirst($state) : 'Belum ada transaksi',
+                                                    })
+                                                    ->color(fn (?string $state): string => match ($state) {
+                                                        'pending' => 'warning',
+                                                        'settlement', 'capture', 'paid', 'success' => 'success',
+                                                        'deny', 'failed', 'cancel', 'expire' => 'danger',
+                                                        'refund' => 'info',
+                                                        default => 'gray',
+                                                    })
                                                     ->placeholder('Belum ada transaksi'),
 
                                                 TextEntry::make('payment.gateway_transaction_id')
@@ -221,7 +258,7 @@ class OrderInfolist
 
                                                 TextEntry::make('payment.paid_at')
                                                     ->label('Waktu Pelunasan')
-                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->dateTime('d/m/Y H:i')
                                                     ->placeholder('-'),
                                             ]),
 
@@ -237,7 +274,7 @@ class OrderInfolist
 
                                                 TextEntry::make('confirmed_at')
                                                     ->label('Waktu Dikonfirmasi CS')
-                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->dateTime('d/m/Y H:i')
                                                     ->placeholder('Menunggu konfirmasi CS'),
 
                                                 TextEntry::make('confirmedBy.name')
@@ -257,7 +294,7 @@ class OrderInfolist
 
                                                 TextEntry::make('confirmed_at')
                                                     ->label('Waktu Dikonfirmasi CS')
-                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->dateTime('d/m/Y H:i')
                                                     ->placeholder('Menunggu konfirmasi CS'),
 
                                                 TextEntry::make('confirmedBy.name')
@@ -285,11 +322,11 @@ class OrderInfolist
 
                                                 TextEntry::make('refund_requested_at')
                                                     ->label('Waktu Pengajuan')
-                                                    ->dateTime('d/m/Y H:i:s'),
+                                                    ->dateTime('d/m/Y H:i'),
 
                                                 TextEntry::make('refund_approved_at')
                                                     ->label('Waktu Disetujui')
-                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->dateTime('d/m/Y H:i')
                                                     ->placeholder('-'),
 
                                                 TextEntry::make('refundApprovedBy.name')
@@ -308,7 +345,7 @@ class OrderInfolist
 
                                                 TextEntry::make('refunded_at')
                                                     ->label('Waktu Selesai Refund')
-                                                    ->dateTime('d/m/Y H:i:s')
+                                                    ->dateTime('d/m/Y H:i')
                                                     ->placeholder('-'),
                                             ]),
                                     ]),
@@ -321,7 +358,8 @@ class OrderInfolist
                                     ->description('Seluruh pergantian status tercatat permanen beserta identitas petugas atau sistem.')
                                     ->schema([
                                         RepeatableEntry::make('statusHistories')
-                                            ->label('')
+                                            ->label('Riwayat Perubahan Status')
+                                            ->hiddenLabel()
                                             ->schema([
                                                 TextEntry::make('created_at')
                                                     ->label('Waktu Transisi')
@@ -330,7 +368,8 @@ class OrderInfolist
                                                 TextEntry::make('from_status')
                                                     ->label('Status Asal')
                                                     ->badge()
-                                                    ->formatStateUsing(fn (?string $state): string => $state ? (Order::getStatusLabels()[$state] ?? $state) : 'Checkout Baru'),
+                                                    ->formatStateUsing(fn (?string $state): string => $state ? (Order::getStatusLabels()[$state] ?? $state) : 'Checkout Baru')
+                                                    ->color(fn (?string $state): string => $state ? Order::getStatusColor($state) : 'gray'),
 
                                                 TextEntry::make('to_status')
                                                     ->label('Status Baru')

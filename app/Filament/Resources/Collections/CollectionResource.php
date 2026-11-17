@@ -36,7 +36,7 @@ class CollectionResource extends Resource
 
     protected static ?string $modelLabel = 'Koleksi';
 
-    protected static ?string $pluralModelLabel = 'Koleksi Produk';
+    protected static ?string $pluralModelLabel = 'Daftar Koleksi';
 
     protected static ?int $navigationSort = 3;
 

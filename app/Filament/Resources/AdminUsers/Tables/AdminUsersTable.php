@@ -6,6 +6,8 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class AdminUsersTable
@@ -27,7 +29,8 @@ class AdminUsersTable
                     ->sortable(),
                 IconColumn::make('is_active')
                     ->label('Aktif')
-                    ->boolean(),
+                    ->boolean()
+                    ->tooltip(fn (bool $state): string => $state ? 'Akun Aktif' : 'Akun Nonaktif'),
                 TextColumn::make('last_login_at')
                     ->label('Login Terakhir')
                     ->dateTime('d/m/Y H:i')
@@ -39,8 +42,13 @@ class AdminUsersTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('name', 'asc')
             ->filters([
-                //
+                SelectFilter::make('role_id')
+                    ->label('Role')
+                    ->relationship('role', 'name'),
+                TernaryFilter::make('is_active')
+                    ->label('Status Aktif'),
             ])
             ->recordActions([
                 EditAction::make(),

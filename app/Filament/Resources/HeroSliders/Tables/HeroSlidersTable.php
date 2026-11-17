@@ -23,8 +23,10 @@ class HeroSlidersTable
                     ->square()
                     ->placeholder('-'),
                 TextColumn::make('title')
+                    ->label('Judul')
                     ->searchable(),
                 TextColumn::make('badge')
+                    ->label('Label / Badge')
                     ->searchable()
                     ->toggleable(),
                 TextColumn::make('sort_order')
@@ -32,13 +34,16 @@ class HeroSlidersTable
                     ->sortable(),
                 IconColumn::make('is_active')
                     ->label('Aktif')
-                    ->boolean(),
+                    ->boolean()
+                    ->tooltip(fn (bool $state): string => $state ? 'Slider Aktif' : 'Slider Nonaktif'),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Dibuat')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Diperbarui')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])

@@ -62,6 +62,7 @@ class ProductForm
                             ->dehydrateStateUsing(fn (?string $state): ?string => $state ? Str::slug($state) : null)
                             ->suffixAction(
                                 Action::make('regenerateSlug')
+                                    ->label('Generate ulang slug')
                                     ->icon('heroicon-m-arrow-path')
                                     ->tooltip('Generate ulang slug dari nama')
                                     ->action(function (Set $set, Get $get): void {
@@ -87,7 +88,7 @@ class ProductForm
                     ->columns(2),
 
                 Section::make('Galeri & Foto Produk')
-                    ->description('Unggah hingga 8 foto produk (format JPG, PNG, atau WEBP, maks 2MB per foto). Foto teratas bertanda "⭐ Foto Utama" otomatis menjadi thumbnail produk di etalase toko. Geser posisi kartu foto (drag & drop) untuk mengatur urutan galeri.')
+                    ->description('Maks. 8 foto (JPG/PNG/WEBP, maks. 2MB). Foto pertama menjadi thumbnail utama; geser kartu untuk mengatur urutan.')
                     ->schema([
                         Repeater::make('media')
                             ->relationship('media')
@@ -107,13 +108,14 @@ class ProductForm
                                 }
 
                                 if ($index !== null) {
-                                    return 'Foto #' . ($index + 1) . ' (Galeri)';
+                                    return 'Foto #'.($index + 1).' (Galeri)';
                                 }
 
                                 return 'Foto Produk';
                             })
                             ->schema([
                                 ImageFileUpload::make('url')
+                                    ->label('Foto Produk')
                                     ->hiddenLabel()
                                     ->disk('public')
                                     ->directory('products')
@@ -132,7 +134,7 @@ class ProductForm
                     ->schema([
                         Toggle::make('is_active')
                             ->label('Status Produk')
-                            ->helperText('Jika diaktifkan, produk langsung dapat dilihat, dicari, dan dibeli oleh pelanggan di website. Jika nonaktif, produk disimpan sebagai draf/disembunyikan.')
+                            ->helperText('Aktif: produk tampil dan dapat dibeli. Nonaktif: disimpan sebagai draf.')
                             ->inline(false)
                             ->onColor('success')
                             ->offColor('danger')
@@ -141,7 +143,7 @@ class ProductForm
                             ->default(true),
                         Toggle::make('is_featured')
                             ->label('Jadikan Produk Unggulan')
-                            ->helperText('Jika diaktifkan, produk ini akan disorot di bagian "Produk Pilihan / Rekomendasi" pada halaman depan (homepage) website.')
+                            ->helperText('Tampilkan produk di bagian "Produk Pilihan / Rekomendasi" halaman depan.')
                             ->inline(false)
                             ->onColor('warning')
                             ->offColor('gray')

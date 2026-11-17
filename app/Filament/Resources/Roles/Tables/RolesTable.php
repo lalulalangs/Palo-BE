@@ -29,7 +29,8 @@ class RolesTable
                     ->counts('adminUsers'),
                 IconColumn::make('is_super_admin')
                     ->label('Superadmin')
-                    ->boolean(),
+                    ->boolean()
+                    ->tooltip(fn (bool $state): string => $state ? 'Superadmin (Akses Penuh)' : 'Role Terbatas'),
                 TextColumn::make('created_at')
                     ->label('Dibuat')
                     ->dateTime('d/m/Y H:i')
@@ -41,6 +42,7 @@ class RolesTable
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('name', 'asc')
             ->filters([
                 //
             ])

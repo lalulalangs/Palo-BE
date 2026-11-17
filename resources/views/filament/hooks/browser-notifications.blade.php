@@ -1,3 +1,72 @@
+<style>
+    #palorinjani-alerts-banner {
+        position: fixed;
+        right: 1rem;
+        bottom: 1rem;
+        z-index: 60;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        max-width: calc(100vw - 2rem);
+        padding: 0.75rem 0.875rem;
+        border: 1px solid #d6d3d1;
+        border-radius: 0.75rem;
+        background: #ffffff;
+        color: #292524;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+        font-family: inherit;
+    }
+
+    .dark #palorinjani-alerts-banner {
+        border-color: #44403c;
+        background: #1c1917;
+        color: #f5f5f4;
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    #palorinjani-alerts-banner .palorinjani-alerts-message {
+        font-size: 0.875rem;
+        line-height: 1.35;
+        color: inherit;
+    }
+
+    #palorinjani-alerts-banner .palorinjani-alerts-btn {
+        flex-shrink: 0;
+        border: 0;
+        border-radius: 0.5rem;
+        background: #1e5e3e;
+        color: #ffffff;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    #palorinjani-alerts-banner .palorinjani-alerts-close {
+        flex-shrink: 0;
+        border: 1px solid #d6d3d1;
+        border-radius: 0.5rem;
+        background: transparent;
+        color: inherit;
+        padding: 0.375rem 0.625rem;
+        font-size: 0.875rem;
+        line-height: 1.25;
+        cursor: pointer;
+    }
+
+    .dark #palorinjani-alerts-banner .palorinjani-alerts-close {
+        border-color: #57534e;
+    }
+
+    #palorinjani-alerts-banner button:focus-visible {
+        outline: 2px solid #1e5e3e;
+        outline-offset: 2px;
+    }
+
+    .dark #palorinjani-alerts-banner button:focus-visible {
+        outline-color: #4fa179;
+    }
+</style>
 <script>
 (() => {
     const ENABLED_KEY = 'palorinjani_admin_alerts_enabled';
@@ -12,6 +81,7 @@
     // pengguna sejak halaman dimuat. Tanpa flag ini, chime memicu warning
     // "AudioContext was prevented from starting automatically".
     let hasUserGesture = false;
+    let hintDismissed = false;
     let warnedMissingToastApi = false;
 
     function alertsEnabled() {
@@ -148,46 +218,34 @@
         banner.id = BANNER_ID;
         banner.dataset.mode = mode;
         banner.setAttribute('role', 'region');
+        banner.setAttribute('aria-live', 'polite');
         banner.setAttribute('aria-label', 'Aktifkan notifikasi pesanan');
-        banner.style.cssText = [
-            'position:fixed',
-            'right:1rem',
-            'bottom:1rem',
-            'z-index:60',
-            'display:flex',
-            'align-items:center',
-            'gap:0.75rem',
-            'max-width:calc(100vw - 2rem)',
-            'padding:0.75rem 0.875rem',
-            'border:1px solid #d6d3d1',
-            'border-radius:0.75rem',
-            'background:#ffffff',
-            'box-shadow:0 12px 30px rgba(0,0,0,0.14)',
-            'font-family:inherit',
-        ].join(';');
 
         const message = document.createElement('span');
+        message.className = 'palorinjani-alerts-message';
         message.textContent = messageText;
-        message.style.cssText = 'font-size:0.8125rem;line-height:1.35;color:#292524;';
         banner.appendChild(message);
 
         if (withButton) {
             const button = document.createElement('button');
             button.type = 'button';
+            button.className = 'palorinjani-alerts-btn';
             button.textContent = 'Aktifkan';
-            button.style.cssText = [
-                'flex-shrink:0',
-                'border:0',
-                'border-radius:0.5rem',
-                'background:#1e5e3e',
-                'color:#ffffff',
-                'padding:0.5rem 0.75rem',
-                'font-size:0.8125rem',
-                'font-weight:600',
-                'cursor:pointer',
-            ].join(';');
             button.addEventListener('click', enableAlerts);
             banner.appendChild(button);
+        }
+
+        if (mode === 'hint') {
+            const closeButton = document.createElement('button');
+            closeButton.type = 'button';
+            closeButton.className = 'palorinjani-alerts-close';
+            closeButton.setAttribute('aria-label', 'Tutup pemberitahuan');
+            closeButton.textContent = '×';
+            closeButton.addEventListener('click', () => {
+                hintDismissed = true;
+                hideBanner();
+            });
+            banner.appendChild(closeButton);
         }
 
         document.body.appendChild(banner);
@@ -200,7 +258,7 @@
             return;
         }
 
-        if (hasUserGesture) {
+        if (hasUserGesture || hintDismissed) {
             hideBanner();
 
             return;

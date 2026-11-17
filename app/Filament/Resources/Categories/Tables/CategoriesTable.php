@@ -15,20 +15,29 @@ class CategoriesTable
         return $table
             ->columns([
                 TextColumn::make('parent.name')
+                    ->label('Kategori Induk')
+                    ->placeholder('-')
                     ->searchable(),
                 TextColumn::make('name')
-                    ->searchable(),
+                    ->label('Nama Kategori')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('slug')
-                    ->searchable(),
+                    ->label('Slug')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Dibuat')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Diperbarui')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('name', 'asc')
             ->filters([
                 //
             ])

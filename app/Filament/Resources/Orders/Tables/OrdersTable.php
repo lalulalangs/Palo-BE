@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Filament\Resources\Orders\Actions\OrderActions;
 use App\Models\Order;
 use Carbon\CarbonImmutable;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
@@ -55,7 +56,8 @@ class OrdersTable
                     ->color(fn (?string $state): string => match ($state) {
                         Order::PAYMENT_METHOD_COD => 'warning',
                         default => 'info',
-                    }),
+                    })
+                    ->toggleable(),
 
                 TextColumn::make('created_at')
                     ->label('Waktu Checkout')
@@ -70,7 +72,8 @@ class OrdersTable
                 TextColumn::make('shipping_courier')
                     ->label('Ekspedisi')
                     ->formatStateUsing(fn (Order $record): string => ($record->shipping_courier ?? '-').($record->shipping_service ? " ({$record->shipping_service})" : ''))
-                    ->description(fn (Order $record): string => $record->tracking_number ? "Resi: {$record->tracking_number}" : 'Belum ada resi'),
+                    ->description(fn (Order $record): string => $record->tracking_number ? "Resi: {$record->tracking_number}" : 'Belum ada resi')
+                    ->toggleable(),
 
                 TextColumn::make('status')
                     ->label('Status')
@@ -188,11 +191,13 @@ class OrdersTable
                 OrderActions::makeProcessingAction(),
                 OrderActions::makeShipAction(),
                 OrderActions::makeCompleteAction(),
-                OrderActions::makeRequestRefundAction(),
-                OrderActions::makeApproveRefundAction(),
-                OrderActions::makeRejectRefundAction(),
-                OrderActions::makeCompleteRefundAction(),
-                OrderActions::makeCancelAction(),
+                ActionGroup::make([
+                    OrderActions::makeRequestRefundAction(),
+                    OrderActions::makeApproveRefundAction(),
+                    OrderActions::makeRejectRefundAction(),
+                    OrderActions::makeCompleteRefundAction(),
+                    OrderActions::makeCancelAction(),
+                ])->label('Aksi Lainnya'),
             ])
             ->bulkActions([
                 BulkActionGroup::make([

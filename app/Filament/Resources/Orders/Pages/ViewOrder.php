@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders\Pages;
 
 use App\Filament\Resources\Orders\Actions\OrderActions;
 use App\Filament\Resources\Orders\OrderResource;
+use Filament\Actions\ActionGroup;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewOrder extends ViewRecord
@@ -17,13 +18,15 @@ class ViewOrder extends ViewRecord
             OrderActions::makeMarkAsPaidAction(),
             OrderActions::makeProcessingAction(),
             OrderActions::makeShipAction(),
-            OrderActions::makeUpdateTrackingAction(),
             OrderActions::makeCompleteAction(),
-            OrderActions::makeRequestRefundAction(),
-            OrderActions::makeApproveRefundAction(),
-            OrderActions::makeRejectRefundAction(),
-            OrderActions::makeCompleteRefundAction(),
-            OrderActions::makeCancelAction(),
+            ActionGroup::make([
+                OrderActions::makeUpdateTrackingAction(),
+                OrderActions::makeRequestRefundAction(),
+                OrderActions::makeApproveRefundAction(),
+                OrderActions::makeRejectRefundAction(),
+                OrderActions::makeCompleteRefundAction(),
+                OrderActions::makeCancelAction(),
+            ])->label('Aksi Lainnya'),
         ];
     }
 }

@@ -61,11 +61,13 @@ class StockMovementsTable
                 TextColumn::make('user.name')
                     ->label('Dicatat Oleh')
                     ->placeholder('Sistem Otomatis')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('notes')
                     ->label('Catatan')
                     ->limit(45)
-                    ->tooltip(fn (StockMovement $record): ?string => $record->notes),
+                    ->tooltip(fn (StockMovement $record): ?string => $record->notes)
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
