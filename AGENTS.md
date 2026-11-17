@@ -167,3 +167,13 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Run `vendor/bin/phpunit` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
 
 </laravel-boost-guidelines>
+
+## PostgreSQL & Production Parity Guardrails
+
+Tests run on SQLite `:memory:`, while staging and production run on PostgreSQL (`pgsql`). To prevent SQLite-passing bugs from crashing staging/production:
+
+- **Qualify columns in joins & relations:** Always prefix column names with table names inside `whereHas`, `orWhereHas`, `HasOneThrough`, `HasManyThrough`, or manual `join` queries (e.g., `products.name`, `skus.sku_code`), especially common columns like `name`, `slug`, `status`, `is_active`, `created_at`.
+- **Case-insensitive search:** Never assume `like` is case-insensitive in PostgreSQL. Use driver-aware operator:
+  `$operator = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';`
+- **Verify generated SQL in tests:** When writing tests for joined/subquery filters on SQLite, assert table-qualified column names via `DB::enableQueryLog()` when ambiguity is possible.
+- **Proactive production impact check:** Whenever a bug is found in existing shared code on `devel`/staging, immediately check `main` (`git show main:<file>`) and warn the user if production is also affected.
