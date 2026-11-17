@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Components\SkuSelect;
 use App\Filament\Resources\StockOpnames\Pages\CreateStockOpname;
 use App\Filament\Resources\StockOpnames\Pages\EditStockOpname;
 use App\Filament\Resources\StockOpnames\Pages\ListStockOpnames;
@@ -15,6 +16,7 @@ use App\Models\StockMovement;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -267,5 +269,66 @@ class StockOpnameResourceTest extends TestCase
 
         $opname->refresh();
         $this->assertEquals('Catatan setelah diperbarui', $opname->notes);
+    }
+
+    public function test_sku_select_search_on_create_stock_opname_qualifies_products_name_and_matches_sku_or_product(): void
+    {
+        $category = Category::firstOrFail();
+        $otherProduct = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Jaket Gunung',
+            'slug' => 'jaket-gunung',
+            'base_price' => 350000,
+        ]);
+        $otherVariant = ProductVariant::create([
+            'product_id' => $otherProduct->id,
+            'name' => 'Hitam - L',
+            'attributes' => ['color' => 'Hitam', 'size' => 'L'],
+        ]);
+        $otherSku = Sku::create([
+            'variant_id' => $otherVariant->id,
+            'sku_code' => 'JKT-GNG-BLK-L',
+            'stock' => 5,
+        ]);
+
+        $livewire = Livewire::actingAs($this->admin, 'admin')
+            ->test(CreateStockOpname::class);
+
+        $skuSelect = collect($livewire->instance()->getSchema('form')->getFlatFields(withHidden: true))
+            ->first(fn ($component) => $component instanceof SkuSelect);
+
+        if (! $skuSelect) {
+            $repeater = $livewire->instance()->getSchema('form')->getFlatFields(withHidden: true)['items'] ?? null;
+            $this->assertNotNull($repeater, 'Repeater items harus tersedia di form CreateStockOpname.');
+            $skuSelect = collect($repeater->getChildSchemas())
+                ->flatMap(fn ($schema) => $schema->getFlatFields(withHidden: true))
+                ->first(fn ($component) => $component instanceof SkuSelect);
+        }
+
+        $this->assertInstanceOf(SkuSelect::class, $skuSelect);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $byCode = $skuSelect->getSearchResults('ACC-TPI');
+        $byProductName = $skuSelect->getSearchResults('Topi Rimba');
+
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+
+        $this->assertArrayHasKey($this->sku->id, $byCode);
+        $this->assertArrayNotHasKey($otherSku->id, $byCode);
+
+        $this->assertArrayHasKey($this->sku->id, $byProductName);
+        $this->assertArrayNotHasKey($otherSku->id, $byProductName);
+
+        $skuSearchQueries = $queries->filter(fn (string $sql): bool => str_contains($sql, '"skus"') && str_contains($sql, '"products"'));
+        $this->assertNotEmpty($skuSearchQueries);
+
+        foreach ($skuSearchQueries as $sql) {
+            $this->assertStringContainsString('"products"."name"', $sql);
+            $this->assertStringContainsString('"skus"."sku_code"', $sql);
+            $this->assertDoesNotMatchRegularExpression('/(?<!\.)"name"/', $sql);
+        }
     }
 }

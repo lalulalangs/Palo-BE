@@ -38,12 +38,14 @@ class SkuSelect extends Select
         return Sku::query()
             ->with(['product', 'variant'])
             ->when(filled($search), function ($query) use ($search): void {
-                $query->where(function ($query) use ($search): void {
-                    $query->where('sku_code', 'like', "%{$search}%")
-                        ->orWhereHas('product', fn ($product) => $product->where('name', 'like', "%{$search}%"));
+                $operator = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
+                $query->where(function ($query) use ($search, $operator): void {
+                    $query->where('skus.sku_code', $operator, "%{$search}%")
+                        ->orWhereHas('product', fn ($product) => $product->where('products.name', $operator, "%{$search}%"));
                 });
             })
-            ->orderBy('sku_code')
+            ->orderBy('skus.sku_code')
             ->limit(50)
             ->get()
             ->mapWithKeys(fn (Sku $sku): array => [$sku->id => $this->formatLabel($sku)])
