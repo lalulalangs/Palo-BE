@@ -15,6 +15,7 @@ use App\Models\Sku;
 use App\Models\StockMovement;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
+use Filament\Forms\Components\Repeater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
@@ -330,5 +331,40 @@ class StockOpnameResourceTest extends TestCase
             $this->assertStringContainsString('"skus"."sku_code"', $sql);
             $this->assertDoesNotMatchRegularExpression('/(?<!\.)"name"/', $sql);
         }
+    }
+
+    public function test_cancelled_opname_locks_items_repeater_and_blocks_saving(): void
+    {
+        $opname = StockOpname::create([
+            'opname_number' => 'OPN-CANCELLED-LOCK',
+            'user_id' => $this->admin->id,
+            'status' => StockOpname::STATUS_CANCELLED,
+            'notes' => 'Catatan awal batal',
+        ]);
+
+        $item = StockOpnameItem::create([
+            'stock_opname_id' => $opname->id,
+            'sku_id' => $this->sku->id,
+            'system_stock' => 20,
+            'physical_stock' => 18,
+            'difference' => -2,
+        ]);
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(EditStockOpname::class, ['record' => $opname->getKey()])
+            ->assertDontSee('Simpan Perubahan Draft')
+            ->assertActionHidden('apply_opname')
+            ->assertActionHidden('cancel_opname')
+            ->assertFormComponentExists('items', fn (Repeater $component): bool => $component->isDisabled())
+            ->fillForm([
+                'notes' => 'Percobaan ubah catatan batal',
+            ])
+            ->call('save')
+            ->assertNotified('Sesi opname sudah terkunci dan tidak dapat diubah');
+
+        $opname->refresh();
+        $item->refresh();
+        $this->assertSame('Catatan awal batal', $opname->notes);
+        $this->assertSame(18, $item->physical_stock);
     }
 }

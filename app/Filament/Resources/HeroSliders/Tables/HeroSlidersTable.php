@@ -35,7 +35,11 @@ class HeroSlidersTable
                 IconColumn::make('is_active')
                     ->label('Aktif')
                     ->boolean()
-                    ->tooltip(fn (bool $state): string => $state ? 'Slider Aktif' : 'Slider Nonaktif'),
+                    ->tooltip(fn (?bool $state): ?string => match ($state) {
+                        true => 'Slider Aktif',
+                        false => 'Slider Nonaktif',
+                        default => null,
+                    }),
                 TextColumn::make('created_at')
                     ->label('Dibuat')
                     ->dateTime('d/m/Y H:i')

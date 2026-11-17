@@ -30,7 +30,11 @@ class AdminUsersTable
                 IconColumn::make('is_active')
                     ->label('Aktif')
                     ->boolean()
-                    ->tooltip(fn (bool $state): string => $state ? 'Akun Aktif' : 'Akun Nonaktif'),
+                    ->tooltip(fn (?bool $state): ?string => match ($state) {
+                        true => 'Akun Aktif',
+                        false => 'Akun Nonaktif',
+                        default => null,
+                    }),
                 TextColumn::make('last_login_at')
                     ->label('Login Terakhir')
                     ->dateTime('d/m/Y H:i')

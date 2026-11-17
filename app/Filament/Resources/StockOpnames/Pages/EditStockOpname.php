@@ -35,7 +35,19 @@ class EditStockOpname extends EditRecord
         return parent::getSaveFormAction()
             ->label('Simpan Perubahan Draft')
             ->keyBindings(['mod+s'])
-            ->visible(fn (): bool => ! $this->getRecord()->isCompleted());
+            ->visible(fn (): bool => $this->getRecord()->isDraft());
+    }
+
+    protected function beforeSave(): void
+    {
+        if (! $this->getRecord()->isDraft()) {
+            Notification::make()
+                ->title('Sesi opname sudah terkunci dan tidak dapat diubah')
+                ->danger()
+                ->send();
+
+            $this->halt();
+        }
     }
 
     protected function getCancelFormAction(): Action
@@ -66,13 +78,12 @@ class EditStockOpname extends EditRecord
                         $record->refresh();
                         $record->unsetRelations();
                         $this->record = $record;
+                        $this->fillForm();
 
                         Notification::make()
                             ->title('Penyesuaian stok opname berhasil diterapkan')
                             ->success()
                             ->send();
-
-                        $this->refreshFormData(['status', 'completed_at']);
                     } catch (Throwable $e) {
                         Notification::make()
                             ->title('Gagal menerapkan opname')

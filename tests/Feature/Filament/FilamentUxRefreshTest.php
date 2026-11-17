@@ -72,7 +72,7 @@ class FilamentUxRefreshTest extends TestCase
             'status' => StockOpname::STATUS_DRAFT,
         ]);
 
-        StockOpnameItem::create([
+        $item = StockOpnameItem::create([
             'stock_opname_id' => $opname->id,
             'sku_id' => $this->sku->id,
             'system_stock' => 20,
@@ -80,11 +80,16 @@ class FilamentUxRefreshTest extends TestCase
             'difference' => -3,
         ]);
 
-        Livewire::actingAs($this->admin, 'admin')
+        $livewire = Livewire::actingAs($this->admin, 'admin')
             ->test(EditStockOpname::class, ['record' => $opname->getRouteKey()])
             ->assertActionVisible('apply_opname')
             ->assertActionVisible('cancel_opname')
-            ->assertSee('Simpan Perubahan Draft')
+            ->assertSee('Simpan Perubahan Draft');
+
+        // Simulasikan mutasi stok di DB setelah draft dibuka, sebelum apply diklik.
+        $this->sku->updateQuietly(['stock' => 15]);
+
+        $livewire
             ->callAction('apply_opname')
             ->assertNotified('Penyesuaian stok opname berhasil diterapkan')
             ->assertFormSet([
@@ -93,6 +98,14 @@ class FilamentUxRefreshTest extends TestCase
             ->assertActionHidden('apply_opname')
             ->assertActionHidden('cancel_opname')
             ->assertDontSee('Simpan Perubahan Draft');
+
+        $itemsState = array_values($livewire->get('data.items'));
+        $this->assertCount(1, $itemsState);
+        $this->assertSame(15, (int) $itemsState[0]['system_stock']);
+        $this->assertSame(17, (int) $itemsState[0]['physical_stock']);
+        $this->assertSame(2, (int) $itemsState[0]['difference']);
+        $this->assertSame(15, $item->fresh()->system_stock);
+        $this->assertSame(2, $item->fresh()->difference);
     }
 
     public function test_stock_opname_cancel_action_succeeds_and_redirects_to_index(): void

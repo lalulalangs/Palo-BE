@@ -79,7 +79,7 @@ class StockOpnameForm
                             ->relationship('items')
                             ->label('Item SKU')
                             ->addActionLabel('Tambah SKU untuk Diperiksa')
-                            ->disabled(fn (?StockOpname $record): bool => $record?->isCompleted() ?? false)
+                            ->disabled(fn (?StockOpname $record, string $operation): bool => $operation !== 'create' && $record !== null && ! $record->isDraft())
                             ->columnSpanFull()
                             ->schema([
                                 SkuSelect::make('sku_id')

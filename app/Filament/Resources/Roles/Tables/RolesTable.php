@@ -30,7 +30,11 @@ class RolesTable
                 IconColumn::make('is_super_admin')
                     ->label('Superadmin')
                     ->boolean()
-                    ->tooltip(fn (bool $state): string => $state ? 'Superadmin (Akses Penuh)' : 'Role Terbatas'),
+                    ->tooltip(fn (?bool $state): ?string => match ($state) {
+                        true => 'Superadmin (Akses Penuh)',
+                        false => 'Role Terbatas',
+                        default => null,
+                    }),
                 TextColumn::make('created_at')
                     ->label('Dibuat')
                     ->dateTime('d/m/Y H:i')

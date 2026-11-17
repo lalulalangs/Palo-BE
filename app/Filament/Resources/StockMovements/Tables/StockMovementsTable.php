@@ -6,6 +6,7 @@ use App\Models\StockMovement;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class StockMovementsTable
 {
@@ -24,7 +25,14 @@ class StockMovementsTable
                     ->weight('bold'),
                 TextColumn::make('sku.product.name')
                     ->label('Produk')
-                    ->searchable(),
+                    ->searchable(query: function (Builder $query, string $search): Builder {
+                        $operator = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+
+                        return $query->orWhereHas(
+                            'sku.product',
+                            fn (Builder $productQuery): Builder => $productQuery->where('products.name', $operator, "%{$search}%")
+                        );
+                    }),
                 TextColumn::make('sku.variant.name')
                     ->label('Varian')
                     ->badge()

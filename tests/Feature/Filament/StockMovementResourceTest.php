@@ -10,6 +10,7 @@ use App\Models\ProductVariant;
 use App\Models\Sku;
 use App\Models\StockMovement;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -110,5 +111,70 @@ class StockMovementResourceTest extends TestCase
 
         $this->sku->refresh();
         $this->assertEquals(10, $this->sku->stock); // Tidak berubah
+    }
+
+    public function test_can_search_stock_movements_by_product_name_with_qualified_column(): void
+    {
+        $category = Category::firstOrFail();
+        $otherProduct = Product::create([
+            'category_id' => $category->id,
+            'name' => 'Celana Trekking',
+            'slug' => 'celana-trekking',
+            'base_price' => 300000,
+        ]);
+        $otherVariant = ProductVariant::create([
+            'product_id' => $otherProduct->id,
+            'name' => 'Khaki - L',
+            'attributes' => ['color' => 'Khaki', 'size' => 'L'],
+        ]);
+        $otherSku = Sku::create([
+            'variant_id' => $otherVariant->id,
+            'sku_code' => 'CLN-TRK-KHK-L',
+            'stock' => 5,
+        ]);
+
+        $matchingMovement = StockMovement::create([
+            'sku_id' => $this->sku->id,
+            'user_id' => $this->admin->id,
+            'type' => StockMovement::TYPE_RESTOCK,
+            'quantity_change' => 10,
+            'stock_before' => 0,
+            'stock_after' => 10,
+            'notes' => 'Masuk jaket',
+        ]);
+
+        $otherMovement = StockMovement::create([
+            'sku_id' => $otherSku->id,
+            'user_id' => $this->admin->id,
+            'type' => StockMovement::TYPE_RESTOCK,
+            'quantity_change' => 5,
+            'stock_before' => 0,
+            'stock_after' => 5,
+            'notes' => 'Masuk celana',
+        ]);
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        Livewire::actingAs($this->admin, 'admin')
+            ->test(ListStockMovements::class)
+            ->searchTable('Windbreaker')
+            ->assertCanSeeTableRecords([$matchingMovement])
+            ->assertCanNotSeeTableRecords([$otherMovement]);
+
+        $queries = collect(DB::getQueryLog())->pluck('query');
+        DB::disableQueryLog();
+
+        $productSearchQueries = $queries->filter(
+            fn (string $sql): bool => str_contains($sql, '"stock_movements"') && str_contains($sql, '"products"')
+        );
+
+        $this->assertNotEmpty($productSearchQueries);
+
+        foreach ($productSearchQueries as $sql) {
+            $this->assertStringContainsString('"products"."name"', $sql);
+            $this->assertTrue(preg_match('/from "products"[^)]+/', $sql, $matches) === 1);
+            $this->assertDoesNotMatchRegularExpression('/(?<!\.)"name"/', $matches[0]);
+        }
     }
 }

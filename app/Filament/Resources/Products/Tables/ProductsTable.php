@@ -47,7 +47,11 @@ class ProductsTable
                     ->falseIcon('heroicon-m-minus')
                     ->trueColor('warning')
                     ->falseColor('gray')
-                    ->tooltip(fn (bool $state): string => $state ? 'Produk Unggulan' : 'Bukan Produk Unggulan'),
+                    ->tooltip(fn (?bool $state): ?string => match ($state) {
+                        true => 'Produk Unggulan',
+                        false => 'Bukan Produk Unggulan',
+                        default => null,
+                    }),
                 IconColumn::make('is_active')
                     ->label('Status Toko')
                     ->boolean()
@@ -55,7 +59,11 @@ class ProductsTable
                     ->falseIcon('heroicon-m-eye-slash')
                     ->trueColor('success')
                     ->falseColor('danger')
-                    ->tooltip(fn (bool $state): string => $state ? 'Aktif di Toko' : 'Disembunyikan / Draf'),
+                    ->tooltip(fn (?bool $state): ?string => match ($state) {
+                        true => 'Aktif di Toko',
+                        false => 'Disembunyikan / Draf',
+                        default => null,
+                    }),
                 TextColumn::make('deleted_at')
                     ->label('Dihapus')
                     ->dateTime('d/m/Y H:i')
