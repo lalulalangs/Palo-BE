@@ -44,7 +44,10 @@ class ListStockMovements extends ListRecords
                         ->numeric()
                         ->required()
                         ->helperText('Gunakan angka positif untuk menambah (misal: 10), atau angka negatif untuk mengurangi (misal: -2).')
-                        ->notIn([0], 'Jumlah perubahan tidak boleh nol (0).'),
+                        ->notIn([0])
+                        ->validationMessages([
+                            'not_in' => 'Jumlah perubahan tidak boleh nol (0).',
+                        ]),
                     Textarea::make('notes')
                         ->label('Alasan / Catatan')
                         ->required()

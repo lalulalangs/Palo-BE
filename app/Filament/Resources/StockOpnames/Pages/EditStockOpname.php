@@ -13,6 +13,9 @@ use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use LogicException;
+use Throwable;
 
 class EditStockOpname extends EditRecord
 {
@@ -31,6 +34,7 @@ class EditStockOpname extends EditRecord
     {
         return parent::getSaveFormAction()
             ->label('Simpan Perubahan Draft')
+            ->keyBindings(['mod+s'])
             ->visible(fn (): bool => ! $this->getRecord()->isCompleted());
     }
 
@@ -59,13 +63,17 @@ class EditStockOpname extends EditRecord
                     try {
                         $service->applyOpname($record, Auth::id() ? (int) Auth::id() : null);
 
+                        $record->refresh();
+                        $record->unsetRelations();
+                        $this->record = $record;
+
                         Notification::make()
                             ->title('Penyesuaian stok opname berhasil diterapkan')
                             ->success()
                             ->send();
 
                         $this->refreshFormData(['status', 'completed_at']);
-                    } catch (\Throwable $e) {
+                    } catch (Throwable $e) {
                         Notification::make()
                             ->title('Gagal menerapkan opname')
                             ->body($e->getMessage())
@@ -87,14 +95,39 @@ class EditStockOpname extends EditRecord
                 ->action(function (): void {
                     /** @var StockOpname $record */
                     $record = $this->getRecord();
-                    $record->update(['status' => StockOpname::STATUS_CANCELLED]);
 
-                    Notification::make()
-                        ->title('Sesi opname berhasil dibatalkan')
-                        ->warning()
-                        ->send();
+                    try {
+                        DB::transaction(function () use ($record): void {
+                            /** @var StockOpname $locked */
+                            $locked = StockOpname::query()
+                                ->whereKey($record->id)
+                                ->lockForUpdate()
+                                ->firstOrFail();
 
-                    $this->redirect($this->getResource()::getUrl('index'));
+                            if (! $locked->isDraft()) {
+                                throw new LogicException("Sesi opname {$locked->opname_number} tidak dalam status draft dan tidak dapat dibatalkan.");
+                            }
+
+                            $locked->update(['status' => StockOpname::STATUS_CANCELLED]);
+                        });
+
+                        $record->refresh();
+                        $record->unsetRelations();
+                        $this->record = $record;
+
+                        Notification::make()
+                            ->title('Sesi opname berhasil dibatalkan')
+                            ->warning()
+                            ->send();
+
+                        $this->redirect($this->getResource()::getUrl('index'));
+                    } catch (Throwable $e) {
+                        Notification::make()
+                            ->title('Gagal membatalkan opname')
+                            ->body($e->getMessage())
+                            ->danger()
+                            ->send();
+                    }
                 }),
 
             DeleteAction::make()

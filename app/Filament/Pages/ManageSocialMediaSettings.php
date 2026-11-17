@@ -193,6 +193,8 @@ class ManageSocialMediaSettings extends Page
             'whatsapp_default_message' => $normalize($state['whatsapp_default_message'] ?? null),
         ]);
 
+        $this->fillForm();
+
         Notification::make()
             ->title('Pengaturan berhasil disimpan')
             ->success()

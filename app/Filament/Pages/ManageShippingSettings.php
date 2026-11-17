@@ -24,6 +24,7 @@ use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Widgets\Widget;
 use Throwable;
 use UnitEnum;
 
@@ -119,7 +120,7 @@ class ManageShippingSettings extends Page
     }
 
     /**
-     * @return array<class-string<\Filament\Widgets\Widget>>
+     * @return array<class-string<Widget>>
      */
     protected function getHeaderWidgets(): array
     {
@@ -264,6 +265,8 @@ class ManageShippingSettings extends Page
                 ? self::CARGO_SERVICE_CODES
                 : null,
         ]);
+
+        $this->fillForm();
 
         Notification::make()
             ->title('Pengaturan ekspedisi berhasil disimpan')

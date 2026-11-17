@@ -12,6 +12,9 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use LogicException;
+use Throwable;
 
 class StockOpnamesTable
 {
@@ -77,7 +80,7 @@ class StockOpnamesTable
                                 ->title('Penyesuaian stok opname berhasil diterapkan')
                                 ->success()
                                 ->send();
-                        } catch (\Throwable $e) {
+                        } catch (Throwable $e) {
                             Notification::make()
                                 ->title('Gagal menerapkan opname')
                                 ->body($e->getMessage())
@@ -96,12 +99,34 @@ class StockOpnamesTable
                     ->modalCancelActionLabel('Tidak')
                     ->visible(fn (StockOpname $record): bool => $record->isDraft())
                     ->action(function (StockOpname $record): void {
-                        $record->update(['status' => StockOpname::STATUS_CANCELLED]);
+                        try {
+                            DB::transaction(function () use ($record): void {
+                                /** @var StockOpname $locked */
+                                $locked = StockOpname::query()
+                                    ->whereKey($record->id)
+                                    ->lockForUpdate()
+                                    ->firstOrFail();
 
-                        Notification::make()
-                            ->title('Sesi opname berhasil dibatalkan')
-                            ->warning()
-                            ->send();
+                                if (! $locked->isDraft()) {
+                                    throw new LogicException("Sesi opname {$locked->opname_number} tidak dalam status draft dan tidak dapat dibatalkan.");
+                                }
+
+                                $locked->update(['status' => StockOpname::STATUS_CANCELLED]);
+                            });
+
+                            $record->refresh();
+
+                            Notification::make()
+                                ->title('Sesi opname berhasil dibatalkan')
+                                ->warning()
+                                ->send();
+                        } catch (Throwable $e) {
+                            Notification::make()
+                                ->title('Gagal membatalkan opname')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
                     }),
                 DeleteAction::make()
                     ->label('Hapus')

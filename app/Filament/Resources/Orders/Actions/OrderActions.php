@@ -21,6 +21,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class OrderActions
 {
     /**
+     * Sinkronkan model Order di memori setelah transisi DB agar ViewOrder
+     * (Infolist + HeaderActions) langsung menampilkan state & relasi terbaru.
+     */
+    private static function refreshOrderRecord(Order $record): void
+    {
+        $record->refresh();
+        $record->unsetRelations();
+    }
+
+    /**
      * Aksi mengonfirmasi pembayaran pesanan non-COD dari status Menunggu Pembayaran.
      *
      * Runtime trigger OrderTransitionService::markAsPaid() yang sudah teruji
@@ -63,6 +73,8 @@ class OrderActions
                             $payment?->gateway_transaction_id ?? '-',
                         )
                     );
+
+                    self::refreshOrderRecord($record);
 
                     Notification::make()
                         ->title("Pembayaran {$record->order_number} dikonfirmasi")
@@ -132,6 +144,8 @@ class OrderActions
                         );
                     }
 
+                    self::refreshOrderRecord($record);
+
                     Notification::make()
                         ->title("Pesanan {$record->order_number} berhasil dikonfirmasi")
                         ->body('Status pesanan diubah ke Diproses dan stok fisik gudang telah dipotong.')
@@ -164,6 +178,8 @@ class OrderActions
             ->action(function (Order $record, OrderTransitionService $service): void {
                 try {
                     $service->markAsProcessing($record, Auth::id() ? (int) Auth::id() : null);
+
+                    self::refreshOrderRecord($record);
 
                     Notification::make()
                         ->title("Pesanan {$record->order_number} sedang disiapkan")
@@ -212,6 +228,8 @@ class OrderActions
                         $data['note'] ?? null
                     );
 
+                    self::refreshOrderRecord($record);
+
                     Notification::make()
                         ->title("Pesanan {$record->order_number} berhasil dikirim")
                         ->body("Nomor resi {$data['tracking_number']} telah dicatat ke sistem.")
@@ -259,6 +277,8 @@ class OrderActions
                         $data['reason']
                     );
 
+                    self::refreshOrderRecord($record);
+
                     Notification::make()
                         ->title("Nomor resi {$record->order_number} diperbarui")
                         ->body("Resi baru {$data['tracking_number']} telah tersimpan dan diaudit.")
@@ -291,6 +311,8 @@ class OrderActions
             ->action(function (Order $record, OrderTransitionService $service): void {
                 try {
                     $service->markAsCompleted($record, Auth::id() ? (int) Auth::id() : null);
+
+                    self::refreshOrderRecord($record);
 
                     Notification::make()
                         ->title("Pesanan {$record->order_number} selesai")
@@ -344,6 +366,8 @@ class OrderActions
                         $data['cancelled_reason'],
                         Auth::id() ? (int) Auth::id() : null
                     );
+
+                    self::refreshOrderRecord($record);
 
                     Notification::make()
                         ->title("Pesanan {$record->order_number} dibatalkan")
@@ -404,6 +428,8 @@ class OrderActions
                         Auth::id() ? (int) Auth::id() : null
                     );
 
+                    self::refreshOrderRecord($record);
+
                     Notification::make()
                         ->title("Pengajuan refund untuk {$record->order_number} berhasil dibuat")
                         ->body('Status refund diubah ke Diajukan dan menunggu persetujuan admin.')
@@ -448,6 +474,8 @@ class OrderActions
                         $data['note'] ?? null
                     );
 
+                    self::refreshOrderRecord($record);
+
                     Notification::make()
                         ->title("Refund pesanan {$record->order_number} disetujui")
                         ->body('Pengajuan refund telah disetujui. Lanjutkan transfer dana dan penyelesaian refund.')
@@ -489,6 +517,8 @@ class OrderActions
                         $data['reason'],
                         Auth::id() ? (int) Auth::id() : null
                     );
+
+                    self::refreshOrderRecord($record);
 
                     Notification::make()
                         ->title("Pengajuan refund {$record->order_number} ditolak")
@@ -549,6 +579,8 @@ class OrderActions
                         $data['refund_method'] ?? 'transfer_bank',
                         $data['note'] ?? null
                     );
+
+                    self::refreshOrderRecord($record);
 
                     Notification::make()
                         ->title("Refund pesanan {$record->order_number} telah diselesaikan")
