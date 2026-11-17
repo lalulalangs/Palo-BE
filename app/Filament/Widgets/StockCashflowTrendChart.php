@@ -41,41 +41,47 @@ class StockCashflowTrendChart extends ChartWidget
         return 'line';
     }
 
-    protected function getOptions(): array
+    protected function getOptions(): RawJs
     {
-        return [
-            'plugins' => [
-                'legend' => [
-                    'display' => true,
-                    'position' => 'top',
-                    'labels' => [
-                        'usePointStyle' => true,
-                        'boxWidth' => 8,
-                    ],
-                ],
-                'tooltip' => [
-                    'callbacks' => [
-                        'label' => RawJs::make("function(context) { return context.dataset.label + ': Rp ' + Number(context.parsed.y || 0).toLocaleString('id-ID'); }"),
-                    ],
-                ],
-            ],
-            'scales' => [
-                'y' => [
-                    'beginAtZero' => true,
-                    'grid' => [
-                        'color' => 'rgba(156, 163, 175, 0.15)',
-                    ],
-                    'ticks' => [
-                        'callback' => RawJs::make("function(value) { return 'Rp ' + Number(value).toLocaleString('id-ID'); }"),
-                    ],
-                ],
-                'x' => [
-                    'grid' => [
-                        'display' => false,
-                    ],
-                ],
-            ],
-        ];
+        return RawJs::make(<<<'JS'
+            {
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            boxWidth: 8,
+                        },
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': Rp ' + Number(context.parsed.y || 0).toLocaleString('id-ID');
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(156, 163, 175, 0.15)',
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return 'Rp ' + Number(value).toLocaleString('id-ID');
+                            },
+                        },
+                    },
+                    x: {
+                        grid: {
+                            display: false,
+                        },
+                    },
+                },
+            }
+        JS);
     }
 
     protected function getData(): array

@@ -4,7 +4,6 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Widgets\KasBesarStatsOverview;
 use App\Filament\Widgets\PromoImpactTableWidget;
-use App\Filament\Widgets\ShippingQuotaWidget;
 use App\Filament\Widgets\StockCashflowTrendChart;
 use App\Models\Address;
 use App\Models\AdminUser;
@@ -155,10 +154,44 @@ class InventoryCashflowDashboardTest extends TestCase
 
     public function test_stock_cashflow_trend_chart_renders_for_superadmin(): void
     {
-        Livewire::actingAs($this->superAdmin, 'admin')
+        $component = Livewire::actingAs($this->superAdmin, 'admin')
             ->test(StockCashflowTrendChart::class)
             ->assertSuccessful()
             ->assertSee('Tren Arus Barang dan Penerimaan Kas');
+
+        $html = $component->html();
+
+        $this->assertStringContainsString("toLocaleString('id-ID')", $html);
+        $this->assertStringContainsString('label: function(context)', $html);
+        $this->assertStringContainsString('callback: function(value)', $html);
+        $this->assertStringNotContainsString('"callback":{}', $html);
+        $this->assertStringNotContainsString('"label":{}', $html);
+
+        $dom = new \DOMDocument;
+        libxml_use_internal_errors(true);
+        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>'.$html);
+        libxml_clear_errors();
+
+        $this->assertTrue($loaded);
+
+        $xpath = new \DOMXPath($dom);
+        $chartNodes = $xpath->query('//*[@x-data]');
+        $this->assertNotFalse($chartNodes);
+        $this->assertGreaterThan(0, $chartNodes->length);
+
+        $chartXData = null;
+        foreach ($chartNodes as $node) {
+            $attr = $node->attributes?->getNamedItem('x-data')?->nodeValue;
+            if ($attr !== null && str_starts_with(trim($attr), 'chart(')) {
+                $chartXData = $attr;
+                break;
+            }
+        }
+
+        $this->assertNotNull($chartXData, 'Atribut x-data="chart(...)" harus ditemukan dan utuh di DOM.');
+        $this->assertStringContainsString('options:', $chartXData);
+        $this->assertStringContainsString("toLocaleString('id-ID')", $chartXData);
+        $this->assertStringContainsString('x-ref="canvas"', $html);
     }
 
     public function test_promo_impact_table_widget_renders_top_discounted_products(): void
