@@ -46,10 +46,15 @@ class ProductController extends Controller
         }
 
         // Search in Name or Description
-        if ($search = $request->input('search')) {
-            $query->where(function (Builder $q) use ($search): void {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
+        $search = trim((string) $request->input('search', ''));
+
+        if ($search !== '') {
+            $operator = $query->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+
+            $query->where(function (Builder $q) use ($operator, $escaped): void {
+                $q->where('products.name', $operator, "%{$escaped}%")
+                    ->orWhere('products.description', $operator, "%{$escaped}%");
             });
         }
 

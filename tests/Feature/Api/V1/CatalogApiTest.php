@@ -9,6 +9,7 @@ use App\Models\ProductMedia;
 use App\Models\ProductVariant;
 use App\Models\Sku;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class CatalogApiTest extends TestCase
@@ -199,6 +200,37 @@ class CatalogApiTest extends TestCase
         $sortAsc->assertStatus(200)
             ->assertJsonPath('data.0.id', $p2->id)
             ->assertJsonPath('data.1.id', $p1->id);
+    }
+
+    public function test_product_search_matches_case_insensitively_and_qualifies_columns(): void
+    {
+        $product = Product::create([
+            'category_id' => $this->childCategory->id,
+            'name' => 'PALO LONG SLEEVE ROUTE BLACK WASH',
+            'slug' => 'palo-long-sleeve-route-black-wash',
+            'description' => 'Kaos lengan panjang PALO edisi Senaru',
+            'base_price' => 195000.00,
+            'is_featured' => false,
+            'is_active' => true,
+        ]);
+
+        DB::enableQueryLog();
+        DB::flushQueryLog();
+
+        $response = $this->getJson('/api/v1/products?search=%20palo%20');
+
+        $queries = array_column(DB::getQueryLog(), 'query');
+        DB::disableQueryLog();
+
+        $response->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $product->id);
+
+        $searchQuery = collect($queries)->first(
+            fn (string $sql): bool => str_contains($sql, '"products"."name"') && str_contains($sql, '"products"."description"'),
+        );
+
+        $this->assertNotNull($searchQuery, 'Query pencarian harus mengkualifikasi products.name dan products.description.');
     }
 
     public function test_can_filter_products_by_in_stock(): void
